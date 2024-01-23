@@ -1,0 +1,25 @@
+Simulation begun at: Wed Jan 17 12:44:43 2024
+NETwork Monte Carlo
+Written By: David OM, Wilson Group, 2019
+------------------------------------------------------------
+Reading input file
+    I/O read
+    Network properties read
+    Monte Carlo parameters read
+    Energy search parameters read
+    Cost search parameters read
+    Cost function parameters read
+    Potential parameters read
+    Geometry optimisation parameters read
+    Write parameters read
+Input file closed
+------------------------------------------------------------
+Initialising network
+    Lattice type: default
+    Number of rings: 4
+    Min ring size: 12
+    Max ring size: 3
+    Min node coordination: 3
+    Max node coordination: 0
+    Monte Carlo run type: --------------------------------------------------
+    Monte Carlo move type: Monte

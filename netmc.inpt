@@ -1,0 +1,75 @@
+I/O
+./Many_Atom_Test       Output Folder prefix
+test            Output File prefix
+0               Restart?
+./Results    Input Folder prefix
+testA            Input File prefix
+--------------------------------------------------
+Network Properties
+1588        Number of rings
+4         min ring size
+12         max ring size
+3           min node coordination
+3           max node coordination
+hexagonal     lattice 
+default     crystal
+1           ignore ring
+fixed_rings ignore ring file
+--------------------------------------------------
+Minimisation Protocols
+0           Turn on/off OpenMP
+1           Simple Graphene (Always leave on if using potentials where bonds not explicitly defined)
+1           Triangle Raft
+0           Bilayer
+0           Tersoff Graphene
+--------------------------------------------------
+Monte Carlo Process
+energy         run type 
+switch      move type (switch/mix)
+0           random seed
+--------------------------------------------------
+Monte Carlo Energy Search
+-2.0         start temperature (10^x)
+-2.0         end temperature (10^x)
+0.1    temperature increment (10^x)
+-1.0        thermalisation temperature
+5           steps per temperature
+1        initial themalisation steps
+--------------------------------------------------
+Monte Carlo Cost Search ### DEPRECATED ###
+0         randomisation steps
+1.0         p lower limit
+1.0         p upper limit
+0.01        p increment
+0.1        r lower limit
+0.1         r upper limit
+0.01        r increment
+1         steps for initial search
+0        steps per search
+0.001        effective temperature
+--------------------------------------------------
+Cost Function ### DEPRECATED ###
+1.0         p constant
+1.0        r constant
+--------------------------------------------------
+Potential Model
+0.8         harmonic bond force constant 
+0.2        harmonic angle force constant 
+10.0        harmonic geometry constraint
+0           maintain convexity
+--------------------------------------------------
+Geometry Optimisation
+10000        monte carlo local max iterations
+1           global minimisation max iterations
+0.5         tau backtracking parameter
+1e-06       tolerance
+5       local region size
+--------------------------------------------------
+1         analysis write frequency
+1          analysis write frequency
+0          write sampling structures
+1        structure write frequency
+--------------------------------------------------
+Output
+8          lj_pairs calculation distance
+-------------------------------------------------
