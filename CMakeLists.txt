@@ -1,6 +1,4 @@
 cmake_minimum_required(VERSION 3.10)
-set(CMAKE_C_COMPILER mpicc)
-set(CMAKE_CXX_COMPILER mpicxx)
 
 project(NetMCMarsh LANGUAGES CXX)
 
@@ -13,12 +11,6 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # Make directory for executable to be saved, this is where you can put netmc.inpt and such
 file(MAKE_DIRECTORY ${CMAKE_SOURCE_DIR}/testing)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/testing)
-
-# Find OpenMP and LAMMPS
-# PkgConfig is used to find LAMMPS no matter where it is installed by the user
-find_package(PkgConfig REQUIRED)
-find_package(OpenMP REQUIRED)
-pkg_check_modules(LAMMPS REQUIRED liblammps)
 
 # Add include directories
 add_subdirectory(src)
