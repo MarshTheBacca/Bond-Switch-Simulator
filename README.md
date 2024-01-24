@@ -35,9 +35,8 @@ Make a directory in the LAMMPS files called _build_
 
 In the terminal, enter _build_ and execute the following commands:
 ```
-cmake ../cmake -D BUILD_SHARED=ON
-cmake --build . -j X
-cmake --install .
+cmake ../cmake -DBUILD_SHARED=ON
+cmake --build . -j X --target install
 ```
 Where `X` is your number of cores (on Linux you can find this by executing `nproc`), this speeds up the build process.
 
