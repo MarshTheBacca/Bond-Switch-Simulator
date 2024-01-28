@@ -9,7 +9,7 @@ find_package(spdlog REQUIRED)
 
 add_executable(netmc.x)
 target_sources(netmc.x PRIVATE
-    lammps_c_interface.cpp
+    lammps_object.cpp
     linked_network.cpp
     main.cpp
     monte_carlo.cpp
