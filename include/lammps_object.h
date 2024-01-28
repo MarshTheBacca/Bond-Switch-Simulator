@@ -1,9 +1,5 @@
-//
-// Created by olwhi on 24/07/2023.
-//
-
-#ifndef NETMC_LAMMPS_C_INTERFACE_H
-#define NETMC_LAMMPS_C_INTERFACE_H
+#ifndef LAMMPS_OBJECT_H
+#define LAMMPS_OBJECT_H
 
 #include <iostream>
 #include <fstream>
@@ -21,24 +17,22 @@
 #include "mpi.h"
 
 #include "network.h"
-// #include "linked_network.h"
-// #include "node.h"
 
 #include "lammps.h" // these are LAMMPS include files
 #include "input.h"
 #include "atom.h"
 #include "library.h"
 
+#include <spdlog/spdlog.h>
+
 using namespace std;
+using LoggerPtr = std::shared_ptr<spdlog::logger>;
 
 class LammpsObject
 {
 
 private:
 public:
-    LammpsObject();
-    LammpsObject(int selector, string prefixin, string prefixout);
-
     Network networkA, networkB, networkT;
 
     void *handle;
@@ -49,11 +43,11 @@ public:
     double *angles = NULL;
 
     string prefixFolderIn, prefixFolderOut;
-
-    bool globalVerbose = false;
     string prefixOut;
 
-    int initialiseLammpsObject();
+    LammpsObject();
+    LammpsObject(string selector, string inputFolder, LoggerPtr logger);
+
     int write_data(int selector);
     int write_restart(int selector);
     int finaliseLammpsObject(int selector);
@@ -72,19 +66,19 @@ public:
 
     int getnAtoms();
 
-    void breakBond(int atom1, int atom2, int type);
-    void formBond(int atom1, int atom2, int type);
+    void breakBond(int atom1, int atom2, int type, LoggerPtr logger);
+    void formBond(int atom1, int atom2, int type, LoggerPtr logger);
     void breakAngle(int atom1, int atom2, int atom3);
     void formAngle(int atom1, int atom2, int atom3);
 
-    void switchGraphene(VecF<int> switchIdsA, Network networkA);
-    void revertGraphene(VecF<int> switchIdsA, Network networkA);
+    void switchGraphene(VecF<int> switchIdsA, Network networkA, LoggerPtr logger);
+    void revertGraphene(VecF<int> switchIdsA, Network networkA, LoggerPtr logger);
 
-    void switchTriangleRaft(VecF<int> switchIdsA, VecF<int> switchIdsB, VecF<int> switchIdsT, Network networkT);
-    void revertTriangleRaft(VecF<int> switchIdsA, VecF<int> switchIdsB, VecF<int> switchIdsT);
+    void switchTriangleRaft(VecF<int> switchIdsA, VecF<int> switchIdsB, VecF<int> switchIdsT, Network networkT, LoggerPtr logger);
+    void revertTriangleRaft(VecF<int> switchIdsA, VecF<int> switchIdsB, VecF<int> switchIdsT, LoggerPtr logger);
 
-    void switchBilayer(VecF<int> switchIdsA, VecF<int> switchIdsB, VecF<int> switchIdsT);
-    void revertBilayer(VecF<int> switchIdsA, VecF<int> switchIdsB, VecF<int> switchIdsT);
+    void switchBilayer(VecF<int> switchIdsA, VecF<int> switchIdsB, VecF<int> switchIdsT, LoggerPtr logger);
+    void revertBilayer(VecF<int> switchIdsA, VecF<int> switchIdsB, VecF<int> switchIdsT, LoggerPtr logger);
 
     void switchBonds(VecF<int> switchIdsA, VecF<int> switchIdsB, VecF<int> switchIdsT);
     void revertBonds(VecF<int> switchIdsA, VecF<int> switchIdsB, VecF<int> switchIdsT);
@@ -95,4 +89,4 @@ public:
     double probeE();
 };
 
-#endif // NETMC_LAMMPS_C_INTERFACE_H
+#endif // LAMMPS_OBJECT_H
