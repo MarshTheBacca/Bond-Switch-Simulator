@@ -1,5 +1,4 @@
 // Network contains nodes and topological information
-
 #ifndef NL_NETWORK_H
 #define NL_NETWORK_H
 
@@ -8,9 +7,13 @@
 #include <sstream>
 #include <iomanip>
 #include <map>
+#include <memory>
 #include "node.h"
 
+#include <spdlog/spdlog.h>
+
 using namespace std;
+using LoggerPtr = std::shared_ptr<spdlog::logger>;
 
 class Network
 {
@@ -19,12 +22,11 @@ private:
     // Default lattices
     void initialiseSquareLattice(int dim, int &maxCnxs);                        // 4 coordinate nodes, forming periodic square lattice
     void initialiseTriangularLattice(int dim, int &maxCnxs);                    // 6 coordinate nodes, forming periodic square lattice
-    void initialiseSnubSquareLattice(int dim, int &maxCnxs);                    // 5 coordinate nodes, forming periodic snub square lattice
     void initialiseAltSquareLattice(int dim, int &maxCnxs);                     // 4/2 coordinate nodes, forming periodic square lattice
     void initialiseMixedTSLattice(int dim, int &maxCnxs, double mixProportion); // 4&6 coordinate nodes, forming mixed triangular and square lattice
     void initialiseCubicLattice(int nNodes, int &maxCnxs);                      // 3&4 coordinate nodes, forming cubic lattice
     void initialiseGeodesicLattice(int nNodes, int &maxCnxs);                   // 5&6 coordinate nodes, forming geodesic lattice
-    void initialiseDescriptors(int maxCnxs);                                    // node descriptors
+    void initialiseDescriptors(int maxCnxs, LoggerPtr logger);                  // node descriptors
 
 public:
     // Data members
@@ -39,12 +41,12 @@ public:
     // Constructors
     Network();
     Network(int nNodes, int maxCnxs);
-    Network(int nNodes, string lattice, int maxCnxs, double mixProportion = 0.0); // construct with default lattice
-    Network(string prefix, int maxNetCnxsA, int maxDualCnxsA);                    // construct by loading from files
+    Network(int nNodes, string lattice, int maxCnxs, LoggerPtr logger);          // construct with default lattice
+    Network(string prefix, int maxNetCnxsA, int maxDualCnxsA, LoggerPtr logger); // construct by loading from files
     Network(VecR<Node> nodesA, VecF<double> pbA, VecF<double> rpbA, string type, int maxNetCnxsA, int maxDualCnxsA);
 
     // Member Functions
-    Network constructDual(int maxCnxs);                            // make dual graph
+    Network constructDual(int maxCnxs, LoggerPtr logger);          // make dual graph
     void generateAuxConnections(Network dualNetwork, int auxType); // generate auxilary connections
     void rescale(double scaleFactor);                              // rescale coordinates
     void project(string projType, double param);                   // project lattice onto different geometry
