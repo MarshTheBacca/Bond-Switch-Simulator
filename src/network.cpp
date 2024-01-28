@@ -18,44 +18,36 @@ Network::Network(int nNodes, int maxCnxs)
 }
 
 // Construct with choice of default lattice
-Network::Network(int nNodes, string lattice, int maxCnxs, double mixProportion)
+Network::Network(int nNodes, string lattice, int maxCnxs, LoggerPtr logger)
 {
     if (lattice == "square")
         initialiseSquareLattice(sqrt(nNodes), maxCnxs);
     else if (lattice == "triangular")
         initialiseTriangularLattice(sqrt(nNodes), maxCnxs);
-    else if (lattice == "snubsquare")
-        initialiseSnubSquareLattice(sqrt(nNodes / 8), maxCnxs);
     else if (lattice == "altsquare")
         initialiseAltSquareLattice(sqrt(nNodes / 3), maxCnxs);
-    else if (lattice == "mixTS")
-        initialiseMixedTSLattice(sqrt(nNodes), maxCnxs, mixProportion);
     else if (lattice == "cubic")
         initialiseCubicLattice(nNodes, maxCnxs);
     else if (lattice == "geodesic")
         initialiseGeodesicLattice(nNodes, maxCnxs);
-    initialiseDescriptors(maxCnxs);
+    initialiseDescriptors(maxCnxs, logger);
 }
 
 // Initialise node and edge statistics
-void Network::initialiseDescriptors(int maxCnxs)
+void Network::initialiseDescriptors(int maxCnxs, LoggerPtr logger)
 {
-
     // Set sizes of vectors and matrices
     nodeDistribution = VecF<int>(maxCnxs + 1);
     edgeDistribution = VecF<VecF<int>>(maxCnxs + 1);
-
-    cout << "Edge Distribution : " << maxCnxs + 1 << endl;
+    logger->info("Edge distribution: {}", maxCnxs + 1);
     for (int i = 0; i < maxCnxs + 1; ++i)
         edgeDistribution[i] = VecF<int>(maxCnxs + 1);
 
     // Count number of each node type and add to vector
-    cout << "Node Distribution" << endl;
     for (int i = 0; i < nodes.n; ++i)
         ++nodeDistribution[nodes[i].netCnxs.n];
 
     // Double count number of each edge type and add to vector
-    cout << "Count number of each edge type and add to vector" << endl;
     for (int i = 0; i < nodes.n; ++i)
     {
         for (int j = 0; j < nodes[i].netCnxs.n; ++j)
@@ -67,10 +59,10 @@ void Network::initialiseDescriptors(int maxCnxs)
 }
 
 // Construct by loading from files
-Network::Network(string prefix, int maxNetCnxsA, int maxDualCnxsA)
+Network::Network(string prefix, int maxNetCnxsA, int maxDualCnxsA, LoggerPtr logger)
 {
-    cout << "Loading from        boo       : " << prefix << endl;
-    cout << "Aux File is        : " << prefix + "_aux.dat" << endl;
+    logger->info("Loading from: {}", prefix);
+    logger->info("Aux file is: {}", prefix + "_aux.dat");
 
     // Initialise variables with aux file information
     string line;
@@ -79,7 +71,7 @@ Network::Network(string prefix, int maxNetCnxsA, int maxDualCnxsA)
     int nNodes;
     getline(auxFile, line);
     istringstream(line) >> nNodes;
-    cout << "Number of Nodes            : " << line << endl;
+    logger->info("Number of nodes: {}", nNodes);
     getline(auxFile, line);
     ss.str(line);
     ss >> maxNetCnxs;
@@ -95,69 +87,40 @@ Network::Network(string prefix, int maxNetCnxsA, int maxDualCnxsA)
         maxNetCnxs += 20;
         maxDualCnxs += 20;
     }
-
-    cout << "Max Net/Dual Connections   : " << maxNetCnxs << " " << maxDualCnxs << endl;
+    logger->info("Max Net/Dual Connections: {} {}", maxNetCnxs, maxDualCnxs);
     getline(auxFile, line);
     istringstream(line) >> geometryCode;
     nodes = VecR<Node>(0, nNodes);
-    if (geometryCode == "2DE")
-    {
-        pb = VecF<double>(2);
-        rpb = VecF<double>(2);
-    }
-    else if (geometryCode == "3DE" || geometryCode == "2DS")
-    {
-        pb = VecF<double>(3);
-        rpb = VecF<double>(3);
-    }
+    pb = VecF<double>(2);
+    rpb = VecF<double>(2);
     getline(auxFile, line);
     ss.str(line);
     ss >> pb[0];
     ss >> pb[1];
-    if (geometryCode == "3DE" || geometryCode == "2DS")
-        ss >> pb[2];
     getline(auxFile, line);
     ss.str(line);
     ss >> rpb[0];
     ss >> rpb[1];
-    if (geometryCode == "3DE" || geometryCode == "2DS")
-        ss >> rpb[2];
     for (int i = 0; i < nodes.nMax; ++i)
     {
         Node node(i, maxNetCnxs, maxDualCnxs, 0);
         nodes.addValue(node);
     }
     auxFile.close();
-    cout << "Aux File Complete" << endl;
+    logger->info("Aux File Complete");
     // Read coordinates
     ifstream crdFile(prefix + "_crds.dat", ios::in);
-    if (geometryCode == "2DE")
+    VecF<double> crd(2);
+    for (int i = 0; i < nodes.n; ++i)
     {
-        VecF<double> crd(2);
-        for (int i = 0; i < nodes.n; ++i)
-        {
-            getline(crdFile, line);
-            ss.str(line);
-            ss >> crd[0];
-            ss >> crd[1];
-            nodes[i].crd = crd;
-        }
+        getline(crdFile, line);
+        ss.str(line);
+        ss >> crd[0];
+        ss >> crd[1];
+        nodes[i].crd = crd;
     }
-    else if (geometryCode == "3DE" || geometryCode == "2DS")
-    {
-        VecF<double> crd(3);
-        for (int i = 0; i < nodes.n; ++i)
-        {
-            getline(crdFile, line);
-            ss.str(line);
-            ss >> crd[0];
-            ss >> crd[1];
-            ss >> crd[2];
-            nodes[i].crd = crd;
-        }
-    }
-    cout << "Crd File Complete" << endl;
     crdFile.close();
+    logger->info("Coord File Complete");
 
     // Read network connections
     int cnx;
@@ -172,8 +135,7 @@ Network::Network(string prefix, int maxNetCnxsA, int maxDualCnxsA)
         }
     }
     netFile.close();
-
-    cout << "Net File Complete" << endl;
+    logger->info("Net file complete");
 
     // Read dual connections
     ifstream dualFile(prefix + "_dual.dat", ios::in);
@@ -186,19 +148,14 @@ Network::Network(string prefix, int maxNetCnxsA, int maxDualCnxsA)
             nodes[i].dualCnxs.addValue(cnx);
     }
     dualFile.close();
-
-    cout << "Dual File Complete" << endl;
+    logger->info("Dual file complete");
 
     // Read rings to ignore
 
     // Set up descriptors
-    cout << "Max Net Cnxs : " << maxNetCnxs << endl;
-    initialiseDescriptors(maxNetCnxs);
-
-    cout << "Number of Nodes in Network : " << nodes.n << endl;
-    cout << endl;
-    cout << "<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<" << endl;
-    cout << endl;
+    logger->info("Max net connections: {}", maxNetCnxs);
+    logger->info("Number of nodes: {}", nodes.n);
+    initialiseDescriptors(maxNetCnxs, logger);
 }
 
 // Create a Triangle raft
@@ -557,198 +514,6 @@ void Network::initialiseTriangularLattice(int dim, int &maxCnxs)
                 nodes[id].dualCnxs.addValue(cnx);
             }
             ++id;
-        }
-    }
-}
-
-// Initialise snub square lattice of periodic 5-coordinate nodes
-void Network::initialiseSnubSquareLattice(int dim, int &maxCnxs)
-{
-    geometryCode = "2DE"; // 2D euclidean
-    int xDim = dim, yDim = dim * 2;
-    int dimSq4 = 4 * xDim * yDim;
-    int dim4 = 4 * xDim;
-    nodes = VecR<Node>(0, dimSq4);
-
-    // make 5 coordinate nodes
-    if (maxCnxs < 5)
-        maxCnxs = 5; // need at least 5 connections
-    for (int i = 0; i < nodes.nMax; ++i)
-    {
-        Node node(i, maxCnxs, maxCnxs, 0);
-        nodes.addValue(node);
-    }
-
-    // assign coordinates in layers with unit bond lengths
-    VecF<double> c(2);
-    double dxa = sqrt(3.0) / 2;
-    double dxe = 1.0;
-    double dya = 0.5;
-    double dye = 0.5 + sqrt(3.0) / 2;
-    pb = VecF<double>(2);
-    rpb = VecF<double>(2);
-    pb[0] = xDim * (dxa * 2 + dxe);
-    pb[1] = yDim * dye;
-    rpb[0] = 1.0 / pb[0];
-    rpb[1] = 1.0 / pb[1];
-    for (int y = 0; y < yDim; ++y)
-    {
-        c[1] = dye * (y + 0.5);
-        for (int x = 0; x < xDim; ++x)
-        {
-            c[0] = x * (2 * dxa + dxe) + (y % 2) * (dxe / 2 + dxa);
-            nodes[y * dim4 + x * 4 + 0].crd = c;
-            c[0] += dxa;
-            c[1] += dya;
-            nodes[y * dim4 + x * 4 + 1].crd = c;
-            c[1] -= 2 * dya;
-            nodes[y * dim4 + x * 4 + 2].crd = c;
-            c[0] += dxa;
-            c[1] += dya;
-            nodes[y * dim4 + x * 4 + 3].crd = c;
-        }
-    }
-
-    // make connections to nodes in clockwise order
-    int id = 0, cnx;
-    for (int y = 0; y < yDim; ++y)
-    {
-        for (int x = 0; x < xDim; ++x)
-        {
-            // environment 0
-            cnx = y * dim4 + (id + dim4 - 1) % dim4;
-            nodes[id].netCnxs.addValue(cnx);
-            if (y % 2 == 0)
-                cnx = (y + 1) * dim4 + ((id % dim4 - 2) + dim4) % dim4;
-            else
-                cnx = (id + dim4 + 2) % dimSq4;
-            nodes[id].netCnxs.addValue(cnx);
-            cnx = id + 1;
-            nodes[id].netCnxs.addValue(cnx);
-            cnx = id + 2;
-            nodes[id].netCnxs.addValue(cnx);
-            if (y % 2 == 0)
-                cnx = (((y - 1) * dim4 + ((id % dim4 - 3) + dim4) % dim4) + dimSq4) % dimSq4;
-            else
-                cnx = id - dim4 + 1;
-            nodes[id].netCnxs.addValue(cnx);
-            ++id;
-            // environment 1
-            cnx = id - 1;
-            nodes[id].netCnxs.addValue(cnx);
-            if (y % 2 == 0)
-                cnx = (y + 1) * dim4 + ((id % dim4 - 2) + dim4) % dim4;
-            else
-                cnx = (id + dim4 + 2) % dimSq4;
-            nodes[id].netCnxs.addValue(cnx);
-            if (y % 2 == 0)
-                cnx = (y + 1) * dim4 + ((id % dim4 - 1) + dim4) % dim4;
-            else
-                cnx = ((y + 1) * dim4 + (id + 3) % dim4) % dimSq4;
-            nodes[id].netCnxs.addValue(cnx);
-            cnx = id + 2;
-            nodes[id].netCnxs.addValue(cnx);
-            cnx = id + 1;
-            nodes[id].netCnxs.addValue(cnx);
-            ++id;
-            // environment 2
-            cnx = id - 2;
-            nodes[id].netCnxs.addValue(cnx);
-            cnx = id - 1;
-            nodes[id].netCnxs.addValue(cnx);
-            cnx = id + 1;
-            nodes[id].netCnxs.addValue(cnx);
-            if (y % 2 == 0)
-                cnx = (((y - 1) * dim4 + ((id % dim4 - 2) + dim4) % dim4) + dimSq4) % dimSq4;
-            else
-                cnx = (y - 1) * dim4 + ((id % dim4 + 2) + dim4) % dim4;
-            nodes[id].netCnxs.addValue(cnx);
-            if (y % 2 == 0)
-                cnx = (((y - 1) * dim4 + ((id % dim4 - 3) + dim4) % dim4) + dimSq4) % dimSq4;
-            else
-                cnx = (y - 1) * dim4 + ((id % dim4 + 1) + dim4) % dim4;
-            nodes[id].netCnxs.addValue(cnx);
-            ++id;
-            // environment 3
-            cnx = id - 1;
-            nodes[id].netCnxs.addValue(cnx);
-            cnx = id - 2;
-            nodes[id].netCnxs.addValue(cnx);
-            if (y % 2 == 0)
-                cnx = (y + 1) * dim4 + ((id % dim4 - 1) + dim4) % dim4;
-            else
-                cnx = ((y + 1) * dim4 + ((id % dim4 + 3) + dim4) % dim4) % dimSq4;
-            nodes[id].netCnxs.addValue(cnx);
-            cnx = y * dim4 + (id + dim4 + 1) % dim4;
-            nodes[id].netCnxs.addValue(cnx);
-            if (y % 2 == 0)
-                cnx = (((y - 1) * dim4 + ((id % dim4 - 2) + dim4) % dim4) + dimSq4) % dimSq4;
-            else
-                cnx = (y - 1) * dim4 + ((id % dim4 + 2) + dim4) % dim4;
-            nodes[id].netCnxs.addValue(cnx);
-            ++id;
-        }
-    }
-
-    // make connections to dual nodes in clockwise order
-    // find all rings and assign code and id
-    map<string, int> ringCodes;
-    int id0, id1, id2, id3;
-    int ringId = 0;
-    for (int i = 0; i < nodes.n; ++i)
-    {
-        id0 = i;
-        for (int j = 0; j < 5; ++j)
-        {
-            id1 = nodes[i].netCnxs[j];
-            id2 = nodes[i].netCnxs[(j + 1) % 5];
-            VecR<int> ringPath(0, 4);
-            ringPath.addValue(i);
-            ringPath.addValue(id1);
-            ringPath.addValue(id2);
-            if (!vContains(nodes[id1].netCnxs, id2))
-            {
-                VecR<int> common = vCommonValues(nodes[id1].netCnxs, nodes[id2].netCnxs);
-                common.delValue(id0);
-                id3 = common[0];
-                ringPath.addValue(id3);
-            }
-            ringPath = vSort(ringPath);
-            string rCode = "";
-            for (int j = 0; j < ringPath.n; ++j)
-                rCode += "#" + to_string(ringPath[j]);
-            if (ringCodes.count(rCode) == 0)
-            {
-                ringCodes[rCode] = ringId;
-                ++ringId;
-            }
-        }
-    }
-    // assign ring ids
-    for (int i = 0; i < nodes.n; ++i)
-    {
-        id0 = i;
-        for (int j = 0; j < 5; ++j)
-        {
-            id1 = nodes[i].netCnxs[j];
-            id2 = nodes[i].netCnxs[(j + 1) % 5];
-            VecR<int> ringPath(0, 4);
-            ringPath.addValue(i);
-            ringPath.addValue(id1);
-            ringPath.addValue(id2);
-            if (!vContains(nodes[id1].netCnxs, id2))
-            {
-                VecR<int> common = vCommonValues(nodes[id1].netCnxs, nodes[id2].netCnxs);
-                common.delValue(id0);
-                id3 = common[0];
-                ringPath.addValue(id3);
-            }
-            ringPath = vSort(ringPath);
-            string rCode = "";
-            for (int j = 0; j < ringPath.n; ++j)
-                rCode += "#" + to_string(ringPath[j]);
-            ringId = ringCodes.at(rCode);
-            nodes[i].dualCnxs.addValue(ringId);
         }
     }
 }
@@ -1678,7 +1443,7 @@ void Network::initialiseGeodesicLattice(int nNodes, int &maxCnxs)
 }
 
 // Construct dual network from network
-Network Network::constructDual(int maxCnxs)
+Network Network::constructDual(int maxCnxs, LoggerPtr logger)
 {
     // Doesn't need to be very optimised as only used during initialisation
 
@@ -1801,7 +1566,7 @@ Network Network::constructDual(int maxCnxs)
     dualNetwork.pb = pb;
     dualNetwork.rpb = rpb;
     dualNetwork.geometryCode = geometryCode;
-    dualNetwork.initialiseDescriptors(maxCnxs);
+    dualNetwork.initialiseDescriptors(maxCnxs, logger);
 
     return dualNetwork;
 }
