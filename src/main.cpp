@@ -2,7 +2,7 @@
 #include <sstream>
 #include "output_file.h"
 #include "linked_network.h"
-#include "lammps_c_interface.h"
+#include "lammps_object.h"
 #include <sys/stat.h>
 #include <unistd.h>
 #include "input_data.h"
@@ -87,7 +87,7 @@ int main()
                                   inputData.localRegionSize);
 
     logger->info("Initialising Monte Carlo...");
-    network.initialiseMonteCarlo(network.networkA, pow(10, inputData.startTemperature), inputData.randomSeed);
+    network.initialiseMonteCarlo(network.networkA, pow(10, inputData.startTemperature), logger, inputData.randomSeed);
 
     network.isOpenMP = inputData.isOpenMPIEnabled;
     network.MCWeighting = inputData.randomOrWeighted;
@@ -206,7 +206,8 @@ int main()
                 if (!disallowed_node)
                 {
                     logger->info("Node {} withing radius at distance {}", i, network.rFixed[i]);
-                    moveStatus = network.SpiralmonteCarloSwitchMoveLAMMPS(i, SimpleGrapheneEnergy, TersoffGrapheneEnergy, TriangleRaftEnergy, BilayerEnergy, BNEnergy, 0);
+                    moveStatus = network.SpiralmonteCarloSwitchMoveLAMMPS(i, SimpleGrapheneEnergy, TersoffGrapheneEnergy,
+                                                                          TriangleRaftEnergy, BilayerEnergy, BNEnergy, 0, logger);
                     VecF<double> ringStats = network.getNodeDistribution("B");
                     double r = network.getAssortativity("B");
                     double aEst = network.getAboavWeaireEstimate("B");
@@ -260,7 +261,8 @@ int main()
                      i, SimpleGrapheneEnergy, TersoffGrapheneEnergy, TriangleRaftEnergy, BilayerEnergy, BNEnergy);
         if (lammps)
         {
-            moveStatus = network.monteCarloSwitchMoveLAMMPS(SimpleGrapheneEnergy, TersoffGrapheneEnergy, TriangleRaftEnergy, BilayerEnergy, BNEnergy, 0);
+            moveStatus = network.monteCarloSwitchMoveLAMMPS(SimpleGrapheneEnergy, TersoffGrapheneEnergy,
+                                                            TriangleRaftEnergy, BilayerEnergy, BNEnergy, 0, logger);
         }
         else
             moveStatus = network.monteCarloMixMove(energy);
@@ -337,11 +339,12 @@ int main()
                          i, SimpleGrapheneEnergy, TersoffGrapheneEnergy, TriangleRaftEnergy, BilayerEnergy, BNEnergy);
             if (lammps)
             {
-                moveStatus = network.monteCarloSwitchMoveLAMMPS(SimpleGrapheneEnergy, TersoffGrapheneEnergy, TriangleRaftEnergy, BilayerEnergy, BNEnergy, 0);
+                moveStatus = network.monteCarloSwitchMoveLAMMPS(SimpleGrapheneEnergy, TersoffGrapheneEnergy,
+                                                                TriangleRaftEnergy, BilayerEnergy,
+                                                                BNEnergy, 0, logger);
             }
             else
                 moveStatus = network.monteCarloMixMove(energy);
-
             accepted += moveStatus[0];
             optCodes[moveStatus[1]] += 1;
             optIterations += moveStatus[2];
