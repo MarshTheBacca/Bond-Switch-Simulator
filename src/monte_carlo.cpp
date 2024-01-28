@@ -1,65 +1,70 @@
 #include "monte_carlo.h"
 
-//##### Metropolis-Hastings #####
+// ##### Metropolis-Hastings #####
 
-//Default constructor
-Metropolis::Metropolis() {
+// Default constructor
+Metropolis::Metropolis()
+{
     mtGen.seed(0);
-    rand01=uniform_real_distribution<double>(0.0,1.0);
-    rTemperature=1.0;
-    energyPrev=0.0;
+    rand01 = uniform_real_distribution<double>(0.0, 1.0);
+    rTemperature = 1.0;
+    energyPrev = 0.0;
 }
 
-//Construct with random seed, temperature and initial energy
-Metropolis::Metropolis(int seed, double temperature, double energy) {
+// Construct with random seed, temperature and initial energy
+Metropolis::Metropolis(int seed, double temperature, double energy)
+{
     mtGen.seed(seed);
-    rand01=uniform_real_distribution<double>(0.0,1.0);
-    if(temperature<=0.0) throw "Cannot initialise Metropolis algorithm with zero temperature";
-    rTemperature=1.0/temperature;
-    energyPrev=energy;
+    rand01 = uniform_real_distribution<double>(0.0, 1.0);
+    if (temperature <= 0.0)
+        throw "Cannot initialise Metropolis algorithm with zero temperature";
+    rTemperature = 1.0 / temperature;
+    energyPrev = energy;
 }
 
-//Set energy
-void Metropolis::setEnergy(double energy) {
-    energyPrev=energy;
+// Set energy
+void Metropolis::setEnergy(double energy)
+{
+    energyPrev = energy;
 }
 
-//Get energy
-double Metropolis::getEnergy() {
+// Get energy
+double Metropolis::getEnergy()
+{
     return energyPrev;
 }
 
-//Set temperature
-void Metropolis::setTemperature(double temperature) {
-    rTemperature=1.0/temperature;
+// Set temperature
+void Metropolis::setTemperature(double temperature)
+{
+    rTemperature = 1.0 / temperature;
 }
 
-//Evaluate Metropolis condition, whether to accept or reject move
-int Metropolis::acceptanceCriterion(double Ef, double Ei, double T_factor) {
+// Evaluate Metropolis condition, whether to accept or reject move
+int Metropolis::acceptanceCriterion(double Ef, double Ei, double T_factor)
+{
 
     /* Metropolis algorithm efficiently samples Boltzmann distribution
      * 1) if move downhill in energy accept
      * 2) if move uphill accept with probabilitiy min[1,e^-de/t] */
 
-    double deltaE=Ef-Ei;
-    if(deltaE<0.0){
-//        energyPrev=energy;
+    double deltaE = Ef - Ei;
+    if (deltaE < 0.0)
+    {
         return 1;
     }
-    else{
-        double probability=exp(-deltaE*rTemperature/T_factor);
-//        cout << "dE = " << -deltaE << " rT = " << rTemperature << endl;
-        double randomNum=rand01(mtGen);
-        if(randomNum<probability){
-//            cout << "               Accepted MC Move        Ei = " << energyPrev << " Ef = " << energy << " Probability : " << probability << endl;
-//            energyPrev=energy;
+    else
+    {
+        double probability = exp(-deltaE * rTemperature / T_factor);
+        double randomNum = rand01(mtGen);
+        if (randomNum < probability)
+        {
 
             return 1;
         }
-        else {
-//            cout << "               Rejected MC Move        Ei = " << energyPrev << " Ef = " << energy << " Probability : " << probability << endl;
+        else
+        {
             return 0;
         }
     }
 }
-
