@@ -147,7 +147,8 @@ int main()
     angHist = 0.0;
 
     // Run monte carlo
-    cout << "                             " << network.mc.getEnergy() << endl;
+    logger->info("Running Monte Carlo...");
+    logger->info("Initial energy: {}", network.mc.getEnergy());
     int accepted = 0, optIterations = 0;
     VecF<int> optCodes(5);
     optCodes = 0;
@@ -190,7 +191,7 @@ int main()
     network.mc.setTemperature(mcT);
     if (inputData.isSpiralEnabled)
     {
-        cout << "Pre-run : attempting MC steps on all atoms within radius" << endl;
+        logger->info("Pre-run : attempting MC steps on all atoms within radius");
         bool disallowed_node;
         for (int i = 0; i < network.networkA.nodes.n; ++i)
         {
@@ -204,9 +205,8 @@ int main()
                 }
                 if (!disallowed_node)
                 {
-                    cout << "Node " << i << " withing radius at distance " << network.rFixed[i] << endl;
+                    logger->info("Node {} withing radius at distance {}", i, network.rFixed[i]);
                     moveStatus = network.SpiralmonteCarloSwitchMoveLAMMPS(i, SimpleGrapheneEnergy, TersoffGrapheneEnergy, TriangleRaftEnergy, BilayerEnergy, BNEnergy, 0);
-
                     VecF<double> ringStats = network.getNodeDistribution("B");
                     double r = network.getAssortativity("B");
                     double aEst = network.getAboavWeaireEstimate("B");
@@ -256,8 +256,8 @@ int main()
 
     for (int i = 1; i <= inputData.initialThermalisationSteps; ++i)
     {
-
-        cout << "Equilibriating : " << i << " -- energy : " << SimpleGrapheneEnergy << " " << TersoffGrapheneEnergy << " " << TriangleRaftEnergy << " " << BilayerEnergy << " " << BNEnergy << endl;
+        logger->info("Equilibriating: {}  -- Energies: {} {} {} {} {}",
+                     i, SimpleGrapheneEnergy, TersoffGrapheneEnergy, TriangleRaftEnergy, BilayerEnergy, BNEnergy);
         if (lammps)
         {
             moveStatus = network.monteCarloSwitchMoveLAMMPS(SimpleGrapheneEnergy, TersoffGrapheneEnergy, TriangleRaftEnergy, BilayerEnergy, BNEnergy, 0);
@@ -268,16 +268,6 @@ int main()
         accepted += moveStatus[0];
         optCodes[moveStatus[1]] += 1;
         optIterations += moveStatus[2];
-        if (i % trackFreq == 0)
-        {
-            // double dt = logFile.timeElapsed();
-            // string track =
-            //     to_string(accepted) + "/" + to_string(i) + " moves accepted/completed in " + to_string(dt) +
-            //     " seconds";
-            // logger->info(track);
-            // cout << "t"
-            //      << " " << i << " " << accepted << "  Energy = " << energy << endl;
-        }
         if (i % inputData.analysisWriteFrequency == 0)
         {
             VecF<double> ringStats = network.getNodeDistribution("B");
@@ -294,9 +284,7 @@ int main()
             corr[3] = aw[1];
             corr[4] = aw[2];
             corr[5] = rr;
-
             VecF<double> eCompare(6);
-
             eCompare[0] = ringStats[6];
             eCompare[1] = SimpleGrapheneEnergy;
             eCompare[2] = TersoffGrapheneEnergy;
@@ -326,8 +314,9 @@ int main()
         if (i % inputData.structureWriteFrequency == 0 && inputData.isWriteSamplingStructuresEnabled == 1)
         {
             network.syncCoordinates();
-            cout << prefixOut + "_therm_" + to_string(i) << endl;
-            network.writeXYZ(prefixOut + "_therm_" + to_string(i));
+            std::string structureFilePath = prefixOut + "_therm_" + to_string(i);
+            logger->info("Writing structure: {} to file {}", i, structureFilePath);
+            network.writeXYZ(structureFilePath);
         }
     }
     logger->info("Monte Carlo equilibration complete");
@@ -341,11 +330,11 @@ int main()
 
         mcT = pow(10, inputData.startTemperature + t * inputData.temperatureIncrement);
         network.mc.setTemperature(mcT);
-        cout << "Temperature : " << mcT << endl;
-        logger->info("Temperature:", mcT);
+        logger->info("Temperature: {}", mcT);
         for (int i = 1; i <= inputData.stepsPerTemperature; ++i)
         {
-            cout << "Running : " << i << " energy : " << SimpleGrapheneEnergy << " " << TersoffGrapheneEnergy << " " << TriangleRaftEnergy << " " << BilayerEnergy << " " << BNEnergy << endl;
+            logger->info("Running: {}  -- Energies: {} {} {} {} {}",
+                         i, SimpleGrapheneEnergy, TersoffGrapheneEnergy, TriangleRaftEnergy, BilayerEnergy, BNEnergy);
             if (lammps)
             {
                 moveStatus = network.monteCarloSwitchMoveLAMMPS(SimpleGrapheneEnergy, TersoffGrapheneEnergy, TriangleRaftEnergy, BilayerEnergy, BNEnergy, 0);
@@ -356,15 +345,6 @@ int main()
             accepted += moveStatus[0];
             optCodes[moveStatus[1]] += 1;
             optIterations += moveStatus[2];
-            if (i % trackFreq == 0)
-            {
-                // double dt = logFile.timeElapsed();
-                // string track =
-                //     to_string(accepted) + "/" + to_string(i) + " moves accepted/completed in " + to_string(dt) +
-                //     " seconds";
-                // logger->info(track);
-                // cout << t << " " << i << " " << accepted << "  Energy = " << energy << endl;
-            }
             if (i % inputData.analysisWriteFrequency == 0)
             {
 
@@ -428,28 +408,27 @@ int main()
 
     if (inputData.isSimpleGrapheneEnabled)
     {
-        cout << "Writing Simple Graphene Results" << endl;
+        logger->info("Writing Simple Graphene Results");
         network.SimpleGraphene.write_data(0);
         network.SimpleGraphene.write_restart(0);
     }
     if (inputData.isTriangleRaftEnabled)
     {
-        cout << "Writing Triangle Raft Results" << endl;
+        logger->info("Writing Triangle Raft Results");
         network.Triangle_Raft.write_data(1);
         network.Triangle_Raft.write_restart(1);
     }
     if (inputData.isBNEnabled)
     {
-        cout << "Writing BN Results" << endl;
+        logger->info("Writing BN Results");
         network.BN.write_data(4);
         network.BN.write_restart(4);
     }
 
     // Check network
     logger->info("Simulation diagnostics");
-    cout << "Check Consistency" << endl;
+    logger->info("Checking consistency and convexity");
     bool consistent = network.checkConsistency();
-    cout << "Check Convexity" << endl;
     bool convex = network.checkConvexity();
     logger->info("Network consistent:", consistent);
     logger->info("Rings convex:", convex);
@@ -469,7 +448,7 @@ int main()
     network.syncCoordinates();
     network.write(prefixOut);
     network.writeXYZ(prefixOut);
-    cout << prefixOut << endl;
+    logger->info(prefixOut);
     logger->info("Writing network files");
     logger->info("Files written");
 
