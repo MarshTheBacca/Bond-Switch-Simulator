@@ -1,5 +1,7 @@
 # LAMMPS Network Monte Carlo
 
+This repository is currently work in progress and will not work out of the box in its current state.
+
 This is a fork of the Wilson Group's [2D Network Monte Carlo](https://github.com/WilsonGroupOxford/Network-Monte-Carlo) repository that integrates [LAMMPS](https://github.com/lammps/lammps) to allow for faster energy evaluation and other 2D structures:
 
 * Silica Bilayers (Si2O3)
@@ -42,6 +44,15 @@ Where `X` is your number of cores (on Linux you can find this by executing `npro
 
 By default, things will be installed to _~./local/lib_, and you need to add another line to _~/.bashrc_ `export PKG_CONFIG_PATH="$HOME/.local/lib/pkgconfig:$PKG_CONFIG_PATH"`
 Now if you enter `pkg-config --list-all | grep liblammps` you should see liblammps is a recognised package.
+
+### spdlog
+
+Enter the following commands into the terminal:
+```
+git clone https://github.com/gabime/spdlog.git
+cd spdlog && mkdir build && cd build
+cmake .. && make -j
+```
 
 ## Credit
 
