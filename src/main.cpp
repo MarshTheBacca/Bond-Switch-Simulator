@@ -11,9 +11,6 @@
 #include "spdlog/spdlog.h"
 #include "spdlog/sinks/stdout_color_sinks.h"
 #include "spdlog/sinks/basic_file_sink.h"
-using namespace std;
-
-// You were changing variable names
 
 int main()
 {
@@ -23,7 +20,7 @@ int main()
 
     // Combine the sinks into a multi-sink logger
     auto logger = std::make_shared<spdlog::logger>("multi_sink", spdlog::sinks_init_list{file_sink, console_sink});
-    spdlog::set_level(spdlog::level::info);
+    spdlog::set_level(spdlog::level::debug);
     spdlog::register_logger(logger);
     logger->set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%^%l%$] %v");
 
@@ -37,9 +34,9 @@ int main()
 
     OutputFile lammpsBondAngle(inputData.inputFolder + "/PARM_Si.lammps");
     lammpsBondAngle.write("bond_style harmonic");
-    lammpsBondAngle.write("bond_coeff 1 " + to_string(inputData.harmonicBondForceConstant) + " 1.000");
+    lammpsBondAngle.write("bond_coeff 1 " + std::to_string(inputData.harmonicBondForceConstant) + " 1.000");
     lammpsBondAngle.write("angle_style cosine/squared");
-    lammpsBondAngle.write("angle_coeff 1 " + to_string(inputData.harmonicAngleForceConstant) + " 120");
+    lammpsBondAngle.write("angle_coeff 1 " + std::to_string(inputData.harmonicAngleForceConstant) + " 120");
 
     // Initialise network
     logger->info("Initialising network");
@@ -63,7 +60,7 @@ int main()
                           inputData.isTriangleRaftEnabled, inputData.isBilayerEnabled,
                           inputData.isTersoffGrapheneEnabled,
                           inputData.isBNEnabled,
-                          inputData.isRestartUsingLammpsObjectsEnabled, logger);
+                          inputData.isRestartUsingLAMMPSObjectsEnabled, logger);
 
     int minCnd = network.minACnxs;
     int maxCnd = network.maxACnxs;
@@ -89,13 +86,13 @@ int main()
     logger->info("Initialising Monte Carlo...");
     network.initialiseMonteCarlo(network.networkA, pow(10, inputData.startTemperature), logger, inputData.randomSeed);
 
-    network.isOpenMP = inputData.isOpenMPIEnabled;
+    network.isOpenMPIEnabled = inputData.isOpenMPIEnabled;
     network.MCWeighting = inputData.randomOrWeighted;
-    network.isSimpleGraphene = inputData.isSimpleGrapheneEnabled;
-    network.isTersoffGraphene = inputData.isTersoffGrapheneEnabled;
-    network.isTriangleRaft = inputData.isTriangleRaftEnabled;
-    network.isBilayer = inputData.isBilayerEnabled;
-    network.isBN = inputData.isBNEnabled;
+    network.isSimpleGrapheneEnabled = inputData.isSimpleGrapheneEnabled;
+    network.isTersoffGrapheneEnabled = inputData.isTersoffGrapheneEnabled;
+    network.isTriangleRaftEnabled = inputData.isTriangleRaftEnabled;
+    network.isBilayerEnabled = inputData.isBilayerEnabled;
+    network.isBNEnabled = inputData.isBNEnabled;
     network.spiralRadius = inputData.spiralRadius;
     if (inputData.isSpiralEnabled)
         network.makerFixed();
@@ -109,7 +106,7 @@ int main()
 
     status = mkdir(inputData.outputFolder.c_str(), 0777);
 
-    string prefixOut = inputData.outputFolder + "/" + inputData.outputFilePrefix;
+    std::string prefixOut = inputData.outputFolder + "/" + inputData.outputFilePrefix;
     OutputFile outEnergyStats(prefixOut + "_e_compare.out");
     OutputFile outRingStats(prefixOut + "_ringstats.out");
     OutputFile outCorr(prefixOut + "_correlations.out");
@@ -149,7 +146,8 @@ int main()
     // Run monte carlo
     logger->info("Running Monte Carlo...");
     logger->info("Initial energy: {}", network.mc.getEnergy());
-    int accepted = 0, optIterations = 0;
+    int numAcceptedMoves = 0;
+    int optIterations = 0;
     VecF<int> optCodes(5);
     optCodes = 0;
     int trackFreq = 100;
@@ -267,7 +265,8 @@ int main()
         else
             moveStatus = network.monteCarloMixMove(energy);
 
-        accepted += moveStatus[0];
+        if (moveStatus[0])
+            numAcceptedMoves++;
         optCodes[moveStatus[1]] += 1;
         optIterations += moveStatus[2];
         if (i % inputData.analysisWriteFrequency == 0)
@@ -316,7 +315,7 @@ int main()
         if (i % inputData.structureWriteFrequency == 0 && inputData.isWriteSamplingStructuresEnabled == 1)
         {
             network.syncCoordinates();
-            std::string structureFilePath = prefixOut + "_therm_" + to_string(i);
+            std::string structureFilePath = prefixOut + "_therm_" + std::to_string(i);
             logger->info("Writing structure: {} to file {}", i, structureFilePath);
             network.writeXYZ(structureFilePath);
         }
@@ -345,7 +344,8 @@ int main()
             }
             else
                 moveStatus = network.monteCarloMixMove(energy);
-            accepted += moveStatus[0];
+            if (moveStatus[0])
+                numAcceptedMoves++;
             optCodes[moveStatus[1]] += 1;
             optIterations += moveStatus[2];
             if (i % inputData.analysisWriteFrequency == 0)
@@ -392,7 +392,7 @@ int main()
             if (i % inputData.structureWriteFrequency == 0 && inputData.isWriteSamplingStructuresEnabled == 1)
             {
                 network.syncCoordinates();
-                network.writeXYZ(prefixOut + "_t" + to_string(t) + "_" + to_string(i));
+                network.writeXYZ(prefixOut + "_t" + std::to_string(t) + "_" + std::to_string(i));
             }
         }
     }
@@ -435,7 +435,7 @@ int main()
     bool convex = network.checkConvexity();
     logger->info("Network consistent:", consistent);
     logger->info("Rings convex:", convex);
-    logger->info("Monte Carlo acceptance:", (double)accepted / inputData.stepsPerTemperature);
+    logger->info("Monte Carlo acceptance:", (double)numAcceptedMoves / inputData.stepsPerTemperature);
     logger->info("Geometry optimisation codes:");
     logger->info("Converged: ", optCodes[0]);
     logger->info("Converged (zero force): ", optCodes[1]);
