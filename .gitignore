@@ -1,0 +1,4 @@
+/build/
+/variable_maps
+/testing/output_files/
+/clean-all.cmake
