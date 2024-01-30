@@ -17,7 +17,6 @@
 #include <omp.h>
 #include <spdlog/spdlog.h>
 
-using namespace std;
 using LoggerPtr = std::shared_ptr<spdlog::logger>;
 
 class LinkedNetwork
@@ -33,33 +32,32 @@ public:
     LammpsObject Bilayer;
     LammpsObject BN;
 
-    string prefixIn, prefixOut;
-    bool isOpenMP = false;
-    bool isSimpleGraphene = true;
-    bool isTriangleRaft = false;
-    bool isTersoffGraphene = false;
-    bool isBilayer = false;
-    bool isBN = false;
+    std::string prefixIn, prefixOut;
+    bool isOpenMPIEnabled = false;
+    bool isSimpleGrapheneEnabled = false;
+    bool isTriangleRaftEnabled = false;
+    bool isTersoffGrapheneEnabled = false;
+    bool isBilayerEnabled = false;
+    bool isBNEnabled = false;
     int MC_Routine;
     double CScaling = 1.420;
     double SiScaling = 1.609 * sqrt((32.0 / 9.0)) / 0.52917721090380;
-    //    LammpsObject Bilayer;
 
-    VecF<double> crds; // copy of coordinates in network A (for efficient geometry optimisation)
-    string MCWeighting;
-    mt19937 mtGen;                                   // mersenne twister random number generator
-    Metropolis mc, mcCost;                           // monte carlo metropolis condition
+    VecF<double> crds;                               // copy of coordinates in network A (for efficient geometry optimisation)
+    std::string MCWeighting;                         // Either 'weighted' or 'random'
+    std::mt19937 mtGen;                              // mersenne twister random number generator
+    Metropolis mc;                                   // monte carlo metropolis condition
     VecF<double> potParamsA, potParamsB, potParamsC; // potential model parameters (angles, bonds, constraints)
     bool isMaintainConvexityEnabled;                 // maintain convexity of lattice
     VecF<int> goptParamsA;                           // geometry optimisation parameters
     VecF<double> goptParamsB;                        // geometry optimisation parameters
     VecF<double> costParams;                         // cost function parameters
 
-    VecR<int> fixedRings;
+    VecR<int> fixedRings; // IDs of the fixed rings
     VecR<int> rFixed;
-    vector<double> weights;
+    std::vector<double> weights;
 
-    int spiralRadius;
+    int spiralRadius; // Radius at which MC moves are considered
 
     // Additional data members
     int minACnxs, maxACnxs, minBCnxs, maxBCnxs;
@@ -67,12 +65,15 @@ public:
     // Constructors
     LinkedNetwork();
     LinkedNetwork(int nodesA, int minCoordination, int maxCoordination, int minRingSize, int maxRingSize, LoggerPtr logger); // construct with starting A lattice
-    LinkedNetwork(string prefixFolderIn, string prefixFileIn, string prefixFolderOut,
+    LinkedNetwork(std::string prefixFolderIn, std::string prefixFileIn, std::string prefixFolderOut,
                   int minA, int maxA, int minB, int maxB,
-                  bool isSimpleGraphene, bool isTriangleRaft, bool isBilayer, bool isTersoffGraphene, bool isBN, bool restartLammps, LoggerPtr); // construct by loading from files
+                  bool isSimpleGrapheneEnabledArg, bool isTriangleRaftEnabledArg,
+                  bool isBilayerEnbledArg, bool isTersoffGrapheneEnabledArg,
+                  bool isBNEnabledArg, bool isRestartUsingLAMMPSObjectsEnabledArg,
+                  LoggerPtr); // construct by loading from files
 
-    void pushPrefix(string prefixin, string prefixout);
-    void findFixedRings(bool fixed_rings, string filename, LoggerPtr logger);
+    void pushPrefix(std::string prefixin, std::string prefixout);
+    void findFixedRings(bool fixed_rings, std::string filename, LoggerPtr logger);
 
     void makerFixed();
     // Member Functions
@@ -83,25 +84,26 @@ public:
     void initialiseMonteCarlo(Network network, double temperature, LoggerPtr logger, int seed = 0);               // set up monte carlo
     void initialiseCostFunction(double temperature, int seed, double pk, double rk);                              // set up cost function
     void rescale(double scaleFactor);                                                                             // rescale lattice dimensions
-    void project(string projType, double param);                                                                  // project lattice onto different geometry
-    void optimalProjection(string projType);                                                                      // project lattice onto different geometry with optimal parameters
-    int pickSpiralCnx34(int &a, int &b, int &u, int &v, mt19937 &gen);
-    int pickDiscreteCnx34(int &a, int &b, int &u, int &v, mt19937 &gen, LoggerPtr logger);
-    int pickRandomCnx34(int &a, int &b, int &u, int &v, mt19937 &gen);                                                                     // choose nodes forming random edge in lattice A, and corresponding nodes in lattice B
-    int pickRandomCnx(int &a, int &b, int &u, int &v, mt19937 &gen);                                                                       // choose nodes forming random edge in lattice A, and corresponding nodes in lattice B
-    int generateSwitchIds34(int cnxType, VecF<int> &switchIdsA, VecF<int> &switchIdsB, VecF<int> &switchIdsT, int a, int b, int u, int v); // get all ids of nodes in lattice A and B needed for switch move
-    int generateMixIds34(int cnxType, VecF<int> &mixIdsA, VecF<int> &mixIdsB, int a, int b, int u, int v);                                 // get all ids of nodes in lattice A and B needed for mix move
-    int generateMixIds(int cnxType, VecF<int> &mixIdsA, VecF<int> &mixIdsB, int a, int b, int u, int v);                                   // get all ids of nodes in lattice A and B needed for mix move
-    int findAssociatedNodeAB(int idA, int idB, int idDel);                                                                                 //
-    int findAssociatedNodeAA(int idA, int idB, int idDel);                                                                                 //
-    void switchCnx33(VecF<int> switchIdsA, VecF<int> switchIdsB, VecF<int> switchIdsT);                                                    // switch connectivities in lattice between 2x3 coordinate nodes
-    void switchCnx44(VecF<int> switchIdsA, VecF<int> switchIdsB);                                                                          // switch connectivities in lattice between 2x4 coordinate nodes
-    void switchCnx43(VecF<int> switchIdsA, VecF<int> switchIdsB);                                                                          // switch connectivities in lattice between 4 and 3 coordinate nodes
-    void mixCnx34(VecF<int> mixIdsA, VecF<int> mixIdsB);                                                                                   // mix connectivities in lattice between 4 and 3 coordinate nodes
-    void mixCnx(VecF<int> mixIdsA, VecF<int> mixIdsB);                                                                                     // mix connectivities in lattice between 4 and 3 coordinate nodes
-    bool checkThreeRingEdges(int id);                                                                                                      // prevent edges being part of three rings
-    bool convexRearrangement(int cnxType, VecF<int> switchIdsA, VecF<int> switchIdsB);                                                     // rearrange nodes after switchi to maintain convexity
-    VecF<int> monteCarloSwitchMove(Network network, double &energy);                                                                       // monte carlo switching move
+    void project(std::string projType, double param);                                                             // project lattice onto different geometry
+    void optimalProjection(std::string projType, LoggerPtr logger);                                               // project lattice onto different geometry with optimal parameters
+    int pickSpiralCnx34(int &a, int &b, int &u, int &v, std::mt19937 &gen);
+    int pickDiscreteCnx34(int &a, int &b, int &u, int &v, std::mt19937 &gen, LoggerPtr logger);
+    int pickRandomCnx34(int &a, int &b, int &u, int &v, std::mt19937 &gen); // choose nodes forming random edge in lattice A, and corresponding nodes in lattice B
+    int pickRandomCnx(int &a, int &b, int &u, int &v, std::mt19937 &gen);   // choose nodes forming random edge in lattice A, and corresponding nodes in lattice B
+    bool generateSwitchIds34(int cnxType, VecF<int> &switchIdsA, VecF<int> &switchIdsB, VecF<int> &switchIdsT,
+                             int a, int b, int u, int v);                                                  // get all ids of nodes in lattice A and B needed for switch move
+    int generateMixIds34(int cnxType, VecF<int> &mixIdsA, VecF<int> &mixIdsB, int a, int b, int u, int v); // get all ids of nodes in lattice A and B needed for mix move
+    bool generateMixIds(int cnxType, VecF<int> &mixIdsA, VecF<int> &mixIdsB, int a, int b, int u, int v);  // get all ids of nodes in lattice A and B needed for mix move
+    int findAssociatedNodeAB(int idA, int idB, int idDel);                                                 //
+    int findAssociatedNodeAA(int idA, int idB, int idDel);                                                 //
+    void switchCnx33(VecF<int> switchIdsA, VecF<int> switchIdsB, VecF<int> switchIdsT);                    // switch connectivities in lattice between 2x3 coordinate nodes
+    void switchCnx44(VecF<int> switchIdsA, VecF<int> switchIdsB);                                          // switch connectivities in lattice between 2x4 coordinate nodes
+    void switchCnx43(VecF<int> switchIdsA, VecF<int> switchIdsB);                                          // switch connectivities in lattice between 4 and 3 coordinate nodes
+    void mixCnx34(VecF<int> mixIdsA, VecF<int> mixIdsB);                                                   // mix connectivities in lattice between 4 and 3 coordinate nodes
+    void mixCnx(VecF<int> mixIdsA, VecF<int> mixIdsB);                                                     // mix connectivities in lattice between 4 and 3 coordinate nodes
+    bool checkThreeRingEdges(int id);                                                                      // prevent edges being part of three rings
+    bool convexRearrangement(int cnxType, VecF<int> switchIdsA, VecF<int> switchIdsB);                     // rearrange nodes after switchi to maintain convexity
+    VecF<int> monteCarloSwitchMove(Network network, double &energy, LoggerPtr logger);                     // monte carlo switching move
     VecF<int> SpiralmonteCarloSwitchMoveLAMMPS(int a, double &SimpleGrapheneEnergy,
                                                double &TersoffGrapheneEnergy, double &TriangleRaftEnergy,
                                                double &BilayerEnergy, double &BNEnergy, int Selected, LoggerPtr logger);
@@ -121,17 +123,17 @@ public:
     void wrapCoordinates();                                                                                                                    // wrap coordinates if periodic
     void syncCoordinates();                                                                                                                    // update geometry optimised coordinates to networks
     void syncCoordinatesTD();                                                                                                                  // update geometry optimised coordinates to networks
-    VecF<double> getNodeDistribution(string lattice);                                                                                          // get proportion of nodes of each size
-    VecF<VecF<int>> getEdgeDistribution(string lattice);                                                                                       // get unnormalised proportion of node connections
-    VecF<double> getAboavWeaire(string lattice);                                                                                               // get aboav-weaire parameters
-    double getAssortativity(string lattice);                                                                                                   // get network assortativity
-    double getAboavWeaireEstimate(string lattice);                                                                                             // get estimate of aw alpha parameter from assortativity
-    VecF<double> getEntropy(string lattice);                                                                                                   // get node and edge distribution entropy
+    VecF<double> getNodeDistribution(std::string lattice);                                                                                     // get proportion of nodes of each size
+    VecF<VecF<int>> getEdgeDistribution(std::string lattice);                                                                                  // get unnormalised proportion of node connections
+    VecF<double> getAboavWeaire(std::string lattice);                                                                                          // get aboav-weaire parameters
+    double getAssortativity(std::string lattice);                                                                                              // get network assortativity
+    double getAboavWeaireEstimate(std::string lattice);                                                                                        // get estimate of aw alpha parameter from assortativity
+    VecF<double> getEntropy(std::string lattice);                                                                                              // get node and edge distribution entropy
     VecF<double> getOptimisationGeometry(Network network, VecF<double> &lenHist, VecF<double> &angHist);                                       // get bond/angle mean and standard deviation
     VecF<double> getOptimisationGeometryTD(VecF<double> &lenHist, VecF<double> &angHist);                                                      // get bond/angle mean and standard deviation
     void getRingAreas(VecF<double> &areaSum, VecF<double> &areaSqSum);                                                                         // get sum of areas and squared areas of each ring size
-    double getMaxCluster(string lattice, int nodeCnd);                                                                                         // get cluster statistics for given node coordination
-    VecF<int> getMaxClusters(string lattice, int minCnd, int maxCnd);                                                                          // get cluster statistics for node coordinations
+    double getMaxCluster(std::string lattice, int nodeCnd);                                                                                    // get cluster statistics for given node coordination
+    VecF<int> getMaxClusters(std::string lattice, int minCnd, int maxCnd);                                                                     // get cluster statistics for node coordinations
     bool checkConsistency();                                                                                                                   // check networks are consistent
     bool checkCnxConsistency();                                                                                                                // check for mutual connections
     bool checkDescriptorConsistency();                                                                                                         // check descriptors are accurate
@@ -139,8 +141,8 @@ public:
     bool checkConvexity(int id);                                                                                                               // check angles are convex around given node
 
     // Write Functions
-    void writeXYZ(string prefix);
-    void write(string prefix);
+    void writeXYZ(std::string prefix);
+    void write(std::string prefix);
 };
 
 #endif // NL_LINKED_NETWORK_H
