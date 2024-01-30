@@ -25,7 +25,6 @@
 
 #include <spdlog/spdlog.h>
 
-using namespace std;
 using LoggerPtr = std::shared_ptr<spdlog::logger>;
 
 class LammpsObject
@@ -42,17 +41,17 @@ public:
     double *bonds = NULL;
     double *angles = NULL;
 
-    string prefixFolderIn, prefixFolderOut;
-    string prefixOut;
+    std::string prefixFolderIn, prefixFolderOut;
+    std::string prefixOut;
 
     LammpsObject();
-    LammpsObject(string selector, string inputFolder, LoggerPtr logger);
+    LammpsObject(std::string selector, std::string inputFolder, LoggerPtr logger);
 
     int write_data(int selector);
     int write_restart(int selector);
     int finaliseLammpsObject(int selector);
 
-    void runInput(string fname);
+    void runInput(std::string fname);
     void getatominfo(int dim);
 
     double pbx();
