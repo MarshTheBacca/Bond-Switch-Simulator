@@ -18,7 +18,7 @@ Network::Network(int nNodes, int maxCnxs)
 }
 
 // Construct with choice of default lattice
-Network::Network(int nNodes, string lattice, int maxCnxs, LoggerPtr logger)
+Network::Network(int nNodes, std::string lattice, int maxCnxs, LoggerPtr logger)
 {
     if (lattice == "square")
         initialiseSquareLattice(sqrt(nNodes), maxCnxs);
@@ -59,28 +59,40 @@ void Network::initialiseDescriptors(int maxCnxs, LoggerPtr logger)
 }
 
 // Construct by loading from files
-Network::Network(string prefix, int maxNetCnxsA, int maxDualCnxsA, LoggerPtr logger)
+/**
+ * @brief Construct a network from files
+ * @param prefix Prefix of files to load
+ * @param maxBaseCoordinationArg Maximum base coordination of nodes
+ * @param maxDualCoordinationArg Maximum dual coordination of nodes
+ * @param logger Logger to log to
+ */
+Network::Network(std::string prefix, int maxBaseCoordinationArg, int maxDualCoordinationArg, LoggerPtr logger)
 {
-    logger->info("Loading from: {}", prefix);
-    logger->info("Aux file is: {}", prefix + "_aux.dat");
+    logger->info("Reading aux file {} ...", prefix + "_aux.dat");
 
     // Initialise variables with aux file information
-    string line;
-    istringstream ss("");
-    ifstream auxFile(prefix + "_aux.dat", ios::in);
+    std::string line;
+    std::istringstream ss("");
+    std::ifstream auxFile(prefix + "_aux.dat", std::ios::in);
+    if (!auxFile.is_open())
+    {
+        logger->critical("Aux file not found!");
+        throw std::runtime_error("Aux file not found!");
+    }
+
     int nNodes;
     getline(auxFile, line);
-    istringstream(line) >> nNodes;
+    std::istringstream(line) >> nNodes;
     logger->info("Number of nodes: {}", nNodes);
     getline(auxFile, line);
     ss.str(line);
     ss >> maxNetCnxs;
     ss >> maxDualCnxs;
 
-    if (maxNetCnxs < maxNetCnxsA)
-        maxNetCnxs = maxNetCnxsA;
-    if (maxDualCnxs < maxDualCnxsA)
-        maxDualCnxs = maxDualCnxsA;
+    if (maxNetCnxs < maxBaseCoordinationArg)
+        maxNetCnxs = maxBaseCoordinationArg;
+    if (maxDualCnxs < maxDualCoordinationArg)
+        maxDualCnxs = maxDualCoordinationArg;
 
     if (maxDualCnxs > 12)
     {
@@ -89,7 +101,7 @@ Network::Network(string prefix, int maxNetCnxsA, int maxDualCnxsA, LoggerPtr log
     }
     logger->info("Max Net/Dual Connections: {} {}", maxNetCnxs, maxDualCnxs);
     getline(auxFile, line);
-    istringstream(line) >> geometryCode;
+    std::istringstream(line) >> geometryCode;
     nodes = VecR<Node>(0, nNodes);
     pb = VecF<double>(2);
     rpb = VecF<double>(2);
@@ -107,9 +119,14 @@ Network::Network(string prefix, int maxNetCnxsA, int maxDualCnxsA, LoggerPtr log
         nodes.addValue(node);
     }
     auxFile.close();
-    logger->info("Aux File Complete");
-    // Read coordinates
-    ifstream crdFile(prefix + "_crds.dat", ios::in);
+
+    logger->info("Reading crds file {} ...", prefix + "_crds.dat");
+    std::ifstream crdFile(prefix + "_crds.dat", std::ios::in);
+    if (!crdFile.is_open())
+    {
+        logger->critical("crds.dat file not found!");
+        throw std::runtime_error("crds.dat file not found!");
+    }
     VecF<double> crd(2);
     for (int i = 0; i < nodes.n; ++i)
     {
@@ -120,37 +137,44 @@ Network::Network(string prefix, int maxNetCnxsA, int maxDualCnxsA, LoggerPtr log
         nodes[i].crd = crd;
     }
     crdFile.close();
-    logger->info("Coord File Complete");
 
     // Read network connections
+    logger->info("Reading net file {} ...", prefix + "_net.dat");
     int cnx;
-    ifstream netFile(prefix + "_net.dat", ios::in);
+    std::ifstream netFile(prefix + "_net.dat", std::ios::in);
+    if (!netFile.is_open())
+    {
+        logger->critical("net.dat file not found!");
+        throw std::runtime_error("net.dat file not found!");
+    }
     for (int i = 0; i < nodes.n; ++i)
     {
         getline(netFile, line);
-        istringstream ss(line);
+        std::istringstream ss(line);
         while (ss >> cnx)
         {
             nodes[i].netCnxs.addValue(cnx);
         }
     }
     netFile.close();
-    logger->info("Net file complete");
 
     // Read dual connections
-    ifstream dualFile(prefix + "_dual.dat", ios::in);
+    logger->info("Reading dual file {} ...", prefix + "_dual.dat");
+    std::ifstream dualFile(prefix + "_dual.dat", std::ios::in);
+    if (!dualFile.is_open())
+    {
+        logger->critical("dual.dat file not found!");
+        throw std::runtime_error("dual.dat file not found!");
+    }
     for (int i = 0; i < nodes.n; ++i)
     {
         getline(dualFile, line);
-        istringstream ss(line);
+        std::istringstream ss(line);
         //        ss.str(line);
         while (ss >> cnx)
             nodes[i].dualCnxs.addValue(cnx);
     }
     dualFile.close();
-    logger->info("Dual file complete");
-
-    // Read rings to ignore
 
     // Set up descriptors
     logger->info("Max net connections: {}", maxNetCnxs);
@@ -165,13 +189,13 @@ Network::Network(string prefix, int maxNetCnxsA, int maxDualCnxsA, LoggerPtr log
 // The main difference is that energy will be calculated for this lattice, rather than networkA
 // However, all changes must be mirrored in all networks
 
-Network::Network(VecR<Node> nodesA, VecF<double> pbA, VecF<double> rpbA, string type, int maxNetCnxsA, int maxDualCnxsA)
+Network::Network(VecR<Node> nodesA, VecF<double> pbA, VecF<double> rpbA, std::string type, int maxNetCnxsA, int maxDualCnxsA)
 {
     bool verbose = false;
     // Taking Nodes and Periodic details from networkA to build new network
     if (verbose)
     {
-        cout << "Generating Triangle Raft" << endl;
+        std::cout << "Generating Triangle Raft" << std::endl;
     }
     int nNodes, OxygenAtom = nodesA.n, atom0, atom1;
     VecF<double> crds(2), crds1(2), crds2(2), v(2);
@@ -185,7 +209,7 @@ Network::Network(VecR<Node> nodesA, VecF<double> pbA, VecF<double> rpbA, string 
     {
         if (verbose)
         {
-            cout << "Triangle Raft" << endl;
+            std::cout << "Triangle Raft" << std::endl;
         }
         nNodes = nodesA.n * 5 / 2;
         geometryCode = "2DEtr";
@@ -215,7 +239,7 @@ Network::Network(VecR<Node> nodesA, VecF<double> pbA, VecF<double> rpbA, string 
             crds1[1] = nodes[atom0].crd[1];
             if (verbose)
             {
-                cout << atom0 << endl;
+                std::cout << atom0 << std::endl;
             }
 
             for (int j = 0; j < nodes[i].netCnxs.n; ++j)
@@ -229,7 +253,7 @@ Network::Network(VecR<Node> nodesA, VecF<double> pbA, VecF<double> rpbA, string 
 
                     if (verbose)
                     {
-                        cout << "    " << atom1 << endl;
+                        std::cout << "    " << atom1 << std::endl;
                     }
                     v[0] = crds1[0] - crds2[0];
                     if (v[0] > pb[0] / 2.0)
@@ -275,26 +299,26 @@ Network::Network(VecR<Node> nodesA, VecF<double> pbA, VecF<double> rpbA, string 
                     nodes.addValue(node);
                     if (verbose)
                     {
-                        cout << "Adding Oxygen Crds" << endl;
+                        std::cout << "Adding Oxygen Crds" << std::endl;
                     }
 
                     nodes[OxygenAtom].crd = crds;
                     if (verbose)
                     {
-                        cout << "Swapping out Cnxs" << endl;
+                        std::cout << "Swapping out Cnxs" << std::endl;
                     }
                     nodes[atom0].netCnxs.swapValue(atom1, OxygenAtom, true);
                     nodes[atom1].netCnxs.swapValue(atom0, OxygenAtom, true);
 
                     if (verbose)
                     {
-                        cout << "Adding Oxygen Cnxs" << endl;
+                        std::cout << "Adding Oxygen Cnxs" << std::endl;
                     }
                     nodes[OxygenAtom].netCnxs.addValue(atom0);
                     nodes[OxygenAtom].netCnxs.addValue(atom1);
                     if (verbose)
                     {
-                        cout << "Oxygen Atom " << OxygenAtom << endl;
+                        std::cout << "Oxygen Atom " << OxygenAtom << std::endl;
                     }
                     OxygenAtom += 1;
                 }
@@ -302,7 +326,7 @@ Network::Network(VecR<Node> nodesA, VecF<double> pbA, VecF<double> rpbA, string 
         }
         if (verbose)
         {
-            cout << "Add Oxygen Triangles" << endl;
+            std::cout << "Add Oxygen Triangles" << std::endl;
         }
         int atom1, atom2, atom3;
         for (int i = 0; i < nodesA.n; ++i)
@@ -322,15 +346,15 @@ Network::Network(VecR<Node> nodesA, VecF<double> pbA, VecF<double> rpbA, string 
         }
         if (verbose)
         {
-            cout << "Printouts" << endl;
+            std::cout << "Printouts" << std::endl;
 
             for (int i = 0; i < nodes.n; ++i)
             {
                 for (int j = 0; j < nodes[i].netCnxs.n; ++j)
                 {
-                    cout << nodes[i].netCnxs[j] << "  ";
+                    std::cout << nodes[i].netCnxs[j] << "  ";
                 }
-                cout << endl;
+                std::cout << std::endl;
             }
         }
     }
@@ -840,12 +864,12 @@ void Network::initialiseMixedTSLattice(int dim, int &maxCnxs, double mixProporti
      * find unique triangles and squares and assign id
      * attribute ids to nodes
      */
-    map<string, int> polyIds;
+    std::map<std::string, int> polyIds;
     int polyId = 0;
     // find unique triangles/squares by looping over ordered network connections
     for (int i = 0; i < nodes.n; ++i)
     {
-        string polyCode;
+        std::string polyCode;
         int n = nodes[i].netCnxs.n;
         for (int j = 0; j < n; ++j)
         {
@@ -856,7 +880,7 @@ void Network::initialiseMixedTSLattice(int dim, int &maxCnxs, double mixProporti
             if (vContains(nodes[poly[1]].netCnxs, poly[2]))
             { // triangle
                 poly = vSort(poly);
-                polyCode = "#" + to_string(poly[0]) + "#" + to_string(poly[1]) + "#" + to_string(poly[2]);
+                polyCode = "#" + std::to_string(poly[0]) + "#" + std::to_string(poly[1]) + "#" + std::to_string(poly[2]);
             }
             else
             { // square
@@ -864,7 +888,7 @@ void Network::initialiseMixedTSLattice(int dim, int &maxCnxs, double mixProporti
                 common.delValue(poly[0]);
                 poly.addValue(common[0]);
                 poly = vSort(poly);
-                polyCode = "#" + to_string(poly[0]) + "#" + to_string(poly[1]) + "#" + to_string(poly[2]) + "#" + to_string(poly[3]);
+                polyCode = "#" + std::to_string(poly[0]) + "#" + std::to_string(poly[1]) + "#" + std::to_string(poly[2]) + "#" + std::to_string(poly[3]);
             }
             if (polyIds.count(polyCode) == 0)
             {
@@ -876,7 +900,7 @@ void Network::initialiseMixedTSLattice(int dim, int &maxCnxs, double mixProporti
     // add dual ids depending on triangles/squares present - will be ordered
     for (int i = 0; i < nodes.n; ++i)
     {
-        string polyCode;
+        std::string polyCode;
         int n = nodes[i].netCnxs.n;
         for (int j = 0; j < n; ++j)
         {
@@ -887,7 +911,7 @@ void Network::initialiseMixedTSLattice(int dim, int &maxCnxs, double mixProporti
             if (vContains(nodes[poly[1]].netCnxs, poly[2]))
             { // triangle
                 poly = vSort(poly);
-                polyCode = "#" + to_string(poly[0]) + "#" + to_string(poly[1]) + "#" + to_string(poly[2]);
+                polyCode = "#" + std::to_string(poly[0]) + "#" + std::to_string(poly[1]) + "#" + std::to_string(poly[2]);
             }
             else
             { // square
@@ -895,7 +919,7 @@ void Network::initialiseMixedTSLattice(int dim, int &maxCnxs, double mixProporti
                 common.delValue(poly[0]);
                 poly.addValue(common[0]);
                 poly = vSort(poly);
-                polyCode = "#" + to_string(poly[0]) + "#" + to_string(poly[1]) + "#" + to_string(poly[2]) + "#" + to_string(poly[3]);
+                polyCode = "#" + std::to_string(poly[0]) + "#" + std::to_string(poly[1]) + "#" + std::to_string(poly[2]) + "#" + std::to_string(poly[3]);
             }
             nodes[i].dualCnxs.addValue(polyIds.at(polyCode));
         }
@@ -1032,10 +1056,10 @@ void Network::initialiseCubicLattice(int nNodes, int &maxCnxs)
             nodes[i].netCnxs.addValue(nb[pos2]);
             nodes[i].netCnxs.addValue(nb[pos3]);
             if (pos0 < 0 || pos1 < 0 || pos2 < 0 || pos3 < 0)
-                throw("Error in cubic network connection generation");
+                throw std::runtime_error("Error in cubic network connection generation");
         }
         else
-            throw("Error in cubic network connection generation");
+            throw std::runtime_error("Error in cubic network connection generation");
     }
 
     /*make dual connections by brute force
@@ -1180,10 +1204,10 @@ void Network::initialiseCubicLattice(int nNodes, int &maxCnxs)
             nodes[i].dualCnxs.addValue(nb[pos2]);
             nodes[i].dualCnxs.addValue(nb[pos3]);
             if (pos0 < 0 || pos1 < 0 || pos2 < 0 || pos3 < 0)
-                throw("Error in cubic network dual connection generation");
+                throw std::runtime_error("Error in cubic network dual connection generation");
         }
         else
-            throw("Error in cubic network dual connection generation");
+            throw std::runtime_error("Error in cubic network dual connection generation");
     }
 
     // recentre coordinates on origin
@@ -1387,13 +1411,13 @@ void Network::initialiseGeodesicLattice(int nNodes, int &maxCnxs)
                 }
             }
             if (nb0 == -1 || nb1 == -1)
-                throw("Error in geodesic network connection generation");
+                throw std::runtime_error("Error in geodesic network connection generation");
             if (!vContains(orderedNb, nb[nb0]))
                 orderedNb.addValue(nb[nb0]);
             else if (!vContains(orderedNb, nb[nb1]))
                 orderedNb.addValue(nb[nb1]);
             else
-                throw("Error in geodesic network connection generation");
+                throw std::runtime_error("Error in geodesic network connection generation");
         }
         for (int j = 0; j < orderedNb.n; ++j)
             nodes[i].netCnxs.addValue(orderedNb[j]);
@@ -1402,13 +1426,13 @@ void Network::initialiseGeodesicLattice(int nNodes, int &maxCnxs)
     /*make dual connections
      * find unique triangles and assigning id
      * attribute ids to nodes */
-    map<string, int> triIds;
+    std::map<std::string, int> triIds;
     int triId = 0;
     // find unique triangles by looping over ordered network connections
     for (int i = 0; i < nNodes; ++i)
     {
         VecF<int> tri(3);
-        string triCode;
+        std::string triCode;
         int n = nodes[i].netCnxs.n;
         for (int j = 0; j < n; ++j)
         {
@@ -1416,7 +1440,7 @@ void Network::initialiseGeodesicLattice(int nNodes, int &maxCnxs)
             tri[1] = nodes[i].netCnxs[j];
             tri[2] = nodes[i].netCnxs[(j + 1) % n];
             tri = vSort(tri);
-            triCode = "#" + to_string(tri[0]) + "#" + to_string(tri[1]) + "#" + to_string(tri[2]);
+            triCode = "#" + std::to_string(tri[0]) + "#" + std::to_string(tri[1]) + "#" + std::to_string(tri[2]);
             if (triIds.count(triCode) == 0)
             {
                 triIds[triCode] = triId;
@@ -1428,7 +1452,7 @@ void Network::initialiseGeodesicLattice(int nNodes, int &maxCnxs)
     for (int i = 0; i < nNodes; ++i)
     {
         VecF<int> tri(3);
-        string triCode;
+        std::string triCode;
         int n = nodes[i].netCnxs.n;
         for (int j = 0; j < n; ++j)
         {
@@ -1436,7 +1460,7 @@ void Network::initialiseGeodesicLattice(int nNodes, int &maxCnxs)
             tri[1] = nodes[i].netCnxs[j];
             tri[2] = nodes[i].netCnxs[(j + 1) % n];
             tri = vSort(tri);
-            triCode = "#" + to_string(tri[0]) + "#" + to_string(tri[1]) + "#" + to_string(tri[2]);
+            triCode = "#" + std::to_string(tri[0]) + "#" + std::to_string(tri[1]) + "#" + std::to_string(tri[2]);
             nodes[i].dualCnxs.addValue(triIds.at(triCode));
         }
     }
@@ -1613,7 +1637,7 @@ void Network::rescale(double scaleFactor)
 }
 
 // Project lattice onto different geometry
-void Network::project(string projType, double param)
+void Network::project(std::string projType, double param)
 {
     if (projType == "sphere")
     {
@@ -2038,142 +2062,136 @@ double Network::maxCluster(int nodeCnd)
 }
 
 // Write network in format which can be loaded
-void Network::write(string prefix)
+void Network::write(std::string prefix)
 {
-
     // auxilary information
-    ofstream auxFile(prefix + "_aux.dat", ios::in | ios::trunc);
-    auxFile << fixed << showpoint << setprecision(1);
-    auxFile << setw(10) << left << nodes.n << endl;
-    auxFile << setw(10) << left << nodes[0].netCnxs.nMax << setw(10) << left << nodes[0].dualCnxs.nMax << endl;
-    auxFile << setw(10) << left << geometryCode << endl;
-    auxFile << fixed << showpoint << setprecision(6);
+    std::ofstream auxFile(prefix + "_aux.dat", std::ios::in | std::ios::trunc);
+    auxFile << std::fixed << std::showpoint << std::setprecision(1);
+    auxFile << std::setw(10) << std::left << nodes.n << std::endl;
+    auxFile << std::setw(10) << std::left << nodes[0].netCnxs.nMax << std::setw(10) << std::left << nodes[0].dualCnxs.nMax << std::endl;
+    auxFile << std::setw(10) << std::left << geometryCode << std::endl;
+    auxFile << std::fixed << std::showpoint << std::setprecision(6);
     for (int i = 0; i < pb.n; ++i)
-        auxFile << setw(20) << left << pb[i];
-    auxFile << endl;
+        auxFile << std::setw(20) << std::left << pb[i];
+    auxFile << std::endl;
     for (int i = 0; i < rpb.n; ++i)
-        auxFile << setw(20) << left << rpb[i];
-    auxFile << endl;
+        auxFile << std::setw(20) << std::left << rpb[i];
+    auxFile << std::endl;
     auxFile.close();
 
     // coordinates
-    ofstream crdFile(prefix + "_crds.dat", ios::in | ios::trunc);
-    crdFile << fixed << showpoint << setprecision(6);
+    std::ofstream crdFile(prefix + "_crds.dat", std::ios::in | std::ios::trunc);
+    crdFile << std::fixed << std::showpoint << std::setprecision(6);
     for (int i = 0; i < nodes.n; ++i)
     {
         for (int j = 0; j < nodes[i].crd.n; ++j)
         {
-            crdFile << setw(20) << left << nodes[i].crd[j];
+            crdFile << std::setw(20) << std::left << nodes[i].crd[j];
         }
-        crdFile << endl;
+        crdFile << std::endl;
     }
     crdFile.close();
 
     // network connections
-    ofstream netFile(prefix + "_net.dat", ios::in | ios::trunc);
-    netFile << fixed << showpoint << setprecision(1);
+    std::ofstream netFile(prefix + "_net.dat", std::ios::in | std::ios::trunc);
+    netFile << std::fixed << std::showpoint << std::setprecision(1);
     for (int i = 0; i < nodes.n; ++i)
     {
         for (int j = 0; j < nodes[i].netCnxs.n; ++j)
         {
-            netFile << setw(20) << left << nodes[i].netCnxs[j];
+            netFile << std::setw(20) << std::left << nodes[i].netCnxs[j];
         }
-        netFile << endl;
+        netFile << std::endl;
     }
     netFile.close();
 
     // dual connections
-    ofstream dualFile(prefix + "_dual.dat", ios::in | ios::trunc);
-    dualFile << fixed << showpoint << setprecision(1);
+    std::ofstream dualFile(prefix + "_dual.dat", std::ios::in | std::ios::trunc);
+    dualFile << std::fixed << std::showpoint << std::setprecision(1);
     for (int i = 0; i < nodes.n; ++i)
     {
         for (int j = 0; j < nodes[i].dualCnxs.n; ++j)
         {
-            dualFile << setw(20) << left << nodes[i].dualCnxs[j];
+            dualFile << std::setw(20) << std::left << nodes[i].dualCnxs[j];
         }
-        dualFile << endl;
+        dualFile << std::endl;
     }
     dualFile.close();
 }
 
 // Write xyz file format of network
-void Network::writeXYZ(string prefix, string element)
+void Network::writeXYZ(std::string prefix, std::string element)
 {
-    ofstream xyzFile(prefix + ".xyz", ios::in | ios::trunc);
+    std::ofstream xyzFile(prefix + ".xyz", std::ios::in | std::ios::trunc);
     if (geometryCode == "2DE")
     {
-        xyzFile << nodes.n << endl;
-        xyzFile << "# Element X Y Z  " << endl;
-        xyzFile << fixed << showpoint << setprecision(6);
+        xyzFile << nodes.n << std::endl;
+        xyzFile << "# Element X Y Z  " << std::endl;
+        xyzFile << std::fixed << std::showpoint << std::setprecision(6);
         for (int i = 0; i < nodes.n; ++i)
         {
-            xyzFile << setw(10) << left << element + to_string(i);
-            xyzFile << setw(20) << left << nodes[i].crd[0];
-            xyzFile << setw(20) << left << nodes[i].crd[1];
-            xyzFile << setw(20) << left << "0.0" << endl;
+            xyzFile << std::setw(10) << std::left << element + std::to_string(i);
+            xyzFile << std::setw(20) << std::left << nodes[i].crd[0];
+            xyzFile << std::setw(20) << std::left << nodes[i].crd[1];
+            xyzFile << std::setw(20) << std::left << "0.0" << std::endl;
         }
     }
     else if (geometryCode == "2DS")
     {
-        xyzFile << nodes.n << endl;
-        xyzFile << "# Element X Y Z  " << endl;
-        xyzFile << fixed << showpoint << setprecision(6);
+        xyzFile << nodes.n << std::endl;
+        xyzFile << "# Element X Y Z  " << std::endl;
+        xyzFile << std::fixed << std::showpoint << std::setprecision(6);
         for (int i = 0; i < nodes.n; ++i)
         {
-            xyzFile << setw(10) << left << element + to_string(i);
-            xyzFile << setw(20) << left << nodes[i].crd[0];
-            xyzFile << setw(20) << left << nodes[i].crd[1];
-            xyzFile << setw(20) << left << nodes[i].crd[2] << endl;
+            xyzFile << std::setw(10) << std::left << element + std::to_string(i);
+            xyzFile << std::setw(20) << std::left << nodes[i].crd[0];
+            xyzFile << std::setw(20) << std::left << nodes[i].crd[1];
+            xyzFile << std::setw(20) << std::left << nodes[i].crd[2] << std::endl;
         }
     }
     else if (geometryCode == "3DE")
     {
-        xyzFile << nodes.n << endl;
-        xyzFile << "# Element X Y Z  " << endl;
-        xyzFile << fixed << showpoint << setprecision(6);
+        xyzFile << nodes.n << std::endl;
+        xyzFile << "# Element X Y Z  " << std::endl;
+        xyzFile << std::fixed << std::showpoint << std::setprecision(6);
         for (int i = 0; i < nodes.n; ++i)
         {
-            xyzFile << setw(10) << left << element + to_string(i);
-            xyzFile << setw(20) << left << nodes[i].crd[0];
-            xyzFile << setw(20) << left << nodes[i].crd[1];
-            xyzFile << setw(20) << left << nodes[i].crd[2] << endl;
+            xyzFile << std::setw(10) << std::left << element + std::to_string(i);
+            xyzFile << std::setw(20) << std::left << nodes[i].crd[0];
+            xyzFile << std::setw(20) << std::left << nodes[i].crd[1];
+            xyzFile << std::setw(20) << std::left << nodes[i].crd[2] << std::endl;
         }
     }
     else if (geometryCode == "2DEtr")
     {
-
-        //        for (int i=0;i<nodes.n;++i) {
-        //            cout << "Write Atom "<<i<<" for ref : " << nodes[i].crd[0] << " " << nodes[i].crd[1] << endl;
-        //        }
-
         int nSi, nO;
         nSi = nodes.n / 2.5;
         nO = nodes.n - nSi;
-        xyzFile << nodes.n << endl;
-        xyzFile << "# Element X Y Z  " << endl;
-        xyzFile << fixed << showpoint << setprecision(6);
+        xyzFile << nodes.n << std::endl;
+        xyzFile << "# Element X Y Z  " << std::endl;
+        xyzFile << std::fixed << std::showpoint << std::setprecision(6);
         for (int i = 0; i < nSi; ++i)
         {
-            xyzFile << setw(10) << left << "Si" + to_string(i);
-            xyzFile << setw(20) << left << nodes[i].crd[0];
-            xyzFile << setw(20) << left << nodes[i].crd[1];
-            xyzFile << setw(20) << left << "0.0" << endl;
+            xyzFile << std::setw(10) << std::left << "Si" + std::to_string(i);
+            xyzFile << std::setw(20) << std::left << nodes[i].crd[0];
+            xyzFile << std::setw(20) << std::left << nodes[i].crd[1];
+            xyzFile << std::setw(20) << std::left << "0.0" << std::endl;
         }
         for (int i = nSi; i < nodes.n; ++i)
         {
-            xyzFile << setw(10) << left << "O" + to_string(i);
-            xyzFile << setw(20) << left << nodes[i].crd[0];
-            xyzFile << setw(20) << left << nodes[i].crd[1];
-            xyzFile << setw(20) << left << "0.0" << endl;
+            xyzFile << std::setw(10) << std::left << "O" + std::to_string(i);
+            xyzFile << std::setw(20) << std::left << nodes[i].crd[0];
+            xyzFile << std::setw(20) << std::left << nodes[i].crd[1];
+            xyzFile << std::setw(20) << std::left << "0.0" << std::endl;
         }
     }
     xyzFile.close();
 }
 
-void Network::writeBN(string prefix)
+void Network::writeBN(std::string prefix)
 {
-    string newoutputPrefixfolder;
-    string newoutputPrefixfile;
+    std::string newoutputPrefixfolder;
+    std::string newoutputPrefixfile;
 
     newoutputPrefixfolder = prefix;
     newoutputPrefixfile = prefix;
@@ -2183,28 +2201,28 @@ void Network::writeBN(string prefix)
 
     dim_y = pb[1] * BN_distance;
     dim_x = pb[0] * BN_distance;
-    ofstream dimFile(prefix + "_dimensions.dat", ios::in | ios::trunc);
+    std::ofstream dimFile(prefix + "_dimensions.dat", std::ios::in | std::ios::trunc);
 
-    dimFile << fixed << showpoint << setprecision(6);
+    dimFile << std::fixed << std::showpoint << std::setprecision(6);
 
-    dimFile << dim_x << endl;
-    dimFile << dim_y << endl;
+    dimFile << dim_x << std::endl;
+    dimFile << dim_y << std::endl;
 
     VecF<double> B(3);
     VecF<double> N(3);
 
-    ofstream crysFile(prefix + "_BN_crys.crds", ios::in | ios::trunc);
-    crysFile << "T\nF\nF\nF\nF" << endl;
-    crysFile << fixed << showpoint << setprecision(6);
+    std::ofstream crysFile(prefix + "_BN_crys.crds", std::ios::in | std::ios::trunc);
+    crysFile << "T\nF\nF\nF\nF" << std::endl;
+    crysFile << std::fixed << std::showpoint << std::setprecision(6);
     for (int i = 0; i < nodes.n; i = i + 2)
     {
         B[0] = nodes[i].crd[0] * BN_distance;
         B[1] = nodes[i].crd[1] * BN_distance;
         B[2] = 50.0;
 
-        crysFile << setw(20) << left << B[0];
-        crysFile << setw(20) << left << B[1];
-        crysFile << setw(20) << left << B[2] << endl;
+        crysFile << std::setw(20) << std::left << B[0];
+        crysFile << std::setw(20) << std::left << B[1];
+        crysFile << std::setw(20) << std::left << B[2] << std::endl;
     }
     for (int i = 1; i < nodes.n; i = i + 2)
     {
@@ -2212,52 +2230,52 @@ void Network::writeBN(string prefix)
         N[1] = nodes[i].crd[1] * BN_distance;
         N[2] = 50.0;
 
-        crysFile << setw(20) << left << N[0];
-        crysFile << setw(20) << left << N[1];
-        crysFile << setw(20) << left << N[2] << endl;
+        crysFile << std::setw(20) << std::left << N[0];
+        crysFile << std::setw(20) << std::left << N[1];
+        crysFile << std::setw(20) << std::left << N[2] << std::endl;
     }
-    crysFile << setw(20) << left << 1.0;
-    crysFile << setw(20) << left << 0.0;
-    crysFile << setw(20) << left << 0.0 << endl;
+    crysFile << std::setw(20) << std::left << 1.0;
+    crysFile << std::setw(20) << std::left << 0.0;
+    crysFile << std::setw(20) << std::left << 0.0 << std::endl;
 
-    crysFile << setw(20) << left << 0.0;
-    crysFile << setw(20) << left << 1.0;
-    crysFile << setw(20) << left << 0.0 << endl;
+    crysFile << std::setw(20) << std::left << 0.0;
+    crysFile << std::setw(20) << std::left << 1.0;
+    crysFile << std::setw(20) << std::left << 0.0 << std::endl;
 
-    crysFile << setw(20) << left << 0.0;
-    crysFile << setw(20) << left << 0.0;
-    crysFile << setw(20) << left << 1.0 << endl;
+    crysFile << std::setw(20) << std::left << 0.0;
+    crysFile << std::setw(20) << std::left << 0.0;
+    crysFile << std::setw(20) << std::left << 1.0 << std::endl;
 
-    crysFile << setw(20) << left << dim_x << endl;
-    crysFile << setw(20) << left << dim_y << endl;
-    crysFile << setw(20) << left << 100.0 << endl;
+    crysFile << std::setw(20) << std::left << dim_x << std::endl;
+    crysFile << std::setw(20) << std::left << dim_y << std::endl;
+    crysFile << std::setw(20) << std::left << 100.0 << std::endl;
 
-    ofstream BNxyzFile(prefix + "_BN_crds.xyz", ios::in | ios::trunc);
+    std::ofstream BNxyzFile(prefix + "_BN_crds.xyz", std::ios::in | std::ios::trunc);
 
-    BNxyzFile << nodes.n << endl;
-    BNxyzFile << "# Element X Y Z  " << endl;
-    BNxyzFile << fixed << showpoint << setprecision(6);
+    BNxyzFile << nodes.n << std::endl;
+    BNxyzFile << "# Element X Y Z  " << std::endl;
+    BNxyzFile << std::fixed << std::showpoint << std::setprecision(6);
     for (int i = 0; i < nodes.n; i = i + 2)
     {
         B[0] = nodes[i].crd[0] * BN_distance;
         B[1] = nodes[i].crd[1] * BN_distance;
         B[2] = 50.0;
-        BNxyzFile << setw(10) << left << "B" + to_string(int(i / 2));
+        BNxyzFile << std::setw(10) << std::left << "B" + std::to_string(int(i / 2));
 
-        BNxyzFile << setw(20) << left << B[0];
-        BNxyzFile << setw(20) << left << B[1];
-        BNxyzFile << setw(20) << left << B[2] << endl;
+        BNxyzFile << std::setw(20) << std::left << B[0];
+        BNxyzFile << std::setw(20) << std::left << B[1];
+        BNxyzFile << std::setw(20) << std::left << B[2] << std::endl;
     }
     for (int i = 1; i < nodes.n; i = i + 2)
     {
         N[0] = nodes[i].crd[0] * BN_distance;
         N[1] = nodes[i].crd[1] * BN_distance;
         N[2] = 50.0;
-        BNxyzFile << setw(10) << left << "N" + to_string(int((i - 1) / 2));
+        BNxyzFile << std::setw(10) << std::left << "N" + std::to_string(int((i - 1) / 2));
 
-        BNxyzFile << setw(20) << left << N[0];
-        BNxyzFile << setw(20) << left << N[1];
-        BNxyzFile << setw(20) << left << N[2] << endl;
+        BNxyzFile << std::setw(20) << std::left << N[0];
+        BNxyzFile << std::setw(20) << std::left << N[1];
+        BNxyzFile << std::setw(20) << std::left << N[2] << std::endl;
     }
 
     crysFile.close();
@@ -2301,12 +2319,11 @@ bool Network::r_ij(int i, int j, float cutoff)
     }
 }
 
-void Network::writeBilayerA(string prefix, float lj_cutoff)
+void Network::writeBilayerA(std::string prefix, float lj_cutoff)
 {
-    cout << " ##### Starting Monolayer" << endl;
+    std::cout << " ##### Starting Monolayer" << std::endl;
     float si_si_distance = 1.609 * sqrt((32.0 / 9.0));
-    cout << "sisi    " << si_si_distance << endl;
-    //    float si_o_distance = si_si_distance/2.0;
+    std::cout << "sisi    " << si_si_distance << std::endl;
     float o_o_distance = 1.609 * sqrt((8.0 / 3.0));
     float h = sin((19.5 / 180) * M_PI) * 1.609;
 
@@ -2316,8 +2333,8 @@ void Network::writeBilayerA(string prefix, float lj_cutoff)
     int oxygen_number = 0;
     int dummythree = nodes.n;
 
-    string newoutputPrefixfolder;
-    string newoutputPrefixfile;
+    std::string newoutputPrefixfolder;
+    std::string newoutputPrefixfile;
 
     newoutputPrefixfolder = prefix;
     newoutputPrefixfile = prefix;
@@ -2325,19 +2342,19 @@ void Network::writeBilayerA(string prefix, float lj_cutoff)
     double dim_x, dim_y;
     dim_y = pb[1] * si_si_distance;
     dim_x = pb[0] * si_si_distance;
-    ofstream dimFile(newoutputPrefixfolder + "/dimensions.dat", ios::in | ios::trunc);
-    dimFile << fixed << showpoint << setprecision(6);
+    std::ofstream dimFile(newoutputPrefixfolder + "/dimensions.dat", std::ios::in | std::ios::trunc);
+    dimFile << std::fixed << std::showpoint << std::setprecision(6);
 
-    dimFile << dim_x << endl;
-    dimFile << dim_y << endl;
+    dimFile << dim_x << std::endl;
+    dimFile << dim_y << std::endl;
 
-    ofstream crysFile(newoutputPrefixfolder + "/crys.crds", ios::in | ios::trunc);
-    ofstream harmpairsFile(newoutputPrefixfolder + "/harmpairs.dat", ios::in | ios::trunc);
-    ofstream bilayerxyzFile(newoutputPrefixfolder + "/bilayer.xyz", ios::in | ios::trunc);
+    std::ofstream crysFile(newoutputPrefixfolder + "/crys.crds", std::ios::in | std::ios::trunc);
+    std::ofstream harmpairsFile(newoutputPrefixfolder + "/harmpairs.dat", std::ios::in | std::ios::trunc);
+    std::ofstream bilayerxyzFile(newoutputPrefixfolder + "/bilayer.xyz", std::ios::in | std::ios::trunc);
 
-    bilayerxyzFile << 6 * nodes.n << endl;
-    bilayerxyzFile << "# Element X Y Z  " << endl;
-    bilayerxyzFile << fixed << showpoint << setprecision(6);
+    bilayerxyzFile << 6 * nodes.n << std::endl;
+    bilayerxyzFile << "# Element X Y Z  " << std::endl;
+    bilayerxyzFile << std::fixed << std::showpoint << std::setprecision(6);
 
     VecF<double> Si(3);
     VecF<double> O(3);
@@ -2352,12 +2369,12 @@ void Network::writeBilayerA(string prefix, float lj_cutoff)
         }
     }
 
-    harmpairsFile << 10 * nodes.n * 2 << endl;
-    crysFile << fixed << showpoint << setprecision(6);
-    harmpairsFile << fixed << showpoint << setprecision(6);
+    harmpairsFile << 10 * nodes.n * 2 << std::endl;
+    crysFile << std::fixed << std::showpoint << std::setprecision(6);
+    harmpairsFile << std::fixed << std::showpoint << std::setprecision(6);
 
     int atom_count = 1;
-    cout << "##### Si crys" << endl;
+    std::cout << "##### Si crys" << std::endl;
     for (int i = 0; i < nodes.n; ++i)
     {
         Si_O_harmpairs[2 * i][0] = 2 * i + 1;
@@ -2367,30 +2384,30 @@ void Network::writeBilayerA(string prefix, float lj_cutoff)
         Si[1] = nodes[i].crd[1] * si_si_distance;
         Si[2] = 5.0;
 
-        crysFile << setw(20) << left << Si[0];
-        crysFile << setw(20) << left << Si[1];
-        crysFile << setw(20) << left << Si[2] << endl;
+        crysFile << std::setw(20) << std::left << Si[0];
+        crysFile << std::setw(20) << std::left << Si[1];
+        crysFile << std::setw(20) << std::left << Si[2] << std::endl;
 
-        bilayerxyzFile << setw(10) << left << "Si" + to_string(2 * i);
-        bilayerxyzFile << setw(20) << left << Si[0];
-        bilayerxyzFile << setw(20) << left << Si[1];
-        bilayerxyzFile << setw(20) << left << Si[2] << endl;
+        bilayerxyzFile << std::setw(10) << std::left << "Si" + std::to_string(2 * i);
+        bilayerxyzFile << std::setw(20) << std::left << Si[0];
+        bilayerxyzFile << std::setw(20) << std::left << Si[1];
+        bilayerxyzFile << std::setw(20) << std::left << Si[2] << std::endl;
 
         atom_count += 1;
         Si[2] = 5.0 + 2.0 * 1.609;
-        crysFile << setw(20) << left << Si[0];
-        crysFile << setw(20) << left << Si[1];
-        crysFile << setw(20) << left << Si[2] << endl;
+        crysFile << std::setw(20) << std::left << Si[0];
+        crysFile << std::setw(20) << std::left << Si[1];
+        crysFile << std::setw(20) << std::left << Si[2] << std::endl;
 
-        bilayerxyzFile << setw(10) << left << "Si" + to_string(2 * i + 1);
-        bilayerxyzFile << setw(20) << left << Si[0];
-        bilayerxyzFile << setw(20) << left << Si[1];
-        bilayerxyzFile << setw(20) << left << Si[2] << endl;
+        bilayerxyzFile << std::setw(10) << std::left << "Si" + std::to_string(2 * i + 1);
+        bilayerxyzFile << std::setw(20) << std::left << Si[0];
+        bilayerxyzFile << std::setw(20) << std::left << Si[1];
+        bilayerxyzFile << std::setw(20) << std::left << Si[2] << std::endl;
 
         atom_count += 1;
     }
-    cout << "##### O crys" << endl;
-    cout << ">>>>>>>>>>>>>>>>> Axial " << endl;
+    std::cout << "##### O crys" << std::endl;
+    std::cout << ">>>>>>>>>>>>>>>>> Axial " << std::endl;
     for (int i = 0; i < nodes.n; ++i)
     {
         O[0] = nodes[i].crd[0] * si_si_distance; // needs pbc work xoxo
@@ -2409,26 +2426,26 @@ void Network::writeBilayerA(string prefix, float lj_cutoff)
 
         O[2] = 5 + 1.609;
 
-        crysFile << setw(20) << left << O[0];
-        crysFile << setw(20) << left << O[1];
-        crysFile << setw(20) << left << O[2] << endl;
-        bilayerxyzFile << setw(10) << left << "O" + to_string(i);
-        bilayerxyzFile << setw(20) << left << O[0];
-        bilayerxyzFile << setw(20) << left << O[1];
-        bilayerxyzFile << setw(20) << left << O[2] << endl;
+        crysFile << std::setw(20) << std::left << O[0];
+        crysFile << std::setw(20) << std::left << O[1];
+        crysFile << std::setw(20) << std::left << O[2] << std::endl;
+        bilayerxyzFile << std::setw(10) << std::left << "O" + std::to_string(i);
+        bilayerxyzFile << std::setw(20) << std::left << O[0];
+        bilayerxyzFile << std::setw(20) << std::left << O[1];
+        bilayerxyzFile << std::setw(20) << std::left << O[2] << std::endl;
 
         Pair[0] = atom_count;
         Pair[1] = 2 * i + 1;
 
-        harmpairsFile << setw(20) << left << Pair[0];
-        harmpairsFile << setw(20) << left << Pair[1] << endl;
+        harmpairsFile << std::setw(20) << std::left << Pair[0];
+        harmpairsFile << std::setw(20) << std::left << Pair[1] << std::endl;
 
         Si_O_harmpairs[2 * i][1] = atom_count;
 
         Pair[1] = 2 * i + 2;
 
-        harmpairsFile << setw(20) << left << Pair[0];
-        harmpairsFile << setw(20) << left << Pair[1] << endl;
+        harmpairsFile << std::setw(20) << std::left << Pair[0];
+        harmpairsFile << std::setw(20) << std::left << Pair[1] << std::endl;
 
         Si_O_harmpairs[2 * i + 1][1] = atom_count;
 
@@ -2447,7 +2464,7 @@ void Network::writeBilayerA(string prefix, float lj_cutoff)
         }
     }
     oxygen_number = 0;
-    cout << ">>>>>>>>>> Equitorial" << endl;
+    std::cout << ">>>>>>>>>> Equitorial" << std::endl;
     for (int i = 0; i < nodes.n; ++i)
     {
         for (int j = 0; j < nodes[i].netCnxs.n; ++j)
@@ -2486,25 +2503,25 @@ void Network::writeBilayerA(string prefix, float lj_cutoff)
 
                 O[2] = 5 + 2 * 1.609 + h;
                 // coordinate write
-                crysFile << setw(20) << left << O[0];
-                crysFile << setw(20) << left << O[1];
-                crysFile << setw(20) << left << O[2] << endl;
+                crysFile << std::setw(20) << std::left << O[0];
+                crysFile << std::setw(20) << std::left << O[1];
+                crysFile << std::setw(20) << std::left << O[2] << std::endl;
                 // bilayer write
-                bilayerxyzFile << setw(10) << left << "O" + to_string(nodes.n + 2 * i);
-                bilayerxyzFile << setw(20) << left << O[0];
-                bilayerxyzFile << setw(20) << left << O[1];
-                bilayerxyzFile << setw(20) << left << O[2] << endl;
+                bilayerxyzFile << std::setw(10) << std::left << "O" + std::to_string(nodes.n + 2 * i);
+                bilayerxyzFile << std::setw(20) << std::left << O[0];
+                bilayerxyzFile << std::setw(20) << std::left << O[1];
+                bilayerxyzFile << std::setw(20) << std::left << O[2] << std::endl;
 
                 Pair[0] = atom_count;
                 Pair[1] = 2 * i + 1;
 
-                harmpairsFile << setw(20) << left << Pair[0];
-                harmpairsFile << setw(20) << left << Pair[1] << endl;
+                harmpairsFile << std::setw(20) << std::left << Pair[0];
+                harmpairsFile << std::setw(20) << std::left << Pair[1] << std::endl;
 
                 Pair[1] = 2 * nodes[i].netCnxs[j] + 1;
 
-                harmpairsFile << setw(20) << left << Pair[0];
-                harmpairsFile << setw(20) << left << Pair[1] << endl;
+                harmpairsFile << std::setw(20) << std::left << Pair[0];
+                harmpairsFile << std::setw(20) << std::left << Pair[1] << std::endl;
 
                 int k = 1;
                 while (k < 5)
@@ -2532,23 +2549,23 @@ void Network::writeBilayerA(string prefix, float lj_cutoff)
                 atom_count += 1;
 
                 O[2] = 5 - h;
-                crysFile << setw(20) << left << O[0];
-                crysFile << setw(20) << left << O[1];
-                crysFile << setw(20) << left << O[2] << endl;
+                crysFile << std::setw(20) << std::left << O[0];
+                crysFile << std::setw(20) << std::left << O[1];
+                crysFile << std::setw(20) << std::left << O[2] << std::endl;
 
-                bilayerxyzFile << setw(10) << left << "O" + to_string(nodes.n + 2 * i + 1);
-                bilayerxyzFile << setw(20) << left << O[0];
-                bilayerxyzFile << setw(20) << left << O[1];
-                bilayerxyzFile << setw(20) << left << O[2] << endl;
+                bilayerxyzFile << std::setw(10) << std::left << "O" + std::to_string(nodes.n + 2 * i + 1);
+                bilayerxyzFile << std::setw(20) << std::left << O[0];
+                bilayerxyzFile << std::setw(20) << std::left << O[1];
+                bilayerxyzFile << std::setw(20) << std::left << O[2] << std::endl;
 
                 Pair[0] = atom_count;
                 Pair[1] = 2 * i + 2;
-                harmpairsFile << setw(20) << left << Pair[0];
-                harmpairsFile << setw(20) << left << Pair[1] << endl;
+                harmpairsFile << std::setw(20) << std::left << Pair[0];
+                harmpairsFile << std::setw(20) << std::left << Pair[1] << std::endl;
 
                 Pair[1] = 2 * nodes[i].netCnxs[j] + 2;
-                harmpairsFile << setw(20) << left << Pair[0];
-                harmpairsFile << setw(20) << left << Pair[1] << endl;
+                harmpairsFile << std::setw(20) << std::left << Pair[0];
+                harmpairsFile << std::setw(20) << std::left << Pair[1] << std::endl;
 
                 k = 1;
                 while (k < 5)
@@ -2577,42 +2594,42 @@ void Network::writeBilayerA(string prefix, float lj_cutoff)
         }
     }
 
-    cout << "##### O-O pairs" << endl;
+    std::cout << "##### O-O pairs" << std::endl;
     for (int i = 0; i < 2 * nodes.n; ++i)
     {
         Pair[0] = Si_O_harmpairs[i][1];
         Pair[1] = Si_O_harmpairs[i][2];
-        harmpairsFile << setw(20) << left << Pair[0];
-        harmpairsFile << setw(20) << left << Pair[1] << endl;
+        harmpairsFile << std::setw(20) << std::left << Pair[0];
+        harmpairsFile << std::setw(20) << std::left << Pair[1] << std::endl;
 
         Pair[0] = Si_O_harmpairs[i][1];
         Pair[1] = Si_O_harmpairs[i][3];
-        harmpairsFile << setw(20) << left << Pair[0];
-        harmpairsFile << setw(20) << left << Pair[1] << endl;
+        harmpairsFile << std::setw(20) << std::left << Pair[0];
+        harmpairsFile << std::setw(20) << std::left << Pair[1] << std::endl;
 
         Pair[0] = Si_O_harmpairs[i][1];
         Pair[1] = Si_O_harmpairs[i][4];
-        harmpairsFile << setw(20) << left << Pair[0];
-        harmpairsFile << setw(20) << left << Pair[1] << endl;
+        harmpairsFile << std::setw(20) << std::left << Pair[0];
+        harmpairsFile << std::setw(20) << std::left << Pair[1] << std::endl;
 
         Pair[0] = Si_O_harmpairs[i][2];
         Pair[1] = Si_O_harmpairs[i][3];
-        harmpairsFile << setw(20) << left << Pair[0];
-        harmpairsFile << setw(20) << left << Pair[1] << endl;
+        harmpairsFile << std::setw(20) << std::left << Pair[0];
+        harmpairsFile << std::setw(20) << std::left << Pair[1] << std::endl;
 
         Pair[0] = Si_O_harmpairs[i][2];
         Pair[1] = Si_O_harmpairs[i][4];
-        harmpairsFile << setw(20) << left << Pair[0];
-        harmpairsFile << setw(20) << left << Pair[1] << endl;
+        harmpairsFile << std::setw(20) << std::left << Pair[0];
+        harmpairsFile << std::setw(20) << std::left << Pair[1] << std::endl;
 
         Pair[0] = Si_O_harmpairs[i][3];
         Pair[1] = Si_O_harmpairs[i][4];
-        harmpairsFile << setw(20) << left << Pair[0];
-        harmpairsFile << setw(20) << left << Pair[1] << endl;
+        harmpairsFile << std::setw(20) << std::left << Pair[0];
+        harmpairsFile << std::setw(20) << std::left << Pair[1] << std::endl;
     }
 
-    cout << "##### Tetrahedron" << endl;
-    ofstream tetrahedraFile(newoutputPrefixfolder + "/tetrahedra.dat", ios::in | ios::trunc);
+    std::cout << "##### Tetrahedron" << std::endl;
+    std::ofstream tetrahedraFile(newoutputPrefixfolder + "/tetrahedra.dat", std::ios::in | std::ios::trunc);
     VecF<int> Tetrahedron(5);
     for (int i = 0; i < 2 * nodes.n; ++i)
     {
@@ -2620,68 +2637,68 @@ void Network::writeBilayerA(string prefix, float lj_cutoff)
         {
             Tetrahedron[j] = Si_O_harmpairs[i][j];
         }
-        tetrahedraFile << setw(20) << left << Tetrahedron[0];
-        tetrahedraFile << setw(20) << left << Tetrahedron[1];
-        tetrahedraFile << setw(20) << left << Tetrahedron[2];
-        tetrahedraFile << setw(20) << left << Tetrahedron[3];
-        tetrahedraFile << setw(20) << left << Tetrahedron[4] << endl;
+        tetrahedraFile << std::setw(20) << std::left << Tetrahedron[0];
+        tetrahedraFile << std::setw(20) << std::left << Tetrahedron[1];
+        tetrahedraFile << std::setw(20) << std::left << Tetrahedron[2];
+        tetrahedraFile << std::setw(20) << std::left << Tetrahedron[3];
+        tetrahedraFile << std::setw(20) << std::left << Tetrahedron[4] << std::endl;
     }
 
-    cout << "##### OPTIMISE_SILICA_INPUT" << endl;
-    ofstream optimise_silica_File(newoutputPrefixfolder + "/optimise_silica.inpt", ios::in | ios::trunc);
-    optimise_silica_File << "I/O" << endl;
-    optimise_silica_File << "./crys.crds              input coordinates" << endl;
-    optimise_silica_File << "./harmpairs.dat              input harmonic pairs" << endl;
-    optimise_silica_File << "./lj_pairs.dat              input repulsive pairs" << endl;
-    optimise_silica_File << "./fixedz.dat              input fixed z atoms" << endl;
-    optimise_silica_File << "./test                              output prefix" << endl;
-    optimise_silica_File << "-----------------------------------------------------------" << endl;
-    optimise_silica_File << "Restart Options" << endl;
-    optimise_silica_File << "0               print restart file" << endl;
-    optimise_silica_File << "0               restart run?" << endl;
-    optimise_silica_File << "-----------------------------------------------------------" << endl;
-    optimise_silica_File << "Sample Information" << endl;
-    optimise_silica_File << int(nodes.n * 2) << endl;
-    optimise_silica_File << "1               stretch x" << endl;
-    optimise_silica_File << "1               stretch y" << endl;
-    optimise_silica_File << "0               stretch z" << endl;
-    optimise_silica_File << "45              central angle" << endl;
-    optimise_silica_File << "0              scan angle" << endl;
-    optimise_silica_File << double(dim_x) << endl;
-    optimise_silica_File << double(dim_y) << endl;
-    optimise_silica_File << "20              unit cell z" << endl;
-    optimise_silica_File << "-----------------------------------------------------------" << endl;
-    optimise_silica_File << "Geometry Optimisation" << endl;
-    optimise_silica_File << "1                   resize(1/0)" << endl;
-    optimise_silica_File << "1.300               starting volume (relative to reference)" << endl;
-    optimise_silica_File << "0.900               final volume (relative to reference)" << endl;
-    optimise_silica_File << "5                   number of volumes to analyse" << endl;
-    optimise_silica_File << "1                  samples per volume" << endl;
-    optimise_silica_File << double(dim_x) << endl;
-    optimise_silica_File << double(dim_y) << endl;
-    optimise_silica_File << "20                  unit cell z reference" << endl;
-    optimise_silica_File << "10000000             max steps iterations steepest descent (per area)" << endl;
-    optimise_silica_File << "0.5                 Armijo backtracking constant" << endl;
-    optimise_silica_File << "1e-9                convergence tolerance" << endl;
-    optimise_silica_File << "-----------------------------------------------------------" << endl;
-    optimise_silica_File << "Potential Model" << endl;
-    optimise_silica_File << "1                   turn on harmonic interactions (1/0)" << endl;
-    optimise_silica_File << "1.609               harmonic Si-O r0" << endl;
-    optimise_silica_File << "1                   harmonic Si-O k" << endl;
-    optimise_silica_File << "1                   harmonic O-O k" << endl;
-    optimise_silica_File << "0                   turn on SiSi harmonics (1/0)" << endl;
-    optimise_silica_File << "0                   harmonic Si-Si r0" << endl;
-    optimise_silica_File << "0                   harmonic Si-Si k" << endl;
-    optimise_silica_File << "1                   turn on 24-12 repulsions (1/0)" << endl;
-    optimise_silica_File << "1.7                 repulsive r0" << endl;
-    optimise_silica_File << "0.25                repulsive k" << endl;
-    optimise_silica_File << "0                   turn on z fixing (1/0)" << endl;
-    optimise_silica_File << "1                   turn on multicore optimisation" << endl;
-    optimise_silica_File << "0                   Parallelise Sample" << endl;
-    optimise_silica_File << "1                   Parallelise Area" << endl;
-    optimise_silica_File << "1                   number of cores" << endl;
-    optimise_silica_File << "0                   turn on cuda" << endl;
-    optimise_silica_File << "-----------------------------------------------------------" << endl;
+    std::cout << "##### OPTIMISE_SILICA_INPUT" << std::endl;
+    std::ofstream optimise_silica_File(newoutputPrefixfolder + "/optimise_silica.inpt", std::ios::in | std::ios::trunc);
+    optimise_silica_File << "I/O" << std::endl;
+    optimise_silica_File << "./crys.crds              input coordinates" << std::endl;
+    optimise_silica_File << "./harmpairs.dat              input harmonic pairs" << std::endl;
+    optimise_silica_File << "./lj_pairs.dat              input repulsive pairs" << std::endl;
+    optimise_silica_File << "./fixedz.dat              input fixed z atoms" << std::endl;
+    optimise_silica_File << "./test                              output prefix" << std::endl;
+    optimise_silica_File << "-----------------------------------------------------------" << std::endl;
+    optimise_silica_File << "Restart Options" << std::endl;
+    optimise_silica_File << "0               print restart file" << std::endl;
+    optimise_silica_File << "0               restart run?" << std::endl;
+    optimise_silica_File << "-----------------------------------------------------------" << std::endl;
+    optimise_silica_File << "Sample Information" << std::endl;
+    optimise_silica_File << int(nodes.n * 2) << std::endl;
+    optimise_silica_File << "1               stretch x" << std::endl;
+    optimise_silica_File << "1               stretch y" << std::endl;
+    optimise_silica_File << "0               stretch z" << std::endl;
+    optimise_silica_File << "45              central angle" << std::endl;
+    optimise_silica_File << "0              scan angle" << std::endl;
+    optimise_silica_File << double(dim_x) << std::endl;
+    optimise_silica_File << double(dim_y) << std::endl;
+    optimise_silica_File << "20              unit cell z" << std::endl;
+    optimise_silica_File << "-----------------------------------------------------------" << std::endl;
+    optimise_silica_File << "Geometry Optimisation" << std::endl;
+    optimise_silica_File << "1                   resize(1/0)" << std::endl;
+    optimise_silica_File << "1.300               starting volume (relative to reference)" << std::endl;
+    optimise_silica_File << "0.900               final volume (relative to reference)" << std::endl;
+    optimise_silica_File << "5                   number of volumes to analyse" << std::endl;
+    optimise_silica_File << "1                  samples per volume" << std::endl;
+    optimise_silica_File << double(dim_x) << std::endl;
+    optimise_silica_File << double(dim_y) << std::endl;
+    optimise_silica_File << "20                  unit cell z reference" << std::endl;
+    optimise_silica_File << "10000000             max steps iterations steepest descent (per area)" << std::endl;
+    optimise_silica_File << "0.5                 Armijo backtracking constant" << std::endl;
+    optimise_silica_File << "1e-9                convergence tolerance" << std::endl;
+    optimise_silica_File << "-----------------------------------------------------------" << std::endl;
+    optimise_silica_File << "Potential Model" << std::endl;
+    optimise_silica_File << "1                   turn on harmonic interactions (1/0)" << std::endl;
+    optimise_silica_File << "1.609               harmonic Si-O r0" << std::endl;
+    optimise_silica_File << "1                   harmonic Si-O k" << std::endl;
+    optimise_silica_File << "1                   harmonic O-O k" << std::endl;
+    optimise_silica_File << "0                   turn on SiSi harmonics (1/0)" << std::endl;
+    optimise_silica_File << "0                   harmonic Si-Si r0" << std::endl;
+    optimise_silica_File << "0                   harmonic Si-Si k" << std::endl;
+    optimise_silica_File << "1                   turn on 24-12 repulsions (1/0)" << std::endl;
+    optimise_silica_File << "1.7                 repulsive r0" << std::endl;
+    optimise_silica_File << "0.25                repulsive k" << std::endl;
+    optimise_silica_File << "0                   turn on z fixing (1/0)" << std::endl;
+    optimise_silica_File << "1                   turn on multicore optimisation" << std::endl;
+    optimise_silica_File << "0                   Parallelise Sample" << std::endl;
+    optimise_silica_File << "1                   Parallelise Area" << std::endl;
+    optimise_silica_File << "1                   number of cores" << std::endl;
+    optimise_silica_File << "0                   turn on cuda" << std::endl;
+    optimise_silica_File << "-----------------------------------------------------------" << std::endl;
 
     crysFile.close();
     harmpairsFile.close();
@@ -2691,13 +2708,13 @@ void Network::writeBilayerA(string prefix, float lj_cutoff)
 
     optimise_silica_File.close();
 
-    cout << "Beginning Lj File" << endl;
-    ofstream ljFile(newoutputPrefixfolder + "/lj_pairs.dat", ios::in | ios::trunc);
+    std::cout << "Beginning Lj File" << std::endl;
+    std::ofstream ljFile(newoutputPrefixfolder + "/lj_pairs.dat", std::ios::in | std::ios::trunc);
 
     VecR<int> lj_i(100000, 100000);
     VecR<int> lj_j(100000, 100000);
 
-    cout << "LJ CUTOFF : " << lj_cutoff << endl;
+    std::cout << "LJ CUTOFF : " << lj_cutoff << std::endl;
 
     int lj_count = 0;
 
@@ -2734,13 +2751,13 @@ void Network::writeBilayerA(string prefix, float lj_cutoff)
         }
     }
 
-    ljFile << lj_count << endl;
-    ljFile << fixed << showpoint << setprecision(6);
+    ljFile << lj_count << std::endl;
+    ljFile << std::fixed << std::showpoint << std::setprecision(6);
 
     for (int i = 0; i < lj_count; ++i)
     {
-        ljFile << setw(20) << left << lj_i[i];
-        ljFile << setw(20) << left << lj_j[i] << endl;
+        ljFile << std::setw(20) << std::left << lj_i[i];
+        ljFile << std::setw(20) << std::left << lj_j[i] << std::endl;
     }
 
     ljFile.close();
