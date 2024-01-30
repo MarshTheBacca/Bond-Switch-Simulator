@@ -9,7 +9,7 @@ LammpsObject::LammpsObject()
 {
 }
 
-LammpsObject::LammpsObject(string selector, string inputFolder, LoggerPtr logger)
+LammpsObject::LammpsObject(std::string selector, std::string inputFolder, LoggerPtr logger)
 {
     logger->info("Creating Lammps Object");
     const char *lmpargv[] = {"liblammps", "-screen", "none"};
@@ -27,7 +27,7 @@ LammpsObject::LammpsObject(string selector, string inputFolder, LoggerPtr logger
     version = lammps_version(handle);
     logger->info("LAMMPS Version: {}", version);
 
-    std::map<string, string> selectorToFile = {
+    std::map<std::string, std::string> selectorToFile = {
         {"SimpleGraphene", "/Si.in"},
         {"TriangleRaft", "/Si2O3.in"},
         {"Bilayer", "/SiO2.in"},
@@ -40,7 +40,7 @@ LammpsObject::LammpsObject(string selector, string inputFolder, LoggerPtr logger
         throw std::runtime_error("Invalid Selector");
     }
 
-    string inputFilePath = inputFolder + selectorToFile[selector];
+    std::string inputFilePath = inputFolder + selectorToFile[selector];
     logger->info("Selected {}", selector);
     logger->info("File to run from : {}", inputFilePath);
     lammps_file(handle, inputFilePath.c_str());
@@ -51,7 +51,7 @@ LammpsObject::LammpsObject(string selector, string inputFolder, LoggerPtr logger
 
 int LammpsObject::write_data(int selector)
 {
-    string fname;
+    std::string fname;
     if (selector == 0)
     {
         fname = "write_data " + prefixFolderOut + "/Si_results.dat";
@@ -83,7 +83,7 @@ int LammpsObject::write_data(int selector)
 
 int LammpsObject::write_restart(int selector)
 {
-    string fname;
+    std::string fname;
     if (selector == 0)
     {
         fname = "write_restart " + prefixFolderOut + "/Si_restart.restart";
@@ -116,7 +116,7 @@ int LammpsObject::write_restart(int selector)
 
 int LammpsObject::finaliseLammpsObject(int selector)
 {
-    string fname;
+    std::string fname;
     if (selector == 0)
     {
         fname = "write_data " + prefixFolderOut + "/Si_results.dat";
@@ -149,7 +149,7 @@ int LammpsObject::finaliseLammpsObject(int selector)
     return 0;
 }
 
-void LammpsObject::runInput(string fname)
+void LammpsObject::runInput(std::string fname)
 {
     lammps_file(handle, fname.c_str());
     nbonds = std::intptr_t(lammps_extract_global(handle, "nbonds"));
@@ -196,7 +196,7 @@ double *LammpsObject::fetchBonds()
 {
     double initialBondCount = lammps_get_thermo(handle, "bonds");
     int bond_size = 3 * initialBondCount;
-    cout << bond_size << endl;
+    std::cout << bond_size << std::endl;
     bonds = new double[bond_size];
     lammps_gather_bonds(handle, bonds);
     return bonds;
@@ -205,10 +205,10 @@ double *LammpsObject::fetchBonds()
 void LammpsObject::breakBond(int atom1, int atom2, int type, LoggerPtr logger)
 {
     double initialBondCount = lammps_get_thermo(handle, "bonds");
-    string command;
-    command = "group switch id " + to_string(atom1) + " " + to_string(atom2);
+    std::string command;
+    command = "group switch id " + std::to_string(atom1) + " " + std::to_string(atom2);
     lammps_command(handle, command.c_str());
-    command = "delete_bonds switch bond " + to_string(type) + " remove";
+    command = "delete_bonds switch bond " + std::to_string(type) + " remove";
     lammps_command(handle, command.c_str());
     lammps_command(handle, "group switch delete");
     double finalBondCount = lammps_get_thermo(handle, "bonds");
@@ -223,8 +223,8 @@ void LammpsObject::breakBond(int atom1, int atom2, int type, LoggerPtr logger)
 
 void LammpsObject::formBond(int atom1, int atom2, int type, LoggerPtr logger)
 {
-    string command;
-    command = "create_bonds single/bond " + to_string(type) + " " + to_string(atom1) + " " + to_string(atom2);
+    std::string command;
+    command = "create_bonds single/bond " + std::to_string(type) + " " + std::to_string(atom1) + " " + std::to_string(atom2);
     lammps_command(handle, command.c_str());
 }
 
@@ -232,23 +232,23 @@ void LammpsObject::breakAngle(int atom1, int atom2, int atom3)
 {
     double initialAngleCount = lammps_get_thermo(handle, "angles");
 
-    string command;
-    command = "group switch id " + to_string(atom1) + " " + to_string(atom2) + " " + to_string(atom3);
+    std::string command;
+    command = "group switch id " + std::to_string(atom1) + " " + std::to_string(atom2) + " " + std::to_string(atom3);
     lammps_command(handle, command.c_str());
     lammps_command(handle, "delete_bonds switch angle 1 remove");
     lammps_command(handle, "group switch delete");
     double finalAngleCount = lammps_get_thermo(handle, "angles");
     if (finalAngleCount != initialAngleCount - 1)
     {
-        cout << "Error in Angle Counts" << endl;
+        std::cout << "Error in Angle Counts" << std::endl;
         exit(7);
     }
 }
 
 void LammpsObject::formAngle(int atom1, int atom2, int atom3)
 {
-    string command;
-    command = "create_bonds single/angle 1 " + to_string(atom1) + " " + to_string(atom2) + " " + to_string(atom3);
+    std::string command;
+    command = "create_bonds single/angle 1 " + std::to_string(atom1) + " " + std::to_string(atom2) + " " + std::to_string(atom3);
     lammps_command(handle, command.c_str());
 }
 
@@ -296,7 +296,7 @@ void LammpsObject::switchGraphene(VecF<int> switchIdsA, Network networkA, Logger
     }
     else
     {
-        cout << "e not connected to b" << endl;
+        std::cout << "e not connected to b" << std::endl;
         sleep(10);
     }
     if (networkA.nodes[d - 1].netCnxs[0] == a - 1)
@@ -316,7 +316,7 @@ void LammpsObject::switchGraphene(VecF<int> switchIdsA, Network networkA, Logger
     }
     else
     {
-        cout << "d not connected to a" << endl;
+        std::cout << "d not connected to a" << std::endl;
         sleep(10);
     }
 
@@ -383,7 +383,7 @@ void LammpsObject::revertGraphene(VecF<int> switchIdsA, Network networkA, Logger
     }
     else
     {
-        cout << "e not connected to a" << endl;
+        std::cout << "e not connected to a" << std::endl;
         sleep(10);
     }
     if (networkA.nodes[d - 1].netCnxs[0] == b - 1)
@@ -403,7 +403,7 @@ void LammpsObject::revertGraphene(VecF<int> switchIdsA, Network networkA, Logger
     }
     else
     {
-        cout << "d not connected to b" << endl;
+        std::cout << "d not connected to b" << std::endl;
         sleep(10);
     }
 
@@ -706,7 +706,7 @@ void LammpsObject::revertBilayer(VecF<int> switchIdsA, VecF<int> switchIdsB,
     delta_prime = 3 * nSi2 + (delta - nSi2) * 2 + 1;
     delta_prime_prime = delta_prime + 1;
 
-    string command;
+    std::string command;
 
     breakBond(a_prime, delta_prime, 2, logger);
     breakBond(b_prime, gamma_prime, 2, logger);
@@ -778,19 +778,19 @@ void LammpsObject::switchBonds(VecF<int> switchIdsA, VecF<int> switchIdsB, VecF<
      *
      */
 
-    string command;
-    command = "group switch id " + to_string(a) + " " + to_string(e);
+    std::string command;
+    command = "group switch id " + std::to_string(a) + " " + std::to_string(e);
     lammps_command(handle, command.c_str());
     lammps_command(handle, "group switch delete");
 
-    command = "group switch id " + to_string(b) + " " + to_string(d);
+    command = "group switch id " + std::to_string(b) + " " + std::to_string(d);
     lammps_command(handle, command.c_str());
     lammps_command(handle, "group switch delete");
 
-    command = "create_bonds single/bond 1 " + to_string(a) + " " + to_string(d);
+    command = "create_bonds single/bond 1 " + std::to_string(a) + " " + std::to_string(d);
     lammps_command(handle, command.c_str());
 
-    command = "create_bonds single/bond 1 " + to_string(b) + " " + to_string(e);
+    command = "create_bonds single/bond 1 " + std::to_string(b) + " " + std::to_string(e);
     lammps_command(handle, command.c_str());
 
     /*
@@ -804,32 +804,32 @@ void LammpsObject::switchBonds(VecF<int> switchIdsA, VecF<int> switchIdsB, VecF<
      *      eta   x delta   eta - gamma
      *
      */
-    command = "group switch id " + to_string(a) + " " + to_string(gamma);
+    command = "group switch id " + std::to_string(a) + " " + std::to_string(gamma);
     lammps_command(handle, command.c_str());
     lammps_command(handle, "group switch delete");
 
-    command = "group switch id " + to_string(b) + " " + to_string(delta);
+    command = "group switch id " + std::to_string(b) + " " + std::to_string(delta);
     lammps_command(handle, command.c_str());
     lammps_command(handle, "group switch delete");
 
-    command = "group switch id " + to_string(gamma) + " " + to_string(beta);
+    command = "group switch id " + std::to_string(gamma) + " " + std::to_string(beta);
     lammps_command(handle, command.c_str());
     lammps_command(handle, "group switch delete");
 
-    command = "group switch id " + to_string(delta) + " " + to_string(eta);
+    command = "group switch id " + std::to_string(delta) + " " + std::to_string(eta);
     lammps_command(handle, command.c_str());
     lammps_command(handle, "group switch delete");
 
-    command = "create_bonds single/bond 1 " + to_string(a) + " " + to_string(delta);
+    command = "create_bonds single/bond 1 " + std::to_string(a) + " " + std::to_string(delta);
     lammps_command(handle, command.c_str());
 
-    command = "create_bonds single/bond 1 " + to_string(b) + " " + to_string(gamma);
+    command = "create_bonds single/bond 1 " + std::to_string(b) + " " + std::to_string(gamma);
     lammps_command(handle, command.c_str());
 
-    command = "create_bonds single/bond 1 " + to_string(beta) + " " + to_string(delta);
+    command = "create_bonds single/bond 1 " + std::to_string(beta) + " " + std::to_string(delta);
     lammps_command(handle, command.c_str());
 
-    command = "create_bonds single/bond 1 " + to_string(eta) + " " + to_string(gamma);
+    command = "create_bonds single/bond 1 " + std::to_string(eta) + " " + std::to_string(gamma);
     lammps_command(handle, command.c_str());
 
     /*
@@ -873,94 +873,94 @@ void LammpsObject::switchBonds(VecF<int> switchIdsA, VecF<int> switchIdsB, VecF<
 
     //      Top layer
 
-    command = "group switch id " + to_string(a_prime) + " " + to_string(gamma_prime);
+    command = "group switch id " + std::to_string(a_prime) + " " + std::to_string(gamma_prime);
     lammps_command(handle, command.c_str());
     lammps_command(handle, "group switch delete");
 
-    command = "group switch id " + to_string(b_prime) + " " + to_string(delta_prime);
+    command = "group switch id " + std::to_string(b_prime) + " " + std::to_string(delta_prime);
     lammps_command(handle, command.c_str());
     lammps_command(handle, "group switch delete");
 
-    command = "group switch id " + to_string(gamma_prime) + " " + to_string(beta_prime);
+    command = "group switch id " + std::to_string(gamma_prime) + " " + std::to_string(beta_prime);
     lammps_command(handle, command.c_str());
     lammps_command(handle, "group switch delete");
 
-    command = "group switch id " + to_string(delta_prime) + " " + to_string(eta_prime);
+    command = "group switch id " + std::to_string(delta_prime) + " " + std::to_string(eta_prime);
     lammps_command(handle, command.c_str());
     lammps_command(handle, "group switch delete");
 
-    command = "create_bonds single/bond 1 " + to_string(a_prime) + " " + to_string(delta_prime);
+    command = "create_bonds single/bond 1 " + std::to_string(a_prime) + " " + std::to_string(delta_prime);
     lammps_command(handle, command.c_str());
 
-    command = "create_bonds single/bond 1 " + to_string(b_prime) + " " + to_string(gamma_prime);
+    command = "create_bonds single/bond 1 " + std::to_string(b_prime) + " " + std::to_string(gamma_prime);
     lammps_command(handle, command.c_str());
 
-    command = "create_bonds single/bond 1 " + to_string(beta_prime) + " " + to_string(delta_prime);
+    command = "create_bonds single/bond 1 " + std::to_string(beta_prime) + " " + std::to_string(delta_prime);
     lammps_command(handle, command.c_str());
 
-    command = "create_bonds single/bond 1 " + to_string(eta_prime) + " " + to_string(gamma_prime);
+    command = "create_bonds single/bond 1 " + std::to_string(eta_prime) + " " + std::to_string(gamma_prime);
     lammps_command(handle, command.c_str());
 
     // Bottom layer
 
-    command = "group switch id " + to_string(a_prime_prime) + " " + to_string(gamma_prime_prime);
+    command = "group switch id " + std::to_string(a_prime_prime) + " " + std::to_string(gamma_prime_prime);
     lammps_command(handle, command.c_str());
     lammps_command(handle, "group switch delete");
 
-    command = "group switch id " + to_string(b_prime_prime) + " " + to_string(delta_prime_prime);
+    command = "group switch id " + std::to_string(b_prime_prime) + " " + std::to_string(delta_prime_prime);
     lammps_command(handle, command.c_str());
     lammps_command(handle, "group switch delete");
 
-    command = "group switch id " + to_string(gamma_prime_prime) + " " + to_string(beta_prime_prime);
+    command = "group switch id " + std::to_string(gamma_prime_prime) + " " + std::to_string(beta_prime_prime);
     lammps_command(handle, command.c_str());
     lammps_command(handle, "group switch delete");
 
-    command = "group switch id " + to_string(delta_prime_prime) + " " + to_string(eta_prime_prime);
+    command = "group switch id " + std::to_string(delta_prime_prime) + " " + std::to_string(eta_prime_prime);
     lammps_command(handle, command.c_str());
     lammps_command(handle, "group switch delete");
 
-    command = "create_bonds single/bond 1 " + to_string(a_prime_prime) + " " + to_string(delta_prime_prime);
+    command = "create_bonds single/bond 1 " + std::to_string(a_prime_prime) + " " + std::to_string(delta_prime_prime);
     lammps_command(handle, command.c_str());
 
-    command = "create_bonds single/bond 1 " + to_string(b_prime_prime) + " " + to_string(gamma_prime_prime);
+    command = "create_bonds single/bond 1 " + std::to_string(b_prime_prime) + " " + std::to_string(gamma_prime_prime);
     lammps_command(handle, command.c_str());
 
-    command = "create_bonds single/bond 1 " + to_string(beta_prime_prime) + " " + to_string(delta_prime_prime);
+    command = "create_bonds single/bond 1 " + std::to_string(beta_prime_prime) + " " + std::to_string(delta_prime_prime);
     lammps_command(handle, command.c_str());
 
-    command = "create_bonds single/bond 1 " + to_string(eta_prime_prime) + " " + to_string(gamma_prime_prime);
+    command = "create_bonds single/bond 1 " + std::to_string(eta_prime_prime) + " " + std::to_string(gamma_prime_prime);
     lammps_command(handle, command.c_str());
 
     // Bridge to Top Layer
 
-    command = "group switch id " + to_string(a_prime_prime_prime) + " " + to_string(gamma_prime);
+    command = "group switch id " + std::to_string(a_prime_prime_prime) + " " + std::to_string(gamma_prime);
     lammps_command(handle, command.c_str());
     lammps_command(handle, "group switch delete");
 
-    command = "group switch id " + to_string(b_prime_prime_prime) + " " + to_string(delta_prime);
+    command = "group switch id " + std::to_string(b_prime_prime_prime) + " " + std::to_string(delta_prime);
     lammps_command(handle, command.c_str());
     lammps_command(handle, "group switch delete");
 
-    command = "create_bonds single/bond 1 " + to_string(a_prime_prime_prime) + " " + to_string(delta_prime);
+    command = "create_bonds single/bond 1 " + std::to_string(a_prime_prime_prime) + " " + std::to_string(delta_prime);
     lammps_command(handle, command.c_str());
 
-    command = "create_bonds single/bond 1 " + to_string(b_prime_prime_prime) + " " + to_string(gamma_prime);
+    command = "create_bonds single/bond 1 " + std::to_string(b_prime_prime_prime) + " " + std::to_string(gamma_prime);
     lammps_command(handle, command.c_str());
 
     // Bridge to Bottom Layer
 
-    command = "group switch id " + to_string(a_prime_prime_prime) + " " + to_string(gamma_prime_prime);
+    command = "group switch id " + std::to_string(a_prime_prime_prime) + " " + std::to_string(gamma_prime_prime);
     lammps_command(handle, command.c_str());
     lammps_command(handle, "group switch delete");
 
-    command = "group switch id " + to_string(b_prime_prime_prime) + " " + to_string(delta_prime_prime);
+    command = "group switch id " + std::to_string(b_prime_prime_prime) + " " + std::to_string(delta_prime_prime);
     lammps_command(handle, command.c_str());
     lammps_command(handle, "group switch delete");
 
-    command = "create_bonds single/bond 1 " + to_string(a_prime_prime_prime) + " " + to_string(delta_prime_prime);
+    command = "create_bonds single/bond 1 " + std::to_string(a_prime_prime_prime) + " " + std::to_string(delta_prime_prime);
     lammps_command(handle, command.c_str());
 
-    command = "create_bonds single/bond 1 " + to_string(b_prime_prime_prime) + " " + to_string(gamma_prime_prime);
+    command = "create_bonds single/bond 1 " + std::to_string(b_prime_prime_prime) + " " + std::to_string(gamma_prime_prime);
     lammps_command(handle, command.c_str());
 }
 
@@ -1006,19 +1006,19 @@ void LammpsObject::revertBonds(VecF<int> switchIdsA, VecF<int> switchIdsB, VecF<
      *
      */
 
-    string command;
-    command = "group switch id " + to_string(a) + " " + to_string(d);
+    std::string command;
+    command = "group switch id " + std::to_string(a) + " " + std::to_string(d);
     lammps_command(handle, command.c_str());
     lammps_command(handle, "group switch delete");
 
-    command = "group switch id " + to_string(b) + " " + to_string(e);
+    command = "group switch id " + std::to_string(b) + " " + std::to_string(e);
     lammps_command(handle, command.c_str());
     lammps_command(handle, "group switch delete");
 
-    command = "create_bonds single/bond 1 " + to_string(a) + " " + to_string(e);
+    command = "create_bonds single/bond 1 " + std::to_string(a) + " " + std::to_string(e);
     lammps_command(handle, command.c_str());
 
-    command = "create_bonds single/bond 1 " + to_string(b) + " " + to_string(d);
+    command = "create_bonds single/bond 1 " + std::to_string(b) + " " + std::to_string(d);
     lammps_command(handle, command.c_str());
 
     /*
@@ -1032,32 +1032,32 @@ void LammpsObject::revertBonds(VecF<int> switchIdsA, VecF<int> switchIdsB, VecF<
      *      eta   x delta   eta - gamma
      *
      */
-    command = "group switch id " + to_string(a) + " " + to_string(delta);
+    command = "group switch id " + std::to_string(a) + " " + std::to_string(delta);
     lammps_command(handle, command.c_str());
     lammps_command(handle, "group switch delete");
 
-    command = "group switch id " + to_string(b) + " " + to_string(gamma);
+    command = "group switch id " + std::to_string(b) + " " + std::to_string(gamma);
     lammps_command(handle, command.c_str());
     lammps_command(handle, "group switch delete");
 
-    command = "group switch id " + to_string(gamma) + " " + to_string(eta);
+    command = "group switch id " + std::to_string(gamma) + " " + std::to_string(eta);
     lammps_command(handle, command.c_str());
     lammps_command(handle, "group switch delete");
 
-    command = "group switch id " + to_string(delta) + " " + to_string(beta);
+    command = "group switch id " + std::to_string(delta) + " " + std::to_string(beta);
     lammps_command(handle, command.c_str());
     lammps_command(handle, "group switch delete");
 
-    command = "create_bonds single/bond 1 " + to_string(a) + " " + to_string(gamma);
+    command = "create_bonds single/bond 1 " + std::to_string(a) + " " + std::to_string(gamma);
     lammps_command(handle, command.c_str());
 
-    command = "create_bonds single/bond 1 " + to_string(b) + " " + to_string(delta);
+    command = "create_bonds single/bond 1 " + std::to_string(b) + " " + std::to_string(delta);
     lammps_command(handle, command.c_str());
 
-    command = "create_bonds single/bond 1 " + to_string(beta) + " " + to_string(gamma);
+    command = "create_bonds single/bond 1 " + std::to_string(beta) + " " + std::to_string(gamma);
     lammps_command(handle, command.c_str());
 
-    command = "create_bonds single/bond 1 " + to_string(eta) + " " + to_string(delta);
+    command = "create_bonds single/bond 1 " + std::to_string(eta) + " " + std::to_string(delta);
     lammps_command(handle, command.c_str());
 }
 
