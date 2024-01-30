@@ -24,7 +24,7 @@ struct InputData
     std::string inputFolder;
     std::string inputFilePrefix;
     bool isFromScratchEnabled;
-    bool isRestartUsingLammpsObjectsEnabled;
+    bool isRestartUsingLAMMPSObjectsEnabled;
 
     // Network Properties Data
     int numRings;
