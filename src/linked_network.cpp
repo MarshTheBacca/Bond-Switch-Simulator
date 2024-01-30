@@ -29,8 +29,7 @@ LinkedNetwork::LinkedNetwork(int nodesA,
     }
     else
     {
-        std::cout << "Initial network does not fit within allowed coordination numbers" << endl
-                  << minCoordination << " vs " << minACnxs << endl;
+        logger->warn("Initial network does not fit within allowed coordination numbers:  {} vs {}", minCoordination, minACnxs);
     }
     if (maxCoordination >= maxACnxs)
     {
@@ -38,8 +37,7 @@ LinkedNetwork::LinkedNetwork(int nodesA,
     }
     else
     {
-        std::cout << "Initial network does not fit within allowed coordination numbers" << endl
-                  << maxCoordination << " vs " << maxACnxs << endl;
+        logger->warn("Initial network does not fit within allowed coordination numbers:  {} vs {}", maxCoordination, maxACnxs);
     }
     if (minRingSize <= minBCnxs)
     {
@@ -47,8 +45,7 @@ LinkedNetwork::LinkedNetwork(int nodesA,
     }
     else
     {
-        std::cout << "Initial network does not fit within allowed coordination numbers" << endl
-                  << minRingSize << " vs " << minBCnxs << endl;
+        logger->warn("Initial network does not fit within allowed coordination numbers:  {} vs {}", minRingSize, minBCnxs);
     }
     if (maxRingSize >= maxBCnxs)
     {
@@ -56,19 +53,35 @@ LinkedNetwork::LinkedNetwork(int nodesA,
     }
     else
     {
-        std::cout << "Initial network does not fit within allowed coordination numbers" << endl
-                  << maxRingSize << " vs " << maxBCnxs << endl;
+        logger->warn("Initial network does not fit within allowed coordination numbers:  {} vs {}", maxRingSize, maxBCnxs);
     }
 }
 
 // Construct by loading networks from files
-LinkedNetwork::LinkedNetwork(string inputFolder, string inputFilePrefix, string outputFolder,
+/**
+ * @brief Construct by loading networks from files
+ * @param inputFolder the folder containing the input files
+ * @param inputFilePrefix the prefix of the input files
+ * @param outputFolder the folder containing the output files
+ * @param minCoordination the minimum coordination number
+ * @param maxCoordination the maximum coordination number
+ * @param minRingSize the minimum ring size
+ * @param maxRingSize the maximum ring size
+ * @param isSimpleGrapheneEnabledArg boolean to enable or disable simple graphene
+ * @param isTriangleRaftEnabledArg boolean to enable or disable triangle raft
+ * @param isBilayerEnabledArg boolean to enable or disable bilayer
+ * @param isTersoffGrapheneEnabledArg boolean to enable or disable tersoff graphene
+ * @param isBNEnabledArg boolean to enable or disable BN
+ * @param isRestartWithLAMMPSObjectsEnabledArg boolean to enable or disable restart with LAMMPS objects
+ * @param logger the logger object
+ */
+LinkedNetwork::LinkedNetwork(std::string inputFolder, std::string inputFilePrefix, std::string outputFolder,
                              int minCoordination, int maxCoordination, int minRingSize, int maxRingSize,
-                             bool isSimpleGrapheneEnabled, bool isTriangleRaftEnabled,
-                             bool isBilayerEnabled, bool isTersoffGrapheneEnabled,
-                             bool isBNEnabled, bool isRestartWithLammpsObjectsEnabled, LoggerPtr logger)
+                             bool isSimpleGrapheneEnabledArg, bool isTriangleRaftEnabledArg,
+                             bool isBilayerEnabledArg, bool isTersoffGrapheneEnabledArg,
+                             bool isBNEnabledArg, bool isRestartWithLAMMPSObjectsEnabledArg, LoggerPtr logger)
 {
-    string prefix = inputFolder + '/' + inputFilePrefix;
+    std::string prefix = inputFolder + '/' + inputFilePrefix;
     networkA = Network(prefix + "_A", maxRingSize, maxRingSize, logger);
     int ACnxs = 0, BCnxs = 0;
     minACnxs = 10;
@@ -124,8 +137,8 @@ LinkedNetwork::LinkedNetwork(string inputFolder, string inputFilePrefix, string 
     {
         logger->warn("Initial network does not fit within allowed max ring coordination numbers:  {} vs {}", maxRingSize, maxBCnxs);
     }
-    logger->info("Creating network T");
-    if (isRestartWithLammpsObjectsEnabled && isTriangleRaftEnabled)
+    logger->info("Creating network T...");
+    if (isRestartWithLAMMPSObjectsEnabledArg && isTriangleRaftEnabledArg)
     {
         networkT = Network(prefix + "_Si2O3", maxRingSize, maxRingSize, logger);
     }
@@ -135,19 +148,19 @@ LinkedNetwork::LinkedNetwork(string inputFolder, string inputFilePrefix, string 
     }
     //  Linked Network can contain lammps objects for minimisation
     //  These will not necessarily have the same coordinate systems, bond orders, etc etc.
-    if (isSimpleGrapheneEnabled)
+    if (isSimpleGrapheneEnabledArg)
         SimpleGraphene = LammpsObject("SimpleGraphene", inputFolder, logger);
-    if (isTersoffGrapheneEnabled)
+    if (isTersoffGrapheneEnabledArg)
         TersoffGraphene = LammpsObject("TersoffGraphene", inputFolder, logger);
-    if (isTriangleRaftEnabled)
+    if (isTriangleRaftEnabledArg)
         Triangle_Raft = LammpsObject("TriangleRaft", inputFolder, logger);
-    if (isBilayerEnabled)
+    if (isBilayerEnabledArg)
         Bilayer = LammpsObject("Bilayer", inputFolder, logger);
-    if (isBNEnabled)
+    if (isBNEnabledArg)
         BN = LammpsObject("BN", inputFolder, logger);
 }
 
-void LinkedNetwork::pushPrefix(string prefixin, string prefixout)
+void LinkedNetwork::pushPrefix(std::string prefixin, std::string prefixout)
 {
     prefixIn = prefixin;
     prefixOut = prefixout;
@@ -159,28 +172,28 @@ void LinkedNetwork::pushPrefix(string prefixin, string prefixout)
  * @param filename the name of the input file
  * @param logger the logger object
  */
-void LinkedNetwork::findFixedRings(bool isFixedRingsEnabled, string filename, LoggerPtr logger)
+void LinkedNetwork::findFixedRings(bool isFixedRingsEnabled, std::string filename, LoggerPtr logger)
 {
     // Format of the fixed_rings.dat file has changed to not include the number of fixed rings on the first line,
     // but simply the IDs of each fixed ring line by line.
     if (isFixedRingsEnabled)
     {
         // Open the file
-        ifstream fixedRingsFile(filename + ".dat", ios::in);
+        std::ifstream fixedRingsFile(filename + ".dat", std::ios::in);
         if (!fixedRingsFile.is_open())
         {
             logger->warn("Failed to open file: {}.dat, setting number of fixed rings to 0.", filename);
             fixedRings.setSize(0);
             return;
         }
-        string line;
+        std::string line;
         std::string ringList = "";
         int numFixedRings = 0;
         // Read the file line by line
         while (getline(fixedRingsFile, line))
         {
             // Convert the line to an integer and store it in the vector
-            istringstream(line) >> fixedRings[numFixedRings];
+            std::istringstream(line) >> fixedRings[numFixedRings];
             ringList += std::to_string(fixedRings[numFixedRings]) + " ";
             numFixedRings++;
         }
@@ -261,7 +274,7 @@ void LinkedNetwork::rescale(double scaleFactor)
 }
 
 // Project lattice onto different geometry
-void LinkedNetwork::project(string projType, double param)
+void LinkedNetwork::project(std::string projType, double param)
 {
     if (projType == "sphere")
     {
@@ -271,9 +284,8 @@ void LinkedNetwork::project(string projType, double param)
 }
 
 // Project lattice onto different geometry with optimal parameters
-void LinkedNetwork::optimalProjection(string projType)
+void LinkedNetwork::optimalProjection(std::string projType, LoggerPtr logger)
 {
-
     if (projType == "sphere")
     {
         // Geometry optimise changing sphere radius until hit minimum in energy
@@ -284,7 +296,7 @@ void LinkedNetwork::optimalProjection(string projType)
         int searchLim = 20;
         VecF<double> saveCrdsA = crds;
         VecF<double> energies(20);
-        energies[0] = numeric_limits<double>::infinity();
+        energies[0] = std::numeric_limits<double>::infinity();
         double radius = 1.0;
         for (int i = 1; i < searchLim; ++i)
         {
@@ -298,7 +310,7 @@ void LinkedNetwork::optimalProjection(string projType)
             }
             globalGeometryOptimisation(false, false, networkA);
             energies[i] = globalPotentialEnergy(false, false, networkA);
-            std::cout << radius << " " << energies[i] << endl;
+            logger->info("Initial spherical minimisation: {} {}", radius, energies[i]);
             radius += 1.0;
             crds = saveCrdsA;
         }
@@ -314,7 +326,7 @@ void LinkedNetwork::optimalProjection(string projType)
             }
         }
         if (id0 == searchLim - 1)
-            throw string("Initial spherical minimisation reached search limit");
+            throw std::runtime_error("Initial spherical minimisation reached search limit");
         else
         {
             lowerLim = id0 - 1.0;
@@ -341,7 +353,7 @@ void LinkedNetwork::optimalProjection(string projType)
         for (int i = 0; i < 3; ++i)
         {
             radius = lowerLim;
-            e0 = numeric_limits<double>::infinity();
+            e0 = std::numeric_limits<double>::infinity();
             for (;;)
             {
                 networkA.project(projType, radius);
@@ -354,7 +366,7 @@ void LinkedNetwork::optimalProjection(string projType)
                 potParamsC[1] = radius;
                 globalGeometryOptimisation(false, false, networkA);
                 e1 = globalPotentialEnergy(false, false, networkA);
-                std::cout << radius << " " << e1 << " " << minEnergy << endl;
+                logger->info("Spherical minimisation: {} {} {}", radius, e1, minEnergy);
                 if (e1 > e0 && e0 <= minEnergy)
                 {
                     lowerLim = radius - 2 * radiusInc;
@@ -379,7 +391,7 @@ void LinkedNetwork::optimalProjection(string projType)
 }
 
 // Select nodes forming a random edge in lattice A, and linked nodes in lattice B, only for 3/4 coordinate nodes
-int LinkedNetwork::pickSpiralCnx34(int &a, int &b, int &u, int &v, mt19937 &gen)
+int LinkedNetwork::pickSpiralCnx34(int &a, int &b, int &u, int &v, std::mt19937 &gen)
 {
     bool includesFixed = false;
 
@@ -397,7 +409,7 @@ int LinkedNetwork::pickSpiralCnx34(int &a, int &b, int &u, int &v, mt19937 &gen)
         return 33;
     while (rn1 < 0)
     {
-        uniform_int_distribution<int> randomCnx(0, cnd0 - 1);
+        std::uniform_int_distribution<int> randomCnx(0, cnd0 - 1);
 
         n1Ref = randomCnx(gen);
         rn1 = rFixedLocal[n1Ref];
@@ -406,7 +418,7 @@ int LinkedNetwork::pickSpiralCnx34(int &a, int &b, int &u, int &v, mt19937 &gen)
     a = n0, b = n1;
 
     VecR<int> common = vCommonValues(networkA.nodes[a].dualCnxs, networkA.nodes[b].dualCnxs);
-    uniform_int_distribution<int> randomDirection(0, 1);
+    std::uniform_int_distribution<int> randomDirection(0, 1);
     if (common.n == 2)
     {
         int randIndex = randomDirection(gen);
@@ -418,22 +430,22 @@ int LinkedNetwork::pickSpiralCnx34(int &a, int &b, int &u, int &v, mt19937 &gen)
         wrapCoordinates();
         syncCoordinates();
         write("debug");
-        std::cout << a << " " << b << " " << common << endl;
-        throw string("Error in random connection - incorrect dual ids");
+        std::cout << a << " " << b << " " << common << std::endl;
+        throw std::runtime_error("Error in random connection - incorrect dual ids");
     }
     int cnxType = 33;
     return cnxType;
 }
 
 // Select nodes forming a random edge in lattice A, and linked nodes in lattice B, only for 3/4 coordinate nodes
-int LinkedNetwork::pickDiscreteCnx34(int &a, int &b, int &u, int &v, mt19937 &gen, LoggerPtr logger)
+int LinkedNetwork::pickDiscreteCnx34(int &a, int &b, int &u, int &v, std::mt19937 &gen, LoggerPtr logger)
 {
 
     // pick random node and one of its random connections
     logger->info("Running Discrete Distribution...");
-    discrete_distribution<> randomNode(weights.begin(), weights.end());
+    std::discrete_distribution<> randomNode(weights.begin(), weights.end());
     logger->info("Discrete distribution created");
-    //    uniform_int_distribution<int> randomNode(0, networkA.nodes.n - 1);
+    //    std::uniform_int_distribution<int> randomNode(0, networkA.nodes.n - 1);
     bool picking_acceptable_ring = true;
     int cnxType;
     bool includesFixed;
@@ -444,7 +456,7 @@ int LinkedNetwork::pickDiscreteCnx34(int &a, int &b, int &u, int &v, mt19937 &ge
         // MAYBE EXCLUDE SOME ATOMS ? //
         int n0 = randomNode(gen);
         int cnd0 = networkA.nodes[n0].netCnxs.n;
-        uniform_int_distribution<int> randomCnx(0, cnd0 - 1);
+        std::uniform_int_distribution<int> randomCnx(0, cnd0 - 1);
         int n1 = networkA.nodes[n0].netCnxs[randomCnx(gen)];
         int cnd1 = networkA.nodes[n1].netCnxs.n;
 
@@ -480,7 +492,7 @@ int LinkedNetwork::pickDiscreteCnx34(int &a, int &b, int &u, int &v, mt19937 &ge
         }
 
         // get nodes in dual in random orientation
-        uniform_int_distribution<int> randomDirection(0, 1);
+        std::uniform_int_distribution<int> randomDirection(0, 1);
         VecR<int> common = vCommonValues(networkA.nodes[a].dualCnxs, networkA.nodes[b].dualCnxs);
 
         if (common.n == 2)
@@ -519,11 +531,11 @@ int LinkedNetwork::pickDiscreteCnx34(int &a, int &b, int &u, int &v, mt19937 &ge
 }
 
 // Select nodes forming a random edge in lattice A, and linked nodes in lattice B, only for 3/4 coordinate nodes
-int LinkedNetwork::pickRandomCnx34(int &a, int &b, int &u, int &v, mt19937 &gen)
+int LinkedNetwork::pickRandomCnx34(int &a, int &b, int &u, int &v, std::mt19937 &gen)
 {
 
     // pick random node and one of its random connections
-    uniform_int_distribution<int> randomNode(0, networkA.nodes.n - 1);
+    std::uniform_int_distribution<int> randomNode(0, networkA.nodes.n - 1);
     bool picking_acceptable_ring = true;
     int cnxType;
     bool includesFixed;
@@ -534,7 +546,7 @@ int LinkedNetwork::pickRandomCnx34(int &a, int &b, int &u, int &v, mt19937 &gen)
         // MAYBE EXCLUDE SOME ATOMS ? //
         int n0 = randomNode(gen);
         int cnd0 = networkA.nodes[n0].netCnxs.n;
-        uniform_int_distribution<int> randomCnx(0, cnd0 - 1);
+        std::uniform_int_distribution<int> randomCnx(0, cnd0 - 1);
         int n1 = networkA.nodes[n0].netCnxs[randomCnx(gen)];
         int cnd1 = networkA.nodes[n1].netCnxs.n;
 
@@ -565,10 +577,10 @@ int LinkedNetwork::pickRandomCnx34(int &a, int &b, int &u, int &v, mt19937 &gen)
             b = n1;
         }
         else
-            throw string("Error in random connection - incorrect coordinations");
+            throw std::runtime_error("Error in random connection - incorrect coordinations");
 
         // get nodes in dual in random orientation
-        uniform_int_distribution<int> randomDirection(0, 1);
+        std::uniform_int_distribution<int> randomDirection(0, 1);
         VecR<int> common = vCommonValues(networkA.nodes[a].dualCnxs, networkA.nodes[b].dualCnxs);
         if (common.n == 2)
         {
@@ -581,8 +593,8 @@ int LinkedNetwork::pickRandomCnx34(int &a, int &b, int &u, int &v, mt19937 &gen)
             wrapCoordinates();
             syncCoordinates();
             write("debug");
-            std::cout << a << " " << b << " " << common << endl;
-            throw string("Error in random connection - incorrect dual ids");
+            std::cout << a << " " << b << " " << common << std::endl;
+            throw std::runtime_error("Error in random connection - incorrect dual ids");
         }
 
         int fixed_ring;
@@ -611,14 +623,14 @@ int LinkedNetwork::pickRandomCnx34(int &a, int &b, int &u, int &v, mt19937 &gen)
 // pick sequential Cnxs
 
 // Select nodes forming a random edge in lattice A, and linked nodes in lattice B, for coordinations >=2
-int LinkedNetwork::pickRandomCnx(int &a, int &b, int &u, int &v, mt19937 &gen)
+int LinkedNetwork::pickRandomCnx(int &a, int &b, int &u, int &v, std::mt19937 &gen)
 {
 
     // pick random node and one of its random connections
-    uniform_int_distribution<int> randomNode(0, networkA.nodes.n - 1);
+    std::uniform_int_distribution<int> randomNode(0, networkA.nodes.n - 1);
     int n0 = randomNode(gen);
     int cnd0 = networkA.nodes[n0].netCnxs.n;
-    uniform_int_distribution<int> randomCnx(0, cnd0 - 1);
+    std::uniform_int_distribution<int> randomCnx(0, cnd0 - 1);
     int n1 = networkA.nodes[n0].netCnxs[randomCnx(gen)];
     int cnd1 = networkA.nodes[n1].netCnxs.n;
 
@@ -627,7 +639,7 @@ int LinkedNetwork::pickRandomCnx(int &a, int &b, int &u, int &v, mt19937 &gen)
     a = n0;
     b = n1;
     // get nodes in dual in random orientation
-    uniform_int_distribution<int> randomDirection(0, 1);
+    std::uniform_int_distribution<int> randomDirection(0, 1);
     VecR<int> common = vCommonValues(networkA.nodes[a].dualCnxs, networkA.nodes[b].dualCnxs);
     if (common.n == 2)
     {
@@ -669,24 +681,33 @@ int LinkedNetwork::pickRandomCnx(int &a, int &b, int &u, int &v, mt19937 &gen)
             wrapCoordinates();
             syncCoordinates();
             write("debug");
-            std::cout << a << " " << b << " " << common << endl;
-            throw string("Error in random connection - incorrect dual ids");
+            std::cout << a << " " << b << " " << common << std::endl;
+            throw std::runtime_error("Error in random connection - incorrect dual ids");
         }
     }
 
     return cnxType;
 }
 
-// Generate all ids of nodes in lattices A and B needed for switch move, only for 3/4 coordinate nodes
-int LinkedNetwork::generateSwitchIds34(int cnxType, VecF<int> &switchIdsA, VecF<int> &switchIdsB, VecF<int> &switchIdsT, int a, int b, int u, int v)
+/**
+ * @brief Generate all ids of nodes in lattices A and B needed for switch move, only for 3/4 coordinate nodes
+ * @param cnxType the type of connection to be generated
+ * @param switchIdsA the ids of the nodes in lattice A
+ * @param switchIdsB the ids of the nodes in lattice B
+ * @param switchIdsT the ids of the nodes in lattice T
+ * @param a the id of the first node in lattice A
+ * @param b the id of the second node in lattice A
+ * @param u the id of the first node in lattice B
+ * @param v the id of the second node in lattice B
+ * @return true if the switch move is possible, false otherwise
+ */
+bool LinkedNetwork::generateSwitchIds34(int cnxType, VecF<int> &switchIdsA, VecF<int> &switchIdsB, VecF<int> &switchIdsT,
+                                        int a, int b, int u, int v)
 {
 
     // lots of error checking to remove any potential pathological cases
     if (a == b || u == v)
-    {
-        return 1;
-    }
-
+        return false;
     if (cnxType == 33)
     {
         /* Switch connectivities in lattice and dual
@@ -755,23 +776,23 @@ int LinkedNetwork::generateSwitchIds34(int cnxType, VecF<int> &switchIdsA, VecF<
         }
         if (alpha == 0)
         {
-            std::cout << "alpha broken" << endl;
+            std::cout << "alpha broken" << std::endl;
         }
         if (beta == 0)
         {
-            std::cout << "beta broken" << endl;
+            std::cout << "beta broken" << std::endl;
         }
         if (gamma == 0)
         {
-            std::cout << "gamma broken" << endl;
+            std::cout << "gamma broken" << std::endl;
         }
         if (delta == 0)
         {
-            std::cout << "delta broken" << endl;
+            std::cout << "delta broken" << std::endl;
         }
         if (eta == 0)
         {
-            std::cout << "eta broken" << endl;
+            std::cout << "eta broken" << std::endl;
         }
 
         // Additional error checking
@@ -795,40 +816,38 @@ int LinkedNetwork::generateSwitchIds34(int cnxType, VecF<int> &switchIdsA, VecF<
             }
         }
         if (errorFlag != 0)
-            return 1;
-
+            return false;
         // check move will not violate dual connectivity limits
         if (networkB.nodes[u].netCnxs.n == minBCnxs || networkB.nodes[v].netCnxs.n == minBCnxs || networkB.nodes[w].netCnxs.n == maxBCnxs || networkB.nodes[x].netCnxs.n == maxBCnxs)
-            return 1;
-        else
-        {
-            switchIdsA = VecF<int>(6);
-            switchIdsB = VecF<int>(4);
-            switchIdsT = VecF<int>(11);
-            switchIdsA[0] = a;
-            switchIdsA[1] = b;
-            switchIdsA[2] = c;
-            switchIdsA[3] = d;
-            switchIdsA[4] = e;
-            switchIdsA[5] = f;
-            switchIdsB[0] = u;
-            switchIdsB[1] = v;
-            switchIdsB[2] = w;
-            switchIdsB[3] = x;
-            switchIdsT[0] = a;
-            switchIdsT[1] = b;
-            switchIdsT[2] = c;
-            switchIdsT[3] = d;
-            switchIdsT[4] = e;
-            switchIdsT[5] = f;
-            switchIdsT[6] = alpha;
-            switchIdsT[7] = beta;
-            switchIdsT[8] = gamma;
-            switchIdsT[9] = delta;
-            switchIdsT[10] = eta;
+            return false;
 
-            return 0;
-        }
+        switchIdsA = VecF<int>(6);
+        switchIdsA[0] = a;
+        switchIdsA[1] = b;
+        switchIdsA[2] = c;
+        switchIdsA[3] = d;
+        switchIdsA[4] = e;
+        switchIdsA[5] = f;
+
+        switchIdsB = VecF<int>(4);
+        switchIdsB[0] = u;
+        switchIdsB[1] = v;
+        switchIdsB[2] = w;
+        switchIdsB[3] = x;
+
+        switchIdsT = VecF<int>(11);
+        switchIdsT[0] = a;
+        switchIdsT[1] = b;
+        switchIdsT[2] = c;
+        switchIdsT[3] = d;
+        switchIdsT[4] = e;
+        switchIdsT[5] = f;
+        switchIdsT[6] = alpha;
+        switchIdsT[7] = beta;
+        switchIdsT[8] = gamma;
+        switchIdsT[9] = delta;
+        switchIdsT[10] = eta;
+        return true;
     }
     else if (cnxType == 44)
     {
@@ -925,34 +944,29 @@ int LinkedNetwork::generateSwitchIds34(int cnxType, VecF<int> &switchIdsA, VecF<
             errorFlag = 7;
 
         if (errorFlag != 0)
-        {
-            //            std::cout<<"Note: skip in switch generation 44"<<endl;
-            return 1;
-        }
-
+            return false;
         // check move will not violate dual connectivity limits
         if (networkB.nodes[u].netCnxs.n == minBCnxs || networkB.nodes[v].netCnxs.n == minBCnxs || networkB.nodes[w].netCnxs.n == maxBCnxs || networkB.nodes[x].netCnxs.n == maxBCnxs)
-            return 1;
-        else
-        {
-            switchIdsA = VecF<int>(8);
-            switchIdsB = VecF<int>(6);
-            switchIdsA[0] = a;
-            switchIdsA[1] = b;
-            switchIdsA[2] = c;
-            switchIdsA[3] = d;
-            switchIdsA[4] = e;
-            switchIdsA[5] = f;
-            switchIdsA[6] = g;
-            switchIdsA[7] = h;
-            switchIdsB[0] = u;
-            switchIdsB[1] = v;
-            switchIdsB[2] = w;
-            switchIdsB[3] = x;
-            switchIdsB[4] = y;
-            switchIdsB[5] = z;
-            return 0;
-        }
+            return false;
+
+        switchIdsA = VecF<int>(8);
+        switchIdsA[0] = a;
+        switchIdsA[1] = b;
+        switchIdsA[2] = c;
+        switchIdsA[3] = d;
+        switchIdsA[4] = e;
+        switchIdsA[5] = f;
+        switchIdsA[6] = g;
+        switchIdsA[7] = h;
+
+        switchIdsB = VecF<int>(6);
+        switchIdsB[0] = u;
+        switchIdsB[1] = v;
+        switchIdsB[2] = w;
+        switchIdsB[3] = x;
+        switchIdsB[4] = y;
+        switchIdsB[5] = z;
+        return true;
     }
     else if (cnxType == 43)
     {
@@ -1035,13 +1049,12 @@ int LinkedNetwork::generateSwitchIds34(int cnxType, VecF<int> &switchIdsA, VecF<
 
         if (errorFlag != 0)
         {
-            //            std::cout << "Note: skip in switch generation 43 with error flag" << " " << errorFlag << endl;
-            return 1;
+            return false;
         }
 
         // check move will not violate dual connectivity limits
         if (networkB.nodes[u].netCnxs.n == minBCnxs || networkB.nodes[v].netCnxs.n == minBCnxs || networkB.nodes[w].netCnxs.n == maxBCnxs || networkB.nodes[x].netCnxs.n == maxBCnxs)
-            return 1;
+            return false;
         else
         {
             switchIdsA = VecF<int>(7);
@@ -1058,10 +1071,13 @@ int LinkedNetwork::generateSwitchIds34(int cnxType, VecF<int> &switchIdsA, VecF<
             switchIdsB[2] = w;
             switchIdsB[3] = x;
             switchIdsB[4] = y;
-            return 0;
+            return true;
         }
     }
-    return 0;
+    else
+    {
+        throw std::runtime_error("Not yet implemented");
+    }
 }
 
 // Generate all ids of nodes in lattices A and B needed for mix move, only for 3/4 coordinate nodes
@@ -1181,114 +1197,122 @@ int LinkedNetwork::generateMixIds34(int cnxType, VecF<int> &mixIdsA, VecF<int> &
         }
     }
 }
+const int MIN_COORDINATION_NUMBER = 2;
+const int NUM_MIX_IDS_A = 6;
+const int NUM_MIX_IDS_B = 7;
 
-// Generate all ids of nodes in lattices A and B needed for mix move, for all coordinations >=2
-int LinkedNetwork::generateMixIds(int cnxType, VecF<int> &mixIdsA, VecF<int> &mixIdsB, int a, int b, int u, int v)
+/**
+ * @brief Generate all ids of nodes in lattices A and B needed for mix move, for all coordinations >=2
+ * @param cnxType Connection type of nodes to be mixed
+ * @param mixIdsA Vector of node ids in lattice A
+ * @param mixIdsB Vector of node ids in lattice B
+ * @param a Node id in lattice A
+ * @param b Node id in lattice A
+ * @param u Node id in lattice B
+ * @param v Node id in lattice B
+ * @return True if move is possible, false otherwise
+ */
+bool LinkedNetwork::generateMixIds(int cnxType, VecF<int> &mixIdsA, VecF<int> &mixIdsB, int a, int b, int u, int v)
 {
-
-    if (cnxType < 30)
+    if (cnxType < MIN_COORDINATION_NUMBER)
     { // cannot mix if first node is 2 coordinate
-        return 1;
+        return false;
     }
-    else
+    /* Get required node ids in lattice and dual
+     * a,b,c,d,e,f are nodes in lattice A
+     * u,v,w,x,y,z,xx are nodes in lattice B
+     *  E      F            V
+     *   \    /          /  |  \
+     * --A---B--    XX--X   |   Z
+     *  /     \         W   |   Y
+     * C       D         \  |  /
+     *                      U
+     */
+
+    int errorFlag = 0;
+    int c, d, e, f;
+    int w, x, y, z, xx;
+
+    VecR<int> common, common1;
+    // c is defined as sharing a,u but not being b
+    c = findAssociatedNodeAB(a, u, b);
+    // d is defined as sharing b,u but not being a
+    d = findAssociatedNodeAB(b, u, a);
+    // e is defined as sharing a,v but not being b
+    e = findAssociatedNodeAB(a, v, b);
+    // f is defined as sharing b,v but not being a
+    f = findAssociatedNodeAB(b, v, a);
+
+    // w is defines as sharing a,c but not being u
+    w = findAssociatedNodeAA(a, c, u);
+    // x is defines as sharing a,e but not being v
+    x = findAssociatedNodeAA(a, e, v);
+    // y is defines as sharing b,d but not being u
+    y = findAssociatedNodeAA(b, d, u);
+    // z is defines as sharing b,f but not being v
+    z = findAssociatedNodeAA(b, f, v);
+
+    // Find next node connected to x by inspecting around a
+    int nCnxs = networkA.nodes[a].dualCnxs.n;
+    for (int i = 0; i < nCnxs; ++i)
     {
-        /* Get required node ids in lattice and dual
-         * a,b,c,d,e,f are nodes in lattice A
-         * u,v,w,x,y,z,xx are nodes in lattice B
-         *  E      F            V
-         *   \    /          /  |  \
-         * --A---B--    XX--X   |   Z
-         *  /     \         W   |   Y
-         * C       D         \  |  /
-         *                      U
-         */
-
-        int errorFlag = 0;
-        int c, d, e, f;
-        int w, x, y, z, xx;
-
-        VecR<int> common, common1;
-        // c is defined as sharing a,u but not being b
-        c = findAssociatedNodeAB(a, u, b);
-        // d is defined as sharing b,u but not being a
-        d = findAssociatedNodeAB(b, u, a);
-        // e is defined as sharing a,v but not being b
-        e = findAssociatedNodeAB(a, v, b);
-        // f is defined as sharing b,v but not being a
-        f = findAssociatedNodeAB(b, v, a);
-
-        // w is defines as sharing a,c but not being u
-        w = findAssociatedNodeAA(a, c, u);
-        // x is defines as sharing a,e but not being v
-        x = findAssociatedNodeAA(a, e, v);
-        // y is defines as sharing b,d but not being u
-        y = findAssociatedNodeAA(b, d, u);
-        // z is defines as sharing b,f but not being v
-        z = findAssociatedNodeAA(b, f, v);
-
-        // Find next node connected to x by inspecting around a
-        int nCnxs = networkA.nodes[a].dualCnxs.n;
-        for (int i = 0; i < nCnxs; ++i)
+        if (networkA.nodes[a].dualCnxs[i] == u)
         {
-            if (networkA.nodes[a].dualCnxs[i] == u)
-            {
-                int j = (i + 1) % nCnxs;
-                int k = (i - 1 + nCnxs) % nCnxs;
-                if (networkA.nodes[a].dualCnxs[j] == v)
-                    xx = networkA.nodes[a].dualCnxs[(j + 2) % nCnxs];
-                else if (networkA.nodes[a].dualCnxs[k] == v)
-                    xx = networkA.nodes[a].dualCnxs[(k - 2 + nCnxs) % nCnxs];
-                else
-                    std::cout << "Error in xx detection" << endl;
-            }
-        }
-
-        // Additional error checking
-        if (c == d || e == f)
-            errorFlag = 6; // can simply be triangle edge sharing pair (not an error)
-        // Prevent rings having only two or fewer neighbours
-        VecR<int> vCnxs = vUnique(networkB.nodes[v].netCnxs);
-        if (vCnxs.n <= 3)
-            errorFlag = 10;
-        VecR<int> uCnxs = vUnique(networkB.nodes[u].netCnxs);
-        uCnxs.delValue(v);
-        if (uCnxs.n <= 2)
-        {
-            for (int i = 0; i < uCnxs.n; ++i)
-            {
-                if (uCnxs[i] == x)
-                {
-                    errorFlag = 10;
-                    break;
-                }
-            }
-        }
-        if (errorFlag != 0)
-            return 1;
-
-        // check move will not violate connectivity limits
-        if (networkB.nodes[v].netCnxs.n == minBCnxs || networkB.nodes[x].netCnxs.n == maxBCnxs || networkA.nodes[a].netCnxs.n == minACnxs || networkA.nodes[b].netCnxs.n == maxACnxs)
-            return 1;
-        else
-        {
-            mixIdsA = VecF<int>(6);
-            mixIdsB = VecF<int>(7);
-            mixIdsA[0] = a;
-            mixIdsA[1] = b;
-            mixIdsA[2] = c;
-            mixIdsA[3] = d;
-            mixIdsA[4] = e;
-            mixIdsA[5] = f;
-            mixIdsB[0] = u;
-            mixIdsB[1] = v;
-            mixIdsB[2] = w;
-            mixIdsB[3] = x;
-            mixIdsB[4] = y;
-            mixIdsB[5] = z;
-            mixIdsB[6] = xx;
-            return 0;
+            int j = (i + 1) % nCnxs;
+            int k = (i - 1 + nCnxs) % nCnxs;
+            if (networkA.nodes[a].dualCnxs[j] == v)
+                xx = networkA.nodes[a].dualCnxs[(j + 2) % nCnxs];
+            else if (networkA.nodes[a].dualCnxs[k] == v)
+                xx = networkA.nodes[a].dualCnxs[(k - 2 + nCnxs) % nCnxs];
+            else
+                std::cout << "Error in xx detection" << std::endl;
         }
     }
+
+    // Additional error checking
+    if (c == d || e == f)
+        errorFlag = 6; // can simply be triangle edge sharing pair (not an error)
+    // Prevent rings having only two or fewer neighbours
+    VecR<int> vCnxs = vUnique(networkB.nodes[v].netCnxs);
+    if (vCnxs.n <= 3)
+        errorFlag = 10;
+    VecR<int> uCnxs = vUnique(networkB.nodes[u].netCnxs);
+    uCnxs.delValue(v);
+    if (uCnxs.n <= 2)
+    {
+        for (int i = 0; i < uCnxs.n; ++i)
+        {
+            if (uCnxs[i] == x)
+            {
+                errorFlag = 10;
+                break;
+            }
+        }
+    }
+    if (errorFlag != 0)
+        return false;
+    // check move will not violate connectivity limits
+    if (networkB.nodes[v].netCnxs.n == minBCnxs || networkB.nodes[x].netCnxs.n == maxBCnxs || networkA.nodes[a].netCnxs.n == minACnxs || networkA.nodes[b].netCnxs.n == maxACnxs)
+    {
+        return false;
+    }
+    mixIdsA = VecF<int>(NUM_MIX_IDS_A);
+    mixIdsA[0] = a;
+    mixIdsA[1] = b;
+    mixIdsA[2] = c;
+    mixIdsA[3] = d;
+    mixIdsA[4] = e;
+    mixIdsA[5] = f;
+
+    mixIdsB = VecF<int>(NUM_MIX_IDS_B);
+    mixIdsB[0] = u;
+    mixIdsB[1] = v;
+    mixIdsB[2] = w;
+    mixIdsB[3] = x;
+    mixIdsB[4] = y;
+    mixIdsB[5] = z;
+    mixIdsB[6] = xx;
+    return true;
 }
 
 int LinkedNetwork::findAssociatedNodeAB(int idA, int idB, int idDel)
@@ -1351,8 +1375,8 @@ int LinkedNetwork::findAssociatedNodeAB(int idA, int idB, int idDel)
         syncCoordinates();
         write("debug");
         std::cout << idA << " " << idB << " "
-                  << " " << idDel << " " << common << endl;
-        std::cout << "ERROR IN ASSOCIATED NODE" << endl;
+                  << " " << idDel << " " << common << std::endl;
+        std::cout << "ERROR IN ASSOCIATED NODE" << std::endl;
         exit(9);
     }
 
@@ -1411,8 +1435,8 @@ int LinkedNetwork::findAssociatedNodeAA(int idA, int idB, int idDel)
         wrapCoordinates();
         syncCoordinates();
         write("debug");
-        std::cout << idA << " " << idB << " " << idDel << " " << common << endl;
-        std::cout << "ERROR IN ASSOCIATED NODE" << endl;
+        std::cout << idA << " " << idB << " " << idDel << " " << common << std::endl;
+        std::cout << "ERROR IN ASSOCIATED NODE" << std::endl;
     }
 
     return associated;
@@ -2318,7 +2342,7 @@ bool LinkedNetwork::convexRearrangement(int cnxType, VecF<int> switchIdsA, VecF<
         }
     }
     else
-        throw(string("Not yet implemented!"));
+        throw(std::string("Not yet implemented!"));
 
     return convex;
 }
@@ -2330,8 +2354,8 @@ void LinkedNetwork::makerFixed()
     rFixed.setSize(networkA.nodes.n);
     VecF<double> crdFixed = networkB.nodes[fixedRings[0]].crd;
     VecF<double> v(2);
-    std::cout << "***********************" << endl;
-    std::cout << networkB.nodes[fixedRings[0]].crd[0] << " " << networkB.nodes[fixedRings[0]].crd[1] << endl;
+    std::cout << "***********************" << std::endl;
+    std::cout << networkB.nodes[fixedRings[0]].crd[0] << " " << networkB.nodes[fixedRings[0]].crd[1] << std::endl;
 
     for (int i = 0; i < networkA.nodes.n; ++i)
     {
@@ -2352,7 +2376,7 @@ void LinkedNetwork::makerFixed()
     {
         weights.push_back(rFixed[i]);
     }
-    std::cout << "---------- " << count << " Spiral atoms" << endl;
+    std::cout << "---------- " << count << " Spiral atoms" << std::endl;
     return;
 }
 
@@ -2371,26 +2395,25 @@ VecF<int> LinkedNetwork::SpiralmonteCarloSwitchMoveLAMMPS(int a, double &SimpleG
     // Select valid random connection - that will not violate connection limits
     int b, u, v;
     VecF<int> switchIdsA, switchIdsB, switchIdsT;
-    int validMove;
+    bool foundValidMove = false;
     int cnxType;
 
     for (int i = 0; i < 10; ++i)
     {
-        // std::cout << "Failed pickSpiral" << endl;
+        // std::cout << "Failed pickSpiral" << std::endl;
         cnxType = pickSpiralCnx34(a, b, u, v, mtGen);
-        validMove = generateSwitchIds34(cnxType, switchIdsA, switchIdsB, switchIdsT, a, b, u, v);
-        if (validMove == 0)
+        foundValidMove = generateSwitchIds34(cnxType, switchIdsA, switchIdsB, switchIdsT, a, b, u, v);
+        if (foundValidMove)
             break;
     }
-    if (validMove == 1)
+    if (!foundValidMove)
     {
-        std::cout << "Cannot find any valid switch moves" << endl;
-        // throw string("Cannot find any valid switch moves");
+        logger->warn("Failed to find valid switch move");
         VecF<int> status(3);
         status[0] = 0;
         status[1] = 0;
         status[2] = 0;
-        std::cout << "returning ..." << endl;
+        logger->warn("returning ...");
         return status;
     }
     // Save current state
@@ -2400,48 +2423,46 @@ VecF<int> LinkedNetwork::SpiralmonteCarloSwitchMoveLAMMPS(int a, double &SimpleG
     double saveEnergyTriangleRaft = TriangleRaftEnergy;
     double saveEnergyBilayer = BilayerEnergy;
     double saveEnergyBN = BNEnergy;
-    if (isSimpleGraphene)
+    if (isSimpleGrapheneEnabled)
     {
         if (abs(SimpleGrapheneEnergy - SimpleGraphene.GlobalPotentialEnergy()) > 0.001)
         {
-            std::cout << "SimpleGraphene" << endl;
-            std::cout << "Saved : " << SimpleGrapheneEnergy << " vs Calculated " << SimpleGraphene.GlobalPotentialEnergy()
-                      << endl;
+            logger->info("SimpleGraphene - Saved: {} vs Calculated: {}", SimpleGrapheneEnergy,
+                         SimpleGraphene.GlobalPotentialEnergy());
         }
         else
         {
             VecF<double> gpe = globalPotentialEnergy(0, isMaintainConvexityEnabled, networkA);
-            std::cout << gpe << endl;
-            std::cout << "Simple Graphene : " << SimpleGraphene.GlobalPotentialEnergy() << "(" << gpe[2] << ")" << endl;
+            logger->info("Simple Graphene : {} ({})", SimpleGraphene.GlobalPotentialEnergy(), gpe[2]);
         }
     }
-    if (isTriangleRaft)
+    if (isTriangleRaftEnabled)
     {
         if (abs(TriangleRaftEnergy - Triangle_Raft.GlobalPotentialEnergy()) > 0.001)
         {
-            std::cout << "Triangle Raft" << endl;
+            std::cout << "Triangle Raft" << std::endl;
             std::cout << "Saved : " << TriangleRaftEnergy << " vs Calculated " << Triangle_Raft.GlobalPotentialEnergy()
-                      << endl;
+                      << std::endl;
         }
     }
-    std::cout << crds[0] << endl;
+    std::cout << crds[0] << std::endl;
     VecF<double> saveCrds = crds;
-    std::cout << "Saved crds" << endl;
+    std::cout << "Saved crds" << std::endl;
     double *saveCrdsSimpleGraphene;
     double *saveCrdsTersoffGraphene;
     double *saveCrdsTriangleRaft;
     double *saveCrdsBilayer;
     double *saveCrdsBN;
 
-    if (isSimpleGraphene)
+    if (isSimpleGrapheneEnabled)
         saveCrdsSimpleGraphene = SimpleGraphene.fetchCrds(2);
-    if (isTersoffGraphene)
+    if (isTersoffGrapheneEnabled)
         saveCrdsTersoffGraphene = TersoffGraphene.fetchCrds(2);
-    if (isTriangleRaft)
+    if (isTriangleRaftEnabled)
         saveCrdsTriangleRaft = Triangle_Raft.fetchCrds(2);
-    if (isBilayer)
+    if (isBilayerEnabled)
         saveCrdsBilayer = Bilayer.fetchCrds(3);
-    if (isBN)
+    if (isBNEnabled)
         saveCrdsBN = BN.fetchCrds(2);
 
     VecF<int> saveNodeDistA = networkA.nodeDistribution;
@@ -2457,7 +2478,7 @@ VecF<int> LinkedNetwork::SpiralmonteCarloSwitchMoveLAMMPS(int a, double &SimpleG
         saveNodesT[i] = networkT.nodes[switchIdsT[i]];
 
     // Switch and geometry optimise
-    std::cout << "Switch" << endl;
+    std::cout << "Switch" << std::endl;
     VecF<int> optStatus_networkA(2);
     VecF<int> optStatus_SimpleGraphene(2);
     VecF<int> optStatus_TersoffGraphene(2);
@@ -2470,13 +2491,13 @@ VecF<int> LinkedNetwork::SpiralmonteCarloSwitchMoveLAMMPS(int a, double &SimpleG
         // works for network version of lammps objects
         switchCnx33(switchIdsA, switchIdsB, switchIdsT);
         // works for lammps objects
-        if (isSimpleGraphene)
+        if (isSimpleGrapheneEnabled)
             SimpleGraphene.switchGraphene(switchIdsA, networkA, logger);
-        if (isTriangleRaft)
+        if (isTriangleRaftEnabled)
             Triangle_Raft.switchTriangleRaft(switchIdsA, switchIdsB, switchIdsT, networkT, logger);
-        if (isBilayer)
+        if (isBilayerEnabled)
             Bilayer.switchBilayer(switchIdsA, switchIdsB, switchIdsT, logger);
-        if (isBN)
+        if (isBNEnabled)
             BN.switchGraphene(switchIdsA, networkA, logger);
     }
     else if (cnxType == 44)
@@ -2485,8 +2506,7 @@ VecF<int> LinkedNetwork::SpiralmonteCarloSwitchMoveLAMMPS(int a, double &SimpleG
         switchCnx43(switchIdsA, switchIdsB);
     else
     {
-        std::cout << "Not yet implemented (?)" << endl;
-        // throw string("Not yet implemented!");
+        std::cout << "Not yet implemented (?)" << std::endl;
     }
 
     // Rearrange nodes after switch
@@ -2525,26 +2545,26 @@ VecF<int> LinkedNetwork::SpiralmonteCarloSwitchMoveLAMMPS(int a, double &SimpleG
         double *localCrdsBilayer;
         double *localCrdsBN;
 
-        if (isSimpleGraphene)
+        if (isSimpleGrapheneEnabled)
             localCrdsSimpleGraphene = SimpleGraphene.fetchCrds(2);
-        if (isTersoffGraphene)
+        if (isTersoffGrapheneEnabled)
             localCrdsTersoff = TersoffGraphene.fetchCrds(2);
-        if (isTriangleRaft)
+        if (isTriangleRaftEnabled)
             localCrdsTriangleRaft = Triangle_Raft.fetchCrds(2);
-        if (isBilayer)
+        if (isBilayerEnabled)
             localCrdsBilayer = Bilayer.fetchCrds(3);
-        if (isBN)
+        if (isBNEnabled)
             localCrdsBN = BN.fetchCrds(2);
 
         int natoms, nSi, nO;
-        if (isBilayer)
+        if (isBilayerEnabled)
         {
             int natoms = Bilayer.natoms;
             int nSi = (int)(round(natoms / 3) + 0.5);
             int nO = natoms - nSi;
         }
         double x, y;
-        if (isTriangleRaft)
+        if (isTriangleRaftEnabled)
         {
             x = localCrdsTriangleRaft[2 * switchIdsT[6]] + localCrdsTriangleRaft[2 * switchIdsT[7]] + localCrdsTriangleRaft[2 * switchIdsT[9]];
             y = localCrdsTriangleRaft[2 * switchIdsT[6] + 1] + localCrdsTriangleRaft[2 * switchIdsT[7] + 1] + localCrdsTriangleRaft[2 * switchIdsT[9] + 1];
@@ -2557,31 +2577,31 @@ VecF<int> LinkedNetwork::SpiralmonteCarloSwitchMoveLAMMPS(int a, double &SimpleG
             localCrdsTriangleRaft[2 * switchIdsA[1] + 1] = y / 3;
         }
 
-        if (isTriangleRaft)
+        if (isTriangleRaftEnabled)
             Triangle_Raft.pushCrds(2, localCrdsTriangleRaft);
-        if (isTersoffGraphene)
+        if (isTersoffGrapheneEnabled)
             TersoffGraphene.pushCrds(2, localCrdsTersoff);
-        if (isBilayer)
+        if (isBilayerEnabled)
             Bilayer.pushCrds(3, localCrdsBilayer);
-        if (isBN)
+        if (isBNEnabled)
             BN.pushCrds(2, localCrdsBN);
 
         int nThreads = 0;
 
-        if (isOpenMP)
+        if (isOpenMPIEnabled)
         {
             optStatus_networkA = localGeometryOptimisation(a, b, goptParamsA[1], 0, isMaintainConvexityEnabled);
 #pragma omp parallel num_threads(3)
             {
-                if (omp_get_thread_num() == 0 and isTriangleRaft)
+                if (omp_get_thread_num() == 0 and isTriangleRaftEnabled)
                 {
                     optStatus_TriangleRaft = Triangle_Raft.GlobalPotentialMinimisation();
                 }
-                else if (omp_get_thread_num() == 1 and isTersoffGraphene)
+                else if (omp_get_thread_num() == 1 and isTersoffGrapheneEnabled)
                 {
                     optStatus_TersoffGraphene = TersoffGraphene.GlobalPotentialMinimisation();
                 }
-                else if (omp_get_thread_num() == 2 and isBilayer)
+                else if (omp_get_thread_num() == 2 and isBilayerEnabled)
                 {
                     optStatus_Bilayer = Bilayer.GlobalPotentialMinimisation();
                 }
@@ -2589,64 +2609,63 @@ VecF<int> LinkedNetwork::SpiralmonteCarloSwitchMoveLAMMPS(int a, double &SimpleG
         }
         else
         {
-            if (isTriangleRaft)
+            if (isTriangleRaftEnabled)
             {
                 optStatus_TriangleRaft = Triangle_Raft.GlobalPotentialMinimisation();
             }
-            if (isTersoffGraphene)
+            if (isTersoffGrapheneEnabled)
             {
                 optStatus_TersoffGraphene = TersoffGraphene.GlobalPotentialMinimisation();
             }
-            if (isBilayer)
+            if (isBilayerEnabled)
             {
                 optStatus_Bilayer = Bilayer.GlobalPotentialMinimisation();
             }
-            if (isBN)
+            if (isBNEnabled)
             {
                 optStatus_BN = BN.GlobalPotentialEnergy();
             }
             optStatus_networkA = localGeometryOptimisation(a, b, goptParamsA[1], 0, isMaintainConvexityEnabled);
         }
 
-        if (isSimpleGraphene)
+        if (isSimpleGrapheneEnabled)
             SimpleGrapheneEnergy = SimpleGraphene.GlobalPotentialEnergy();
-        if (isTriangleRaft)
+        if (isTriangleRaftEnabled)
             TriangleRaftEnergy = Triangle_Raft.GlobalPotentialEnergy();
-        if (isTersoffGraphene)
+        if (isTersoffGrapheneEnabled)
             TersoffGrapheneEnergy = TersoffGraphene.GlobalPotentialEnergy();
-        if (isBilayer)
+        if (isBilayerEnabled)
             BilayerEnergy = Bilayer.GlobalPotentialEnergy();
-        if (isBN)
+        if (isBNEnabled)
             BNEnergy = BN.GlobalPotentialEnergy();
         syncCoordinates();
     }
     else
     {
-        SimpleGrapheneEnergy = numeric_limits<double>::infinity();
-        TriangleRaftEnergy = numeric_limits<double>::infinity();
-        TersoffGrapheneEnergy = numeric_limits<double>::infinity();
-        BilayerEnergy = numeric_limits<double>::infinity();
-        BNEnergy = numeric_limits<double>::infinity();
+        SimpleGrapheneEnergy = std::numeric_limits<double>::infinity();
+        TriangleRaftEnergy = std::numeric_limits<double>::infinity();
+        TersoffGrapheneEnergy = std::numeric_limits<double>::infinity();
+        BilayerEnergy = std::numeric_limits<double>::infinity();
+        BNEnergy = std::numeric_limits<double>::infinity();
     }
 
     // Accept or reject
-    int accept;
+    bool isAccepted = false;
     if (MC_Routine == 1)
-        accept = mc.acceptanceCriterion(SimpleGrapheneEnergy, saveEnergySimpleGraphene, 1.0);
+        isAccepted = mc.acceptanceCriterion(SimpleGrapheneEnergy, saveEnergySimpleGraphene, 1.0);
     else if (MC_Routine == 2)
-        accept = mc.acceptanceCriterion(TriangleRaftEnergy, saveEnergyTriangleRaft, 7.3448);
+        isAccepted = mc.acceptanceCriterion(TriangleRaftEnergy, saveEnergyTriangleRaft, 7.3448);
     else if (MC_Routine == 5)
-        accept = mc.acceptanceCriterion(BNEnergy, saveEnergyBN, 7.0);
-
-    if (accept == 0)
+        isAccepted = mc.acceptanceCriterion(BNEnergy, saveEnergyBN, 7.0);
+    if (isAccepted)
     {
         std::cout << "               Rejected MC Move        Ei = ";
         if (MC_Routine == 1)
-            std::cout << saveEnergySimpleGraphene << " Ef = " << SimpleGrapheneEnergy << endl;
+            std::cout << saveEnergySimpleGraphene << " Ef = " << SimpleGrapheneEnergy << std::endl;
         else if (MC_Routine == 2)
-            std::cout << saveEnergyTriangleRaft << " Ef = " << TriangleRaftEnergy << endl;
+            std::cout << saveEnergyTriangleRaft << " Ef = " << TriangleRaftEnergy << std::endl;
         else if (MC_Routine == 5)
-            std::cout << saveEnergyBN << " Ef = " << BNEnergy << endl;
+            std::cout << saveEnergyBN << " Ef = " << BNEnergy << std::endl;
 
         crds = saveCrds;
         networkA.nodeDistribution = saveNodeDistA;
@@ -2661,59 +2680,59 @@ VecF<int> LinkedNetwork::SpiralmonteCarloSwitchMoveLAMMPS(int a, double &SimpleG
         for (int i = 0; i < saveNodesT.n; ++i)
             networkT.nodes[switchIdsT[i]] = saveNodesT[i];
 
-        if (isSimpleGraphene)
+        if (isSimpleGrapheneEnabled)
             SimpleGraphene.pushCrds(2, saveCrdsSimpleGraphene);
-        if (isTriangleRaft)
+        if (isTriangleRaftEnabled)
             Triangle_Raft.pushCrds(2, saveCrdsTriangleRaft);
-        if (isBilayer)
+        if (isBilayerEnabled)
             Bilayer.pushCrds(3, saveCrdsBilayer);
-        if (isTersoffGraphene)
+        if (isTersoffGrapheneEnabled)
             TersoffGraphene.pushCrds(2, saveCrdsTersoffGraphene);
-        if (isBN)
+        if (isBNEnabled)
             BN.pushCrds(2, saveCrdsBN);
-        if (isSimpleGraphene)
+        if (isSimpleGrapheneEnabled)
         {
             SimpleGraphene.revertGraphene(switchIdsA, networkA, logger);
             SimpleGraphene.GlobalPotentialMinimisation();
         }
-        if (isTriangleRaft)
+        if (isTriangleRaftEnabled)
         {
             Triangle_Raft.revertTriangleRaft(switchIdsA, switchIdsB, switchIdsT, logger);
             Triangle_Raft.GlobalPotentialMinimisation();
         }
-        if (isBilayer)
+        if (isBilayerEnabled)
         {
             Bilayer.revertBilayer(switchIdsA, switchIdsB, switchIdsT, logger);
             Bilayer.GlobalPotentialMinimisation();
         }
-        if (isBN)
+        if (isBNEnabled)
         {
             BN.revertGraphene(switchIdsA, networkA, logger);
             BN.GlobalPotentialMinimisation();
         }
 
-        if (isSimpleGraphene)
+        if (isSimpleGrapheneEnabled)
             SimpleGrapheneEnergy = SimpleGraphene.GlobalPotentialEnergy();
-        if (isTriangleRaft)
+        if (isTriangleRaftEnabled)
             TriangleRaftEnergy = Triangle_Raft.GlobalPotentialEnergy();
-        if (isTersoffGraphene)
+        if (isTersoffGrapheneEnabled)
             TersoffGrapheneEnergy = TersoffGraphene.GlobalPotentialEnergy();
-        if (isBilayer)
+        if (isBilayerEnabled)
             BilayerEnergy = Bilayer.GlobalPotentialEnergy();
-        if (isBN)
+        if (isBNEnabled)
             BNEnergy = BN.GlobalPotentialEnergy();
     }
     else
     {
         std::cout << "               Accepted MC Move        Ei = ";
         if (MC_Routine == 1)
-            std::cout << saveEnergySimpleGraphene << " Ef = " << SimpleGrapheneEnergy << endl;
+            std::cout << saveEnergySimpleGraphene << " Ef = " << SimpleGrapheneEnergy << std::endl;
         else if (MC_Routine == 2)
-            std::cout << saveEnergyTriangleRaft << " Ef = " << TriangleRaftEnergy << endl;
+            std::cout << saveEnergyTriangleRaft << " Ef = " << TriangleRaftEnergy << std::endl;
         else if (MC_Routine == 5)
-            std::cout << saveEnergyBN << " Ef = " << BNEnergy << endl;
+            std::cout << saveEnergyBN << " Ef = " << BNEnergy << std::endl;
         else
-            std::cout << "MC ROUTINE : " << MC_Routine << endl;
+            std::cout << "MC ROUTINE : " << MC_Routine << std::endl;
 
         syncCoordinates();
     }
@@ -2723,7 +2742,7 @@ VecF<int> LinkedNetwork::SpiralmonteCarloSwitchMoveLAMMPS(int a, double &SimpleG
      * [1] optimisation code 0=successful 1=successful(zero force) 2=unsuccessful(it limit) 3=unsuccessful(intersection) 4=unsuccessful(non-convex)
      * [2] optimisation iterations */
     VecF<int> status(3);
-    status[0] = accept;
+    status[0] = isAccepted;
     status[1] = optStatus_SimpleGraphene[0];
     status[2] = optStatus_SimpleGraphene[1];
 
@@ -2745,21 +2764,21 @@ VecF<int> LinkedNetwork::monteCarloSwitchMoveLAMMPS(double &SimpleGrapheneEnergy
     // Select valid random connection - that will not violate connection limits
     int a, b, u, v;
     VecF<int> switchIdsA, switchIdsB, switchIdsT;
-    int validMove;
+    bool foundValidMove = false;
     int cnxType;
-    logger->info("Finding move");
+    logger->info("Finding move...");
     for (int i = 0; i < networkA.nodes.n * networkA.nodes.n; ++i)
     {
         // catch in case cannot find any valid moves
-        if (MCWeighting == "Weighted" || MCWeighting == "weighted")
+        if (MCWeighting == "weighted")
             cnxType = pickDiscreteCnx34(a, b, u, v, mtGen, logger);
         else
             cnxType = pickRandomCnx34(a, b, u, v, mtGen);
-        validMove = generateSwitchIds34(cnxType, switchIdsA, switchIdsB, switchIdsT, a, b, u, v);
-        if (validMove == 0)
+        foundValidMove = generateSwitchIds34(cnxType, switchIdsA, switchIdsB, switchIdsT, a, b, u, v);
+        if (foundValidMove)
             break;
     }
-    if (validMove == 1)
+    if (!foundValidMove)
     {
         logger->critical("Cannot find any valid switch moves");
         throw std::runtime_error("Cannot find any valid switch moves");
@@ -2772,14 +2791,14 @@ VecF<int> LinkedNetwork::monteCarloSwitchMoveLAMMPS(double &SimpleGrapheneEnergy
     double saveEnergyTriangleRaft = TriangleRaftEnergy;
     double saveEnergyBilayer = BilayerEnergy;
     double saveEnergyBN = BNEnergy;
-    if (isSimpleGraphene)
+    if (isSimpleGrapheneEnabled)
     {
         if (abs(SimpleGrapheneEnergy - SimpleGraphene.GlobalPotentialEnergy()) > 0.001)
         {
             logger->info("Saved simpleGraphene energy: {} vs calculated: {}", SimpleGrapheneEnergy, SimpleGraphene.GlobalPotentialEnergy());
         }
     }
-    if (isTriangleRaft)
+    if (isTriangleRaftEnabled)
     {
         if (abs(TriangleRaftEnergy - Triangle_Raft.GlobalPotentialEnergy()) > 0.001)
         {
@@ -2798,17 +2817,31 @@ VecF<int> LinkedNetwork::monteCarloSwitchMoveLAMMPS(double &SimpleGrapheneEnergy
     double *saveCrdsBilayer;
     double *saveCrdsBN;
 
-    if (isSimpleGraphene)
+    if (isSimpleGrapheneEnabled)
+    {
+        logger->info("Saving SimpleGraphene coordinates");
         saveCrdsSimpleGraphene = SimpleGraphene.fetchCrds(2);
-    if (isTersoffGraphene)
+    }
+    if (isTersoffGrapheneEnabled)
+    {
+        logger->info("Saving TersoffGraphene coordinates");
         saveCrdsTersoffGraphene = TersoffGraphene.fetchCrds(2);
-    if (isTriangleRaft)
+    }
+    if (isTriangleRaftEnabled)
+    {
+        logger->info("Saving TriangleRaft coordinates");
         saveCrdsTriangleRaft = Triangle_Raft.fetchCrds(2);
-    if (isBilayer)
+    }
+    if (isBilayerEnabled)
+    {
+        logger->info("Saving Bilayer coordinates");
         saveCrdsBilayer = Bilayer.fetchCrds(3);
-    if (isBN)
+    }
+    if (isBNEnabled)
+    {
+        logger->info("Saving BN coordinates");
         saveCrdsBN = BN.fetchCrds(2);
-
+    }
     VecF<int> saveNodeDistA = networkA.nodeDistribution;
     VecF<int> saveNodeDistB = networkB.nodeDistribution;
 
@@ -2818,6 +2851,7 @@ VecF<int> LinkedNetwork::monteCarloSwitchMoveLAMMPS(double &SimpleGrapheneEnergy
     VecF<Node> saveNodesA(switchIdsA.n), saveNodesB(switchIdsB.n), saveNodesT(switchIdsT.n);
     for (int i = 0; i < saveNodesA.n; ++i)
         saveNodesA[i] = networkA.nodes[switchIdsA[i]];
+
     for (int i = 0; i < saveNodesB.n; ++i)
         saveNodesB[i] = networkB.nodes[switchIdsB[i]];
     for (int i = 0; i < saveNodesT.n; ++i)
@@ -2838,19 +2872,19 @@ VecF<int> LinkedNetwork::monteCarloSwitchMoveLAMMPS(double &SimpleGrapheneEnergy
         switchCnx33(switchIdsA, switchIdsB, switchIdsT);
         // works for lammps objects
 
-        if (isSimpleGraphene)
+        if (isSimpleGrapheneEnabled)
         {
             logger->info("Switching Simple Graphene");
             SimpleGraphene.switchGraphene(switchIdsA, networkA, logger);
         }
-        if (isTriangleRaft)
+        if (isTriangleRaftEnabled)
         {
             logger->info("Switching Triangle Raft");
             Triangle_Raft.switchTriangleRaft(switchIdsA, switchIdsB, switchIdsT, networkT, logger);
         }
-        if (isBilayer)
+        if (isBilayerEnabled)
             Bilayer.switchBilayer(switchIdsA, switchIdsB, switchIdsT, logger);
-        if (isBN)
+        if (isBNEnabled)
         {
             logger->info("Switching BN");
             BN.switchGraphene(switchIdsA, networkA, logger);
@@ -2895,7 +2929,7 @@ VecF<int> LinkedNetwork::monteCarloSwitchMoveLAMMPS(double &SimpleGrapheneEnergy
         optStatus_SimpleGraphene[0] = 4;
 
     // Geometry optimisation of local region
-    logger->info("Optimising geometry..");
+    logger->info("Optimising geometry...");
     if (geometryOK)
     {
         optStatus_SimpleGraphene = SimpleGraphene.GlobalPotentialMinimisation();
@@ -2905,18 +2939,18 @@ VecF<int> LinkedNetwork::monteCarloSwitchMoveLAMMPS(double &SimpleGrapheneEnergy
         double *localCrdsBilayer;
         double *localCrdsBN;
 
-        if (isSimpleGraphene)
+        if (isSimpleGrapheneEnabled)
             localCrdsSimpleGraphene = SimpleGraphene.fetchCrds(2);
-        if (isTersoffGraphene)
+        if (isTersoffGrapheneEnabled)
             localCrdsTersoff = TersoffGraphene.fetchCrds(2);
-        if (isTriangleRaft)
+        if (isTriangleRaftEnabled)
             localCrdsTriangleRaft = Triangle_Raft.fetchCrds(2);
-        if (isBilayer)
+        if (isBilayerEnabled)
             localCrdsBilayer = Bilayer.fetchCrds(3);
-        if (isBN)
+        if (isBNEnabled)
             localCrdsBN = BN.fetchCrds(2);
         int natoms, nSi, nO;
-        if (isBilayer)
+        if (isBilayerEnabled)
         {
             int natoms = Bilayer.natoms;
             int nSi = (int)(round(natoms / 3) + 0.5);
@@ -2925,12 +2959,12 @@ VecF<int> LinkedNetwork::monteCarloSwitchMoveLAMMPS(double &SimpleGrapheneEnergy
 
         for (int i = 0; i < 6; ++i)
         {
-            if (isSimpleGraphene and isTersoffGraphene)
+            if (isSimpleGrapheneEnabled and isTersoffGrapheneEnabled)
             {
                 localCrdsTersoff[2 * switchIdsA[i]] = localCrdsSimpleGraphene[2 * switchIdsA[i]] * CScaling;
                 localCrdsTersoff[2 * switchIdsA[i] + 1] = localCrdsSimpleGraphene[2 * switchIdsA[i] + 1] * CScaling;
             }
-            if (isSimpleGraphene and isBilayer)
+            if (isSimpleGrapheneEnabled and isBilayerEnabled)
             {
                 localCrdsBilayer[3 * (switchIdsA[i] * 2)] = localCrdsSimpleGraphene[2 * switchIdsA[i]] * SiScaling;
                 localCrdsBilayer[3 * (switchIdsA[i] * 2) + 1] =
@@ -2943,27 +2977,27 @@ VecF<int> LinkedNetwork::monteCarloSwitchMoveLAMMPS(double &SimpleGrapheneEnergy
                     localCrdsSimpleGraphene[2 * switchIdsA[i] + 1] * SiScaling;
             }
         }
-        if (isTersoffGraphene)
+        if (isTersoffGrapheneEnabled)
             TersoffGraphene.pushCrds(2, localCrdsTersoff);
-        if (isBilayer)
+        if (isBilayerEnabled)
             Bilayer.pushCrds(3, localCrdsBilayer);
 
         int nThreads = 0;
-        if (isOpenMP)
+        if (isOpenMPIEnabled)
         {
             optStatus_networkA = localGeometryOptimisation(a, b, goptParamsA[1], 0, isMaintainConvexityEnabled);
 #pragma omp parallel num_threads(3)
             {
 
-                if (omp_get_thread_num() == 0 and isTriangleRaft)
+                if (omp_get_thread_num() == 0 and isTriangleRaftEnabled)
                 {
                     optStatus_TriangleRaft = Triangle_Raft.GlobalPotentialMinimisation();
                 }
-                else if (omp_get_thread_num() == 1 and isTersoffGraphene)
+                else if (omp_get_thread_num() == 1 and isTersoffGrapheneEnabled)
                 {
                     optStatus_TersoffGraphene = TersoffGraphene.GlobalPotentialMinimisation();
                 }
-                else if (omp_get_thread_num() == 2 and isBilayer)
+                else if (omp_get_thread_num() == 2 and isBilayerEnabled)
                 {
                     optStatus_Bilayer = Bilayer.GlobalPotentialMinimisation();
                 }
@@ -2972,54 +3006,53 @@ VecF<int> LinkedNetwork::monteCarloSwitchMoveLAMMPS(double &SimpleGrapheneEnergy
         else
         {
 
-            if (isTriangleRaft)
+            if (isTriangleRaftEnabled)
             {
                 optStatus_TriangleRaft = Triangle_Raft.GlobalPotentialMinimisation();
             }
-            if (isTersoffGraphene)
+            if (isTersoffGrapheneEnabled)
             {
                 optStatus_TersoffGraphene = TersoffGraphene.GlobalPotentialMinimisation();
             }
-            if (isBilayer)
+            if (isBilayerEnabled)
             {
                 optStatus_Bilayer = Bilayer.GlobalPotentialMinimisation();
             }
-            if (isBN)
+            if (isBNEnabled)
             {
                 optStauts_BN = BN.GlobalPotentialMinimisation();
             }
             optStatus_networkA = localGeometryOptimisation(a, b, goptParamsA[1], 0, isMaintainConvexityEnabled);
         }
-        if (isSimpleGraphene)
+        if (isSimpleGrapheneEnabled)
             SimpleGrapheneEnergy = SimpleGraphene.GlobalPotentialEnergy();
-        if (isTriangleRaft)
+        if (isTriangleRaftEnabled)
             TriangleRaftEnergy = Triangle_Raft.GlobalPotentialEnergy();
-        if (isTersoffGraphene)
+        if (isTersoffGrapheneEnabled)
             TersoffGrapheneEnergy = TersoffGraphene.GlobalPotentialEnergy();
-        if (isBilayer)
+        if (isBilayerEnabled)
             BilayerEnergy = Bilayer.GlobalPotentialEnergy();
-        if (isBN)
+        if (isBNEnabled)
             BNEnergy = BN.GlobalPotentialEnergy();
         syncCoordinates();
     }
     else
     {
-        SimpleGrapheneEnergy = numeric_limits<double>::infinity();
-        TriangleRaftEnergy = numeric_limits<double>::infinity();
-        TersoffGrapheneEnergy = numeric_limits<double>::infinity();
-        BilayerEnergy = numeric_limits<double>::infinity();
-        BNEnergy = numeric_limits<double>::infinity();
+        SimpleGrapheneEnergy = std::numeric_limits<double>::infinity();
+        TriangleRaftEnergy = std::numeric_limits<double>::infinity();
+        TersoffGrapheneEnergy = std::numeric_limits<double>::infinity();
+        BilayerEnergy = std::numeric_limits<double>::infinity();
+        BNEnergy = std::numeric_limits<double>::infinity();
     }
     logger->info("Accepting or rejecting...");
-    int accept;
+    bool isAccepted = false;
     if (MC_Routine == 1)
-        accept = mc.acceptanceCriterion(SimpleGrapheneEnergy, saveEnergySimpleGraphene, 1.0);
+        isAccepted = mc.acceptanceCriterion(SimpleGrapheneEnergy, saveEnergySimpleGraphene, 1.0);
     else if (MC_Routine == 2)
-        accept = mc.acceptanceCriterion(TriangleRaftEnergy, saveEnergyTriangleRaft, 7.3448);
+        isAccepted = mc.acceptanceCriterion(TriangleRaftEnergy, saveEnergyTriangleRaft, 7.3448);
     else if (MC_Routine == 5)
-        accept = mc.acceptanceCriterion(BNEnergy, saveEnergyBN, 7.0);
-
-    if (accept == 0)
+        isAccepted = mc.acceptanceCriterion(BNEnergy, saveEnergyBN, 7.0);
+    if (isAccepted)
     {
         if (MC_Routine == 1)
             logger->info("Rejected Move, Ei = {} Ef = {}", saveEnergySimpleGraphene, SimpleGrapheneEnergy);
@@ -3041,43 +3074,43 @@ VecF<int> LinkedNetwork::monteCarloSwitchMoveLAMMPS(double &SimpleGrapheneEnergy
         for (int i = 0; i < saveNodesT.n; ++i)
             networkT.nodes[switchIdsT[i]] = saveNodesT[i];
 
-        if (isSimpleGraphene)
+        if (isSimpleGrapheneEnabled)
             SimpleGrapheneEnergy = saveEnergySimpleGraphene;
-        if (isTriangleRaft)
+        if (isTriangleRaftEnabled)
             TriangleRaftEnergy = saveEnergyTriangleRaft;
-        if (isTersoffGraphene)
+        if (isTersoffGrapheneEnabled)
             TersoffGrapheneEnergy = saveEnergyTersoffGraphene;
-        if (isBilayer)
+        if (isBilayerEnabled)
             BilayerEnergy = saveEnergyBilayer;
-        if (isBN)
+        if (isBNEnabled)
             BNEnergy = saveEnergyBN;
-        if (isSimpleGraphene)
+        if (isSimpleGrapheneEnabled)
             SimpleGraphene.pushCrds(2, saveCrdsSimpleGraphene);
-        if (isTriangleRaft)
+        if (isTriangleRaftEnabled)
             Triangle_Raft.pushCrds(2, saveCrdsTriangleRaft);
-        if (isBilayer)
+        if (isBilayerEnabled)
             Bilayer.pushCrds(3, saveCrdsBilayer);
-        if (isTersoffGraphene)
+        if (isTersoffGrapheneEnabled)
             TersoffGraphene.pushCrds(2, saveCrdsTersoffGraphene);
-        if (isBN)
+        if (isBNEnabled)
             BN.pushCrds(2, saveCrdsBN);
 
-        if (isSimpleGraphene)
+        if (isSimpleGrapheneEnabled)
         {
             SimpleGraphene.revertGraphene(switchIdsA, networkA, logger);
             SimpleGraphene.GlobalPotentialMinimisation();
         }
-        if (isTriangleRaft)
+        if (isTriangleRaftEnabled)
         {
             Triangle_Raft.revertTriangleRaft(switchIdsA, switchIdsB, switchIdsT, logger);
             Triangle_Raft.GlobalPotentialMinimisation();
         }
-        if (isBilayer)
+        if (isBilayerEnabled)
         {
             Bilayer.revertBilayer(switchIdsA, switchIdsB, switchIdsT, logger);
             Bilayer.GlobalPotentialMinimisation();
         }
-        if (isBN)
+        if (isBNEnabled)
         {
             BN.revertGraphene(switchIdsA, networkA, logger);
             BN.GlobalPotentialMinimisation();
@@ -3101,7 +3134,7 @@ VecF<int> LinkedNetwork::monteCarloSwitchMoveLAMMPS(double &SimpleGrapheneEnergy
      * [1] optimisation code 0=successful 1=successful(zero force) 2=unsuccessful(it limit) 3=unsuccessful(intersection) 4=unsuccessful(non-convex)
      * [2] optimisation iterations */
     VecF<int> status(3);
-    status[0] = accept;
+    status[0] = isAccepted;
     status[1] = optStatus_SimpleGraphene[0];
     status[2] = optStatus_SimpleGraphene[1];
     logger->info("Returning status");
@@ -3109,7 +3142,7 @@ VecF<int> LinkedNetwork::monteCarloSwitchMoveLAMMPS(double &SimpleGrapheneEnergy
 }
 
 // Single monte carlo switching move
-VecF<int> LinkedNetwork::monteCarloSwitchMove(Network network, double &energy)
+VecF<int> LinkedNetwork::monteCarloSwitchMove(Network network, double &energy, LoggerPtr logger)
 {
 
     /* Single MC switch move
@@ -3123,23 +3156,19 @@ VecF<int> LinkedNetwork::monteCarloSwitchMove(Network network, double &energy)
     // Select valid random connection - that will not violate connection limits
     int a, b, u, v;
     VecF<int> switchIdsA, switchIdsB, switchIdsT;
-    int validMove;
+    bool foundValidMove = false;
     int cnxType;
     for (int i = 0; i < networkA.nodes.n * networkA.nodes.n; ++i)
     { // catch in case cannot find any valid moves
         cnxType = pickRandomCnx34(a, b, u, v, mtGen);
-        validMove = generateSwitchIds34(cnxType, switchIdsA, switchIdsB, switchIdsT, a, b, u, v);
-        if (validMove == 0)
+        foundValidMove = generateSwitchIds34(cnxType, switchIdsA, switchIdsB, switchIdsT, a, b, u, v);
+        if (foundValidMove)
             break;
     }
-    if (validMove == 1)
+    if (!foundValidMove)
     {
-        std::cout << "Cannot find any valid switch moves" << endl;
-        throw string("Cannot find any valid switch moves");
-    }
-    else
-    {
-        //    std::cout << "Found a valid switch ! " << endl;
+        logger->critical("Cannot find any valid switch moves");
+        throw std::runtime_error("Cannot find any valid switch moves");
     }
 
     // Save current state
@@ -3158,7 +3187,7 @@ VecF<int> LinkedNetwork::monteCarloSwitchMove(Network network, double &energy)
         saveNodesT[i] = networkT.nodes[switchIdsT[i]];
 
     // Switch and geometry optimise
-    std::cout << "Switch" << endl;
+    logger->info("Switching...");
     VecF<int> optStatus(3);
     if (cnxType == 33)
         switchCnx33(switchIdsA, switchIdsB, switchIdsT);
@@ -3167,8 +3196,10 @@ VecF<int> LinkedNetwork::monteCarloSwitchMove(Network network, double &energy)
     else if (cnxType == 43)
         switchCnx43(switchIdsA, switchIdsB);
     else
-        throw string("Not yet implemented!");
-
+    {
+        logger->critical("Not yet implemented cnxType: {}", cnxType);
+        throw std::runtime_error("Not yet implemented");
+    }
     // Rearrange nodes after switch
     bool geometryOK = true;
     geometryOK = checkThreeRingEdges(u);
@@ -3195,7 +3226,7 @@ VecF<int> LinkedNetwork::monteCarloSwitchMove(Network network, double &energy)
         optStatus[0] = 4;
 
     // Geometry optimisation of local region
-    std::cout << "Geometry Optimise" << endl;
+    logger->info("Optimising geometry...");
     if (geometryOK)
     {
 
@@ -3203,13 +3234,13 @@ VecF<int> LinkedNetwork::monteCarloSwitchMove(Network network, double &energy)
         energy = globalPotentialEnergy(0, isMaintainConvexityEnabled, network);
     }
     else
-        energy = numeric_limits<double>::infinity();
+        energy = std::numeric_limits<double>::infinity();
 
     // Accept or reject
-    int accept = mc.acceptanceCriterion(energy, saveEnergy, 1.00);
-    if (accept == 0)
+    bool isAccepted = mc.acceptanceCriterion(energy, saveEnergy, 1.00);
+    if (isAccepted)
     {
-        std::cout << "               Rejected MC Move        Ei = " << saveEnergy << " Ef = " << energy << endl;
+        logger->info("Accepted MC Move Ei = {} Ef = {}", saveEnergy, energy);
         energy = saveEnergy;
         crds = saveCrds;
         networkA.nodeDistribution = saveNodeDistA;
@@ -3225,6 +3256,7 @@ VecF<int> LinkedNetwork::monteCarloSwitchMove(Network network, double &energy)
     }
     else
     {
+        logger->info("Rejected MC Move Ei = {} Ef = {}", saveEnergy, energy);
         syncCoordinates();
     }
 
@@ -3233,10 +3265,9 @@ VecF<int> LinkedNetwork::monteCarloSwitchMove(Network network, double &energy)
      * [1] optimisation code 0=successful 1=successful(zero force) 2=unsuccessful(it limit) 3=unsuccessful(intersection) 4=unsuccessful(non-convex)
      * [2] optimisation iterations */
     VecF<int> status(3);
-    status[0] = accept;
+    status[0] = isAccepted;
     status[1] = optStatus[0];
     status[2] = optStatus[1];
-
     return status;
 }
 
@@ -3253,17 +3284,18 @@ VecF<int> LinkedNetwork::monteCarloMixMove(double &energy)
     // Select valid random connection - that will not violate connection limits
     int a, b, u, v;
     VecF<int> mixIdsA, mixIdsB;
-    int validMove;
+    bool foundValidMove = false;
     int cnxType;
     for (int i = 0; i < networkA.nodes.n * networkA.nodes.n; ++i)
-    { // catch in case cannot find any valid moves
+    {
+        // catch in case cannot find any valid moves
         cnxType = pickRandomCnx(a, b, u, v, mtGen);
-        validMove = generateMixIds(cnxType, mixIdsA, mixIdsB, a, b, u, v);
-        if (validMove == 0)
+        foundValidMove = generateMixIds(cnxType, mixIdsA, mixIdsB, a, b, u, v);
+        if (foundValidMove)
             break;
     }
-    if (validMove == 1)
-        throw string("Cannot find any valid switch moves");
+    if (!foundValidMove)
+        throw std::runtime_error("Cannot find any valid switch moves");
 
     // Save current state
     double saveEnergy = energy;
@@ -3311,11 +3343,11 @@ VecF<int> LinkedNetwork::monteCarloMixMove(double &energy)
         energy = globalPotentialEnergy(0, isMaintainConvexityEnabled, networkA);
     }
     else
-        energy = numeric_limits<double>::infinity();
+        energy = std::numeric_limits<double>::infinity();
 
     // Accept or reject
-    int accept = mc.acceptanceCriterion(energy, saveEnergy, 1.00);
-    if (accept == 0)
+    bool isAccepted = mc.acceptanceCriterion(energy, saveEnergy, 1.00);
+    if (isAccepted)
     {
         energy = saveEnergy;
         crds = saveCrdsA;
@@ -3334,7 +3366,7 @@ VecF<int> LinkedNetwork::monteCarloMixMove(double &energy)
      * [1] optimisation code 0=successful 1=successful(zero force) 2=unsuccessful(it limit) 3=unsuccessful(intersection)
      * [2] optimisation iterations */
     VecF<int> status(3);
-    status[0] = accept;
+    status[0] = isAccepted;
     status[1] = optStatus[0];
     status[2] = optStatus[1];
 
@@ -3444,7 +3476,7 @@ double LinkedNetwork::globalPotentialEnergy(bool useIntx, bool isMaintainConvexi
     {
         bool convex = checkConvexity();
         if (!convex)
-            potEnergy = numeric_limits<double>::infinity();
+            potEnergy = std::numeric_limits<double>::infinity();
     }
     return potEnergy;
 }
@@ -3452,7 +3484,7 @@ double LinkedNetwork::globalPotentialEnergy(bool useIntx, bool isMaintainConvexi
 // Geometry optimise entire system
 VecF<int> LinkedNetwork::globalGeometryOptimisation(bool useIntx, bool isMaintainConvexityEnabled, Network network)
 {
-    auto start_GEO = chrono::system_clock::now();
+    auto start_GEO = std::chrono::system_clock::now();
     /* Potential model
      * Bonds as harmonic
      * Angles as approximated harmonic
@@ -3505,7 +3537,7 @@ VecF<int> LinkedNetwork::globalGeometryOptimisation(bool useIntx, bool isMaintai
             potModel.setAngles(angs, angP);
             if (useIntx)
                 potModel.setIntersections(intx, intxP);
-            if (potModel.function(crds) < numeric_limits<double>::infinity())
+            if (potModel.function(crds) < std::numeric_limits<double>::infinity())
             { // only optimise if no line intersections
                 SteepestDescentArmijoMultiDim<HI2DP> optimiser(goptParamsA[0], goptParamsB[0], goptParamsB[1]);
                 optStatus = optimiser(potModel, crds);
@@ -3523,7 +3555,7 @@ VecF<int> LinkedNetwork::globalGeometryOptimisation(bool useIntx, bool isMaintai
             potModel.setAngles(angs, angP);
             if (useIntx)
                 potModel.setIntersections(intx, intxP);
-            if (potModel.function(crds) < numeric_limits<double>::infinity())
+            if (potModel.function(crds) < std::numeric_limits<double>::infinity())
             { // only optimise if no line intersections
                 SteepestDescentArmijoMultiDim<HRI2DP> optimiser(goptParamsA[0], goptParamsB[0], goptParamsB[1]);
                 optStatus = optimiser(potModel, crds);
@@ -3548,7 +3580,7 @@ VecF<int> LinkedNetwork::globalGeometryOptimisation(bool useIntx, bool isMaintai
             potModel.setGeomConstraints(constrained, potParamsC);
             if (useIntx)
                 potModel.setIntersections(intx, intxP);
-            if (potModel.function(crds) < numeric_limits<double>::infinity())
+            if (potModel.function(crds) < std::numeric_limits<double>::infinity())
             { // only optimise if no line intersections
                 SteepestDescentArmijoMultiDim<HI3DS> optimiser(goptParamsA[0], goptParamsB[0], goptParamsB[1]);
                 optStatus = optimiser(potModel, crds);
@@ -3567,7 +3599,7 @@ VecF<int> LinkedNetwork::globalGeometryOptimisation(bool useIntx, bool isMaintai
             potModel.setGeomConstraints(constrained, potParamsC);
             if (useIntx)
                 potModel.setIntersections(intx, intxP);
-            if (potModel.function(crds) < numeric_limits<double>::infinity())
+            if (potModel.function(crds) < std::numeric_limits<double>::infinity())
             { // only optimise if no line intersections
                 SteepestDescentArmijoMultiDim<HRI3DS> optimiser(goptParamsA[0], goptParamsB[0], goptParamsB[1]);
                 optStatus = optimiser(potModel, crds);
@@ -3581,10 +3613,10 @@ VecF<int> LinkedNetwork::globalGeometryOptimisation(bool useIntx, bool isMaintai
     }
     else if (network.geometryCode == "2DEtr")
     {
-        std::cout << "Minimise Triangle Raft" << endl;
+        std::cout << "Minimise Triangle Raft" << std::endl;
         HLJ2DP potModel(network.pb[0], network.pb[1]);
         potModel.setBonds(bnds, bndP);
-        if (potModel.function(crds) < numeric_limits<double>::infinity())
+        if (potModel.function(crds) < std::numeric_limits<double>::infinity())
         { // only optimise if no line intersections
             SteepestDescentArmijoMultiDim<HLJ2DP> optimiser(goptParamsA[0], goptParamsB[0], goptParamsB[1]);
             optStatus = optimiser(potModel, crds);
@@ -3595,9 +3627,9 @@ VecF<int> LinkedNetwork::globalGeometryOptimisation(bool useIntx, bool isMaintai
             optStatus[1] = 0;
         }
     }
-    auto end_GEO = chrono::system_clock::now();
-    chrono::duration<double> elapsed_GEO = end_GEO - start_GEO;
-    std::cout << "GEO took " << elapsed_GEO.count() << endl;
+    auto end_GEO = std::chrono::system_clock::now();
+    std::chrono::duration<double> elapsed_GEO = end_GEO - start_GEO;
+    std::cout << "GEO took " << elapsed_GEO.count() << std::endl;
     return optStatus;
 }
 
@@ -3656,7 +3688,7 @@ VecF<int> LinkedNetwork::localGeometryOptimisation(int centreA, int centreB, int
         potModel.setFixedAtoms(fixd);
         if (useIntx)
             potModel.setIntersections(intx, intxP);
-        if (potModel.function(crds) < numeric_limits<double>::infinity())
+        if (potModel.function(crds) < std::numeric_limits<double>::infinity())
         { // optimise if no line intersections
             SteepestDescentArmijoMultiDim<HI2DP> optimiser(goptParamsA[0], goptParamsB[0], goptParamsB[1]);
             optStatus = optimiser(potModel, crds);
@@ -3675,7 +3707,7 @@ VecF<int> LinkedNetwork::localGeometryOptimisation(int centreA, int centreB, int
         potModel.setFixedAtoms(fixd);
         if (useIntx)
             potModel.setIntersections(intx, intxP);
-        if (potModel.function(crds) < numeric_limits<double>::infinity())
+        if (potModel.function(crds) < std::numeric_limits<double>::infinity())
         { // optimise if no line intersections
             SteepestDescentArmijoMultiDim<HRI2DP> optimiser(goptParamsA[0], goptParamsB[0], goptParamsB[1]);
             optStatus = optimiser(potModel, crds);
@@ -3940,7 +3972,7 @@ void LinkedNetwork::syncCoordinatesTD()
 }
 
 // Get normalised probability distribution of nodes of each size in given lattice
-VecF<double> LinkedNetwork::getNodeDistribution(string lattice)
+VecF<double> LinkedNetwork::getNodeDistribution(std::string lattice)
 {
 
     if (lattice == "A")
@@ -3950,7 +3982,7 @@ VecF<double> LinkedNetwork::getNodeDistribution(string lattice)
 }
 
 // Get unnormalised probability distribution of node connections in given lattice
-VecF<VecF<int>> LinkedNetwork::getEdgeDistribution(string lattice)
+VecF<VecF<int>> LinkedNetwork::getEdgeDistribution(std::string lattice)
 {
 
     if (lattice == "A")
@@ -3960,7 +3992,7 @@ VecF<VecF<int>> LinkedNetwork::getEdgeDistribution(string lattice)
 }
 
 // Get Aboav-Weaire fitting parameters
-VecF<double> LinkedNetwork::getAboavWeaire(string lattice)
+VecF<double> LinkedNetwork::getAboavWeaire(std::string lattice)
 {
 
     if (lattice == "A")
@@ -3970,7 +4002,7 @@ VecF<double> LinkedNetwork::getAboavWeaire(string lattice)
 }
 
 // Get assortativity
-double LinkedNetwork::getAssortativity(string lattice)
+double LinkedNetwork::getAssortativity(std::string lattice)
 {
 
     if (lattice == "A")
@@ -3980,7 +4012,7 @@ double LinkedNetwork::getAssortativity(string lattice)
 }
 
 // Get alpha estimate
-double LinkedNetwork::getAboavWeaireEstimate(string lattice)
+double LinkedNetwork::getAboavWeaireEstimate(std::string lattice)
 {
 
     if (lattice == "A")
@@ -3990,7 +4022,7 @@ double LinkedNetwork::getAboavWeaireEstimate(string lattice)
 }
 
 // Get entropy
-VecF<double> LinkedNetwork::getEntropy(string lattice)
+VecF<double> LinkedNetwork::getEntropy(std::string lattice)
 {
 
     if (lattice == "A")
@@ -4000,7 +4032,7 @@ VecF<double> LinkedNetwork::getEntropy(string lattice)
 }
 
 // Get cluster information
-double LinkedNetwork::getMaxCluster(string lattice, int nodeCnd)
+double LinkedNetwork::getMaxCluster(std::string lattice, int nodeCnd)
 {
 
     if (lattice == "A")
@@ -4010,7 +4042,7 @@ double LinkedNetwork::getMaxCluster(string lattice, int nodeCnd)
 }
 
 // Get cluster information
-VecF<int> LinkedNetwork::getMaxClusters(string lattice, int minCnd, int maxCnd)
+VecF<int> LinkedNetwork::getMaxClusters(std::string lattice, int minCnd, int maxCnd)
 {
 
     if (lattice == "A")
@@ -4503,7 +4535,7 @@ void LinkedNetwork::wrapCoordinates()
 }
 
 // Write xyz file format of networks
-void LinkedNetwork::writeXYZ(string prefix)
+void LinkedNetwork::writeXYZ(std::string prefix)
 {
     networkA.writeXYZ(prefix + "_A", "O");
     networkB.writeXYZ(prefix + "_B", "N");
@@ -4511,7 +4543,7 @@ void LinkedNetwork::writeXYZ(string prefix)
 }
 
 // Write networks in format that can be loaded and visualised
-void LinkedNetwork::write(string prefix)
+void LinkedNetwork::write(std::string prefix)
 {
     networkA.write(prefix + "_A");
     networkB.write(prefix + "_B");
