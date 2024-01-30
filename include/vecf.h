@@ -6,8 +6,6 @@
 #include <limits>
 #include <cmath>
 
-using namespace std;
-
 // Vector class
 template <typename T>
 class VecF
@@ -57,10 +55,10 @@ public:
     VecF operator-();
 
     // Stream
-    friend ostream &operator<<(ostream &output, const VecF &source)
+    friend std::ostream &operator<<(std::ostream &output, const VecF &source)
     {
         for (int i = 0; i < source.n; ++i)
-            output << source.v[i] << endl;
+            output << source.v[i] << std::endl;
         return output;
     };
 };
