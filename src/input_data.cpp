@@ -48,13 +48,10 @@ std::string InputData::getFirstWord(std::ifstream &inputFile, std::istringstream
 }
 
 /**
- * @brief Reads a section of the input file
+ * @brief Reads the IO section of the input file
  * @param inputFile The input file stream
- * @param args The values to be read
- * @tparam Args The types of the values to be read
- * @return void
+ * @param logger The log file
  */
-
 void InputData::readIO(std::ifstream &inputFile, const LoggerPtr &logger)
 {
     readSection(inputFile, "IO", logger,
@@ -63,7 +60,7 @@ void InputData::readIO(std::ifstream &inputFile, const LoggerPtr &logger)
                 inputFolder,
                 inputFilePrefix,
                 isFromScratchEnabled,
-                isRestartUsingLammpsObjectsEnabled);
+                isRestartUsingLAMMPSObjectsEnabled);
 }
 
 void InputData::readNetworkProperties(std::ifstream &inputFile, const LoggerPtr &logger)
@@ -234,7 +231,7 @@ InputData::InputData(const std::string &filePath, const LoggerPtr &logger)
     std::ifstream inputFile(filePath);
 
     // Check if the file was opened successfully
-    if (!inputFile)
+    if (!inputFile.is_open())
     {
         throw std::runtime_error("Unable to open file: " + filePath);
     }
