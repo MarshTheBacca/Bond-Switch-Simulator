@@ -15,7 +15,7 @@ template <typename T>
 VecF<T>::VecF(int size)
 {
     if (size < 0)
-        throw string("Vector cannot be instantiated with negative size");
+        throw std::runtime_error("Vector cannot be instantiated with negative size");
     this->n = size;
     this->v = new T[this->n]();
 }
@@ -41,7 +41,7 @@ VecF<T>::~VecF()
 template <typename T>
 bool VecF<T>::equals(const T &a, const T &b)
 {
-    return a == b || abs(a - b) < abs(min(a, b)) * numeric_limits<T>::epsilon();
+    return a == b || abs(a - b) < abs(std::min(a, b)) * std::numeric_limits<T>::epsilon();
 }
 
 // Subscript operator
@@ -49,7 +49,7 @@ template <typename T>
 T &VecF<T>::operator[](int i)
 {
     if (this->n <= i)
-        throw string("Vector subscript out of bounds");
+        throw std::runtime_error("Vector subscript out of bounds");
     return this->v[i];
 }
 
@@ -166,7 +166,7 @@ template <typename T>
 void VecF<T>::operator+=(const VecF &source)
 {
     if (this->n != source.n)
-        throw string("Cannot perform binary operation on vectors of different sizes");
+        throw std::runtime_error("Cannot perform binary operation on vectors of different sizes");
     for (int i = 0; i < this->n; ++i)
         this->v[i] += source.v[i];
 }
@@ -175,7 +175,7 @@ template <typename T>
 void VecF<T>::operator-=(const VecF &source)
 {
     if (this->n != source.n)
-        throw string("Cannot perform binary operation on vectors of different sizes");
+        throw std::runtime_error("Cannot perform binary operation on vectors of different sizes");
     for (int i = 0; i < this->n; ++i)
         this->v[i] -= source.v[i];
 }
@@ -184,7 +184,7 @@ template <typename T>
 void VecF<T>::operator*=(const VecF &source)
 {
     if (this->n != source.n)
-        throw string("Cannot perform binary operation on vectors of different sizes");
+        throw std::runtime_error("Cannot perform binary operation on vectors of different sizes");
     for (int i = 0; i < this->n; ++i)
         this->v[i] *= source.v[i];
 }
@@ -193,7 +193,7 @@ template <typename T>
 void VecF<T>::operator/=(const VecF &source)
 {
     if (this->n != source.n)
-        throw string("Cannot perform binary operation on vectors of different sizes");
+        throw std::runtime_error("Cannot perform binary operation on vectors of different sizes");
     for (int i = 0; i < this->n; ++i)
         this->v[i] /= source.v[i];
 }
@@ -233,7 +233,7 @@ template <typename T>
 VecF<T> VecF<T>::operator+(const VecF &source)
 {
     if (this->n != source.n)
-        throw string("Cannot perform binary operation on vectors of different sizes");
+        throw std::runtime_error("Cannot perform binary operation on vectors of different sizes");
     VecF<T> vec(this->n);
     for (int i = 0; i < this->n; ++i)
         vec[i] = this->v[i] + source.v[i];
@@ -244,7 +244,7 @@ template <typename T>
 VecF<T> VecF<T>::operator-(const VecF &source)
 {
     if (this->n != source.n)
-        throw string("Cannot perform binary operation on vectors of different sizes");
+        throw std::runtime_error("Cannot perform binary operation on vectors of different sizes");
     VecF<T> vec(this->n);
     for (int i = 0; i < this->n; ++i)
         vec[i] = this->v[i] - source.v[i];
@@ -255,7 +255,7 @@ template <typename T>
 VecF<T> VecF<T>::operator*(const VecF &source)
 {
     if (this->n != source.n)
-        throw string("Cannot perform binary operation on vectors of different sizes");
+        throw std::runtime_error("Cannot perform binary operation on vectors of different sizes");
     VecF<T> vec(this->n);
     for (int i = 0; i < this->n; ++i)
         vec[i] = this->v[i] * source.v[i];
@@ -266,7 +266,7 @@ template <typename T>
 VecF<T> VecF<T>::operator/(const VecF &source)
 {
     if (this->n != source.n)
-        throw string("Cannot perform binary operation on vectors of different sizes");
+        throw std::runtime_error("Cannot perform binary operation on vectors of different sizes");
     VecF<T> vec(this->n);
     for (int i = 0; i < this->n; ++i)
         vec[i] = this->v[i] / source.v[i];
