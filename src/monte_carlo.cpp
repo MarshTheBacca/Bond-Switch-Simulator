@@ -1,12 +1,12 @@
 #include "monte_carlo.h"
 
-// ##### Metropolis-Hastings #####
+// Metropolis-Hastings
 
 // Default constructor
 Metropolis::Metropolis()
 {
     mtGen.seed(0);
-    rand01 = uniform_real_distribution<double>(0.0, 1.0);
+    rand01 = std::uniform_real_distribution<double>(0.0, 1.0);
     rTemperature = 1.0;
     energyPrev = 0.0;
 }
@@ -15,9 +15,9 @@ Metropolis::Metropolis()
 Metropolis::Metropolis(int seed, double temperature, double energy)
 {
     mtGen.seed(seed);
-    rand01 = uniform_real_distribution<double>(0.0, 1.0);
+    rand01 = std::uniform_real_distribution<double>(0.0, 1.0);
     if (temperature <= 0.0)
-        throw "Cannot initialise Metropolis algorithm with zero temperature";
+        throw std::runtime_error("Cannot initialise Metropolis algorithm with zero temperature");
     rTemperature = 1.0 / temperature;
     energyPrev = energy;
 }
@@ -40,31 +40,28 @@ void Metropolis::setTemperature(double temperature)
     rTemperature = 1.0 / temperature;
 }
 
-// Evaluate Metropolis condition, whether to accept or reject move
-int Metropolis::acceptanceCriterion(double Ef, double Ei, double T_factor)
+/**
+ * @brief Evaluate Metropolis condition, whether to accept or reject move
+ * @param Ef Final energy
+ * @param Ei Initial energy
+ * @param T_factor Temperature factor
+ * @return True if move accepted, false if rejected
+ */
+bool Metropolis::acceptanceCriterion(double Ef, double Ei, double T_factor)
 {
-
     /* Metropolis algorithm efficiently samples Boltzmann distribution
      * 1) if move downhill in energy accept
      * 2) if move uphill accept with probabilitiy min[1,e^-de/t] */
-
     double deltaE = Ef - Ei;
     if (deltaE < 0.0)
     {
-        return 1;
+        return true;
     }
-    else
+    double probability = exp(-deltaE * rTemperature / T_factor);
+    double randomNum = rand01(mtGen);
+    if (randomNum < probability)
     {
-        double probability = exp(-deltaE * rTemperature / T_factor);
-        double randomNum = rand01(mtGen);
-        if (randomNum < probability)
-        {
-
-            return 1;
-        }
-        else
-        {
-            return 0;
-        }
+        return true;
     }
+    return false;
 }
