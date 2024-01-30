@@ -1,4 +1,8 @@
 /build/
 /variable_maps
 /testing/output_files/
+/testing/log.lammps
+/testing/netmc.log
+/testing/netmc.x
+/testing/Si.log
 /clean-all.cmake
