@@ -22,7 +22,7 @@ target_sources(netmc.x PRIVATE
     input_data.cpp
     output_file.cpp
 )
-
+target_include_directories(netmc.x PUBLIC ${LAMMPS_INCLUDE_DIRS}/lammps)
 target_include_directories(netmc.x BEFORE PRIVATE ${CMAKE_SOURCE_DIR}/include)
 
 # Link against the LAMMPS and OpenMP libraries
