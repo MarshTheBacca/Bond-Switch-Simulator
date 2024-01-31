@@ -29,30 +29,32 @@ using LoggerPtr = std::shared_ptr<spdlog::logger>;
 
 class LammpsObject
 {
-
-private:
 public:
-    Network networkA, networkB, networkT;
+    Network networkA;
+    Network networkB;
+    Network networkT;
 
     void *handle;
     int version;
-    int natoms = 0, nbonds = 0, nangles = 0;
-    double *coords = NULL;
-    double *bonds = NULL;
-    double *angles = NULL;
+    int natoms = 0;
+    int nbonds = 0;
+    int nangles = 0;
+    double *coords = nullptr;
+    double *bonds = nullptr;
+    double *angles = nullptr;
 
-    std::string prefixFolderIn, prefixFolderOut;
+    std::string prefixFolderIn;
+    std::string prefixFolderOut;
     std::string prefixOut;
 
     LammpsObject();
-    LammpsObject(std::string selector, std::string inputFolder, LoggerPtr logger);
+    LammpsObject(const std::string &selector, const std::string &inputFolder, const LoggerPtr logger);
 
     int write_data(int selector);
-    int write_restart(int selector);
+    void write_restart(const std::string &structureName);
     int finaliseLammpsObject(int selector);
 
-    void runInput(std::string fname);
-    void getatominfo(int dim);
+    void runInput(const std::string &fname);
 
     double pbx();
     double pby();
@@ -63,7 +65,7 @@ public:
 
     double *fetchBonds();
 
-    int getnAtoms();
+    const int getNumAtoms();
 
     void breakBond(int atom1, int atom2, int type, LoggerPtr logger);
     void formBond(int atom1, int atom2, int type, LoggerPtr logger);
