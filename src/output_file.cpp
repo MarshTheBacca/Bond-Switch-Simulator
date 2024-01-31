@@ -3,22 +3,12 @@
 #include <ctime>
 #include <sstream>
 
-OutputFile::OutputFile() : file("a.out", std::ios::out | std::ios::trunc)
-{
-    if (!file)
-    {
-        throw std::runtime_error("Unable to open file: a.out");
-    }
-    initVariables();
-}
-
 OutputFile::OutputFile(const std::string &name) : file(name, std::ios::out | std::ios::trunc)
 {
-    if (!file)
+    if (!file.is_open())
     {
-        std::ostringstream oss;
-        oss << "Unable to open file: " << name;
-        throw std::runtime_error(oss.str());
+        std::string error_message = "Unable to open file: " + name;
+        throw std::runtime_error(error_message);
     }
     initVariables();
 }
@@ -32,11 +22,13 @@ void OutputFile::initVariables(int precision, int indentSize, int sepSize, int s
     currIndent = 0;
 }
 
-void OutputFile::datetime(std::string message)
+void OutputFile::datetime(const std::string &message)
 {
     std::time_t now = std::time(0);
+    struct tm timeinfo;
+    localtime_r(&now, &timeinfo);
     char buffer[100];
-    std::strftime(buffer, 100, "%Y-%m-%d %H:%M:%S", std::localtime(&now));
+    std::strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", &timeinfo);
     std::string time(buffer);
     file << message << time << '\n';
 }
@@ -44,38 +36,4 @@ void OutputFile::datetime(std::string message)
 void OutputFile::separator()
 {
     file << dashed << '\n';
-}
-
-LogFile::LogFile(const std::string &name) : OutputFile(name)
-{
-    tStart = std::chrono::high_resolution_clock::now();
-    t0 = tStart;
-}
-
-LogFile::~LogFile()
-{
-    if (file.is_open())
-    {
-        tEnd = std::chrono::high_resolution_clock::now();
-        double dt = std::chrono::duration_cast<std::chrono::seconds>(tEnd - tStart).count();
-        dt /= 60.0;
-        file << "Duration: " << dt << " minutes" << '\n';
-    }
-}
-
-void LogFile::criticalError(std::string message)
-{
-    if (file.is_open())
-    {
-        file << "Critical error: " << message << '\n';
-    }
-    throw std::runtime_error(message);
-}
-
-double LogFile::timeElapsed()
-{
-    t1 = std::chrono::high_resolution_clock::now();
-    double dt = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
-    t0 = t1;
-    return dt / 1000.0;
 }
