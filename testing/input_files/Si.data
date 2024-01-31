@@ -2,33 +2,17 @@ DATA FILE Produced from netmc results (cf David Morley)
 3140 atoms
 4710 bonds
 9420 angles
-0 dihedrals
-0 impropers
 1 atom types
 1 bond types
 1 angle types
-0 dihedral types
-0 improper types
 0.00000 68.62943944719063 xlo xhi
 0.00000 59.434838268476845 ylo yhi
 
-# Pair Coeffs
-#
-# 1  Si
-
-# Bond Coeffs
-# 
-# 1  Si-Si
-
-# Angle Coeffs
-# 
-# 1  Si-Si-Si
-
- Masses
+Masses
 
 1 28.085500 # Si
 
- Atoms # molecular
+Atoms # molecular
 
 1    1    1    35.17254670664679        30.95564493149836        0.0                     # Si
 2    2    1    36.888331429393936       30.95564493149836        0.0                     # Si

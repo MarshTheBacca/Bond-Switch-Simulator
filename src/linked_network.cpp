@@ -2383,9 +2383,8 @@ void LinkedNetwork::makerFixed()
 // Single monte carlo switching move
 VecF<int> LinkedNetwork::SpiralmonteCarloSwitchMoveLAMMPS(int a, double &SimpleGrapheneEnergy,
                                                           double &TersoffGrapheneEnergy, double &TriangleRaftEnergy,
-                                                          double &BilayerEnergy, double &BNEnergy, int Selected, LoggerPtr logger)
+                                                          double &BilayerEnergy, double &BNEnergy, LoggerPtr logger)
 {
-    Selected = 0;
     /* Single MC switch move
      * 1) select random connection
      * 2) switch connection
@@ -2752,9 +2751,9 @@ VecF<int> LinkedNetwork::SpiralmonteCarloSwitchMoveLAMMPS(int a, double &SimpleG
 // Single monte carlo switching move
 VecF<int> LinkedNetwork::monteCarloSwitchMoveLAMMPS(double &SimpleGrapheneEnergy, double &TersoffGrapheneEnergy,
                                                     double &TriangleRaftEnergy, double &BilayerEnergy, double &BNEnergy,
-                                                    int Selected, LoggerPtr logger)
+                                                    LoggerPtr logger)
 {
-    Selected = 0;
+
     /* Single MC switch move
      * 1) select random connection
      * 2) switch connection
@@ -2769,7 +2768,6 @@ VecF<int> LinkedNetwork::monteCarloSwitchMoveLAMMPS(double &SimpleGrapheneEnergy
     logger->info("Finding move...");
     for (int i = 0; i < networkA.nodes.n * networkA.nodes.n; ++i)
     {
-        // catch in case cannot find any valid moves
         if (MCWeighting == "weighted")
             cnxType = pickDiscreteCnx34(a, b, u, v, mtGen, logger);
         else

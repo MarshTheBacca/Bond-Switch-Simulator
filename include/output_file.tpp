@@ -38,9 +38,6 @@ void OutputFile::write(T val0, U val1)
 template <typename T>
 void OutputFile::writeRowVector(T vec)
 {
-    // static_assert(std::is_same<decltype(vec.n), int>::value, "Type T must have an integer member 'n'");
-    // static_assert(std::is_same<decltype(vec[0]), double>::value || std::is_same<decltype(vec[0]), int>::value,
-    //            "Vector must have a subscript operator returning double or int");
     for (int i = 0; i < vec.n; ++i)
     {
         file << std::setw(spacing) << std::left << vec[i];

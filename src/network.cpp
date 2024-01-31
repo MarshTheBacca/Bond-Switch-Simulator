@@ -140,13 +140,13 @@ Network::Network(std::string prefix, int maxBaseCoordinationArg, int maxDualCoor
 
     // Read network connections
     logger->info("Reading net file {} ...", prefix + "_net.dat");
-    int cnx;
     std::ifstream netFile(prefix + "_net.dat", std::ios::in);
     if (!netFile.is_open())
     {
         logger->critical("net.dat file not found!");
         throw std::runtime_error("net.dat file not found!");
     }
+    int cnx;
     for (int i = 0; i < nodes.n; ++i)
     {
         getline(netFile, line);
@@ -170,7 +170,6 @@ Network::Network(std::string prefix, int maxBaseCoordinationArg, int maxDualCoor
     {
         getline(dualFile, line);
         std::istringstream ss(line);
-        //        ss.str(line);
         while (ss >> cnx)
             nodes[i].dualCnxs.addValue(cnx);
     }

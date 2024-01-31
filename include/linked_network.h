@@ -106,10 +106,10 @@ public:
     VecF<int> monteCarloSwitchMove(Network network, double &energy, LoggerPtr logger);                     // monte carlo switching move
     VecF<int> SpiralmonteCarloSwitchMoveLAMMPS(int a, double &SimpleGrapheneEnergy,
                                                double &TersoffGrapheneEnergy, double &TriangleRaftEnergy,
-                                               double &BilayerEnergy, double &BNEnergy, int Selected, LoggerPtr logger);
+                                               double &BilayerEnergy, double &BNEnergy, LoggerPtr logger);
     VecF<int> monteCarloSwitchMoveLAMMPS(double &SimpleGrapheneEnergy, double &TersoffGrapheneEnergy,
                                          double &TriangleRaftEnergy, double &BilayerEnergy,
-                                         double &BNEnergy, int Selected, LoggerPtr logger);
+                                         double &BNEnergy, LoggerPtr logger);
     VecF<int> monteCarloCostSwitchMove(double &cost, double &energy, double pTarget, double rTarget);                                          // monte carlo switching move with cost function
     VecF<int> monteCarloMixMove(double &energy);                                                                                               // monte carlo mixing move
     double costFunction(double &pTarget, double &rTarget);                                                                                     // cost function based on ring statistics and assortative mixing
