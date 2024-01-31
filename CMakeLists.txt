@@ -14,16 +14,3 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/testing)
 
 # Add include directories
 add_subdirectory(src)
-
-add_custom_target(clean-cmake-files
-   COMMAND ${CMAKE_COMMAND} -P clean-all.cmake
-)
-
-# Create a clean-all.cmake script
-file(WRITE clean-all.cmake "
-file(REMOVE_RECURSE ${CMAKE_BINARY_DIR}/CMakeCache.txt)
-file(REMOVE_RECURSE ${CMAKE_BINARY_DIR}/CMakeFiles)
-file(REMOVE_RECURSE ${CMAKE_BINARY_DIR}/*.cmake)
-file(REMOVE_RECURSE ${CMAKE_BINARY_DIR}/*.o)
-file(REMOVE_RECURSE ${CMAKE_BINARY_DIR}/*.ghc)
-")
