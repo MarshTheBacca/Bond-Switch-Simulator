@@ -5,9 +5,7 @@
 #include <unistd.h>
 #include <fstream>
 
-LammpsObject::LammpsObject()
-{
-}
+LammpsObject::LammpsObject() = default;
 
 LammpsObject::LammpsObject(const std::string &selector, const std::string &inputFolder, const LoggerPtr logger)
 {
@@ -28,11 +26,11 @@ LammpsObject::LammpsObject(const std::string &selector, const std::string &input
     logger->info("LAMMPS Version: {}", version);
 
     std::map<std::string, std::string> selectorToFile = {
-        {"SimpleGraphene", "/Si.in"},
-        {"TriangleRaft", "/Si2O3.in"},
-        {"Bilayer", "/SiO2.in"},
-        {"Tersoff", "/C.in"},
-        {"BN", "/BN.in"}};
+        {"Si", "Si.in"},
+        {"Si2O3", "Si2O3.in"},
+        {"SiO2", "SiO2.in"},
+        {"C", "C.in"},
+        {"BN", "BN.in"}};
 
     if (selectorToFile.find(selector) == selectorToFile.end())
     {
@@ -40,13 +38,12 @@ LammpsObject::LammpsObject(const std::string &selector, const std::string &input
         throw std::runtime_error("Invalid Selector");
     }
 
-    std::string inputFilePath = inputFolder + selectorToFile[selector];
+    std::string inputFilePath = inputFolder + "/" + selectorToFile[selector];
     logger->info("Executing LAMMPS Script: {}", inputFilePath);
     lammps_file(handle, inputFilePath.c_str());
     natoms = (int)(lammps_get_natoms(handle) + 0.5);
     logger->info("LAMMPS Number of atoms {}", natoms);
-    int *nbonds_ptr = static_cast<int *>(lammps_extract_global(handle, "nbonds"));
-    if (nbonds_ptr)
+    if (const auto nbonds_ptr = static_cast<const int *>(lammps_extract_global(handle, "nbonds")); nbonds_ptr)
     {
         nbonds = *nbonds_ptr;
         logger->info("LAMMPS Number of bonds {}", nbonds);
@@ -56,8 +53,7 @@ LammpsObject::LammpsObject(const std::string &selector, const std::string &input
         logger->error("Failed to extract number of bonds");
     }
 
-    int *nangles_ptr = static_cast<int *>(lammps_extract_global(handle, "nangles"));
-    if (nangles_ptr)
+    if (const auto nangles_ptr = static_cast<int *>(lammps_extract_global(handle, "nangles")); nangles_ptr)
     {
         nangles = *nangles_ptr;
         logger->info("LAMMPS Number of angles {}", nangles);
@@ -68,36 +64,22 @@ LammpsObject::LammpsObject(const std::string &selector, const std::string &input
     }
 }
 
-int LammpsObject::write_data(int selector)
+void LammpsObject::write_data(const std::string &structureName)
 {
-    std::string fname;
-    if (selector == 0)
-    {
-        fname = "write_data " + prefixFolderOut + "/Si_results.dat";
-    }
-    else if (selector == 1)
-    {
-        fname = "write_data " + prefixFolderOut + "/Si2O3_results.dat";
-    }
-    else if (selector == 2)
-    {
-        fname = "write_data " + prefixFolderOut + "/SiO2_results.dat";
-    }
-    else if (selector == 3)
-    {
-        fname = "write_data " + prefixFolderOut + "/C_results.dat";
-    }
-    else if (selector == 4)
-    {
-        fname = "write_data " + prefixFolderOut + "/BN_results.dat";
-    }
-    else
-    {
-        exit(3);
-    }
+    std::unordered_map<std::string, std::string> selectorToFile = {
+        {"Si", "Si_results.in"},
+        {"Si2O3", "Si2O3_results.in"},
+        {"SiO2", "SiO2_results.in"},
+        {"C", "C_results.in"},
+        {"BN", "BN_results.in"}};
 
-    lammps_command(handle, fname.c_str());
-    return 0;
+    auto iterator = selectorToFile.find(structureName);
+    if (iterator == selectorToFile.end())
+    {
+        throw std::runtime_error("Invalid structure name");
+    }
+    std::string command = "write_data " + prefixFolderOut + "/" + iterator->second;
+    lammps_command(handle, command.c_str());
 }
 
 void LammpsObject::write_restart(const std::string &structureName)
@@ -117,43 +99,26 @@ void LammpsObject::write_restart(const std::string &structureName)
     }
 
     // that's why we use iterator->second to access the value of the pair
-    std::string fname = "write_restart " + prefixFolderOut + "/" + iterator->second;
-    lammps_command(handle, fname.c_str());
+    std::string command = "write_restart " + prefixFolderOut + "/" + iterator->second;
+    lammps_command(handle, command.c_str());
 }
 
-int LammpsObject::finaliseLammpsObject(int selector)
+void LammpsObject::finaliseLAMMPSObject(const std::string &structureName)
 {
-    std::string fname;
-    if (selector == 0)
+    std::unordered_map<std::string, std::string> structureToFile = {
+        {"Si", "Si_restart.restart"},
+        {"Si2O3", "Si2O3_restart.restart"},
+        {"SiO2", "SiO2_restart.restart"},
+        {"C", "C_restart.restart"},
+        {"BN", "BN_restart.restart"}};
+    auto iterator = structureToFile.find(structureName);
+    if (iterator == structureToFile.end())
     {
-        fname = "write_data " + prefixFolderOut + "/Si_results.dat";
+        throw std::runtime_error("Invalid structure name");
     }
-    else if (selector == 1)
-    {
-        fname = "write_data " + prefixFolderOut + "/Si2O3_results.dat";
-    }
-    else if (selector == 2)
-    {
-        fname = "write_data " + prefixFolderOut + "/SiO2_results.dat";
-    }
-    else if (selector == 3)
-    {
-        fname = "write_data " + prefixFolderOut + "/C_results.dat";
-    }
-    else if (selector == 4)
-    {
-        fname = "write_data " + prefixFolderOut + "/BN_results.dat";
-    }
-
-    else
-    {
-        exit(3);
-    }
-
-    lammps_command(handle, fname.c_str());
+    std::string command = "write_data " + prefixFolderOut + "/" + iterator->second;
+    lammps_command(handle, command.c_str());
     lammps_close(handle);
-    lammps_mpi_finalize();
-    return 0;
 }
 
 void LammpsObject::runInput(const std::string &fname)
@@ -174,11 +139,6 @@ double LammpsObject::pby()
 double LammpsObject::pbz()
 {
     return *(double *)lammps_extract_global(handle, "boxzhi");
-}
-
-const int LammpsObject::getNumAtoms()
-{
-    return natoms;
 }
 
 double *LammpsObject::fetchCrds(int dim)
@@ -205,7 +165,7 @@ double *LammpsObject::fetchBonds()
 
 void LammpsObject::breakBond(int atom1, int atom2, int type, LoggerPtr logger)
 {
-    logger->info("Breaking bond between {} and {} of type {}", atom1, atom2, type);
+    logger->debug("Breaking bond between {} and {} of type {}", atom1, atom2, type);
     double initialBondCount = lammps_get_thermo(handle, "bonds");
     std::string command;
     command = "group switch id " + std::to_string(atom1) + " " + std::to_string(atom2);
@@ -225,6 +185,7 @@ void LammpsObject::breakBond(int atom1, int atom2, int type, LoggerPtr logger)
 
 void LammpsObject::formBond(int atom1, int atom2, int type, LoggerPtr logger)
 {
+    logger->debug("Forming bond between {} and {} of type {}", atom1, atom2, type);
     std::string command;
     command = "create_bonds single/bond " + std::to_string(type) + " " + std::to_string(atom1) + " " + std::to_string(atom2);
     lammps_command(handle, command.c_str());
@@ -270,7 +231,10 @@ void LammpsObject::switchGraphene(VecF<int> switchIdsA, Network networkA, Logger
     formBond(atom1, atom4, 1, logger);
     formBond(atom2, atom5, 1, logger);
 
-    int e1, e11, d1, d11;
+    int e1;
+    int e11;
+    int d1;
+    int d11;
     if (networkA.nodes[atom5 - 1].netCnxs[0] == atom2 - 1)
     {
         e1 = networkA.nodes[atom5 - 1].netCnxs[1] + 1;
@@ -337,27 +301,22 @@ void LammpsObject::revertGraphene(VecF<int> switchIdsA, Network networkA, Logger
 {
 
     // unpck parameters
-    int a, b, c, d, e, f;
-    a = switchIdsA[0];
-    b = switchIdsA[1];
-    c = switchIdsA[2];
-    d = switchIdsA[3];
-    e = switchIdsA[4];
-    f = switchIdsA[5];
-
-    a += 1;
-    b += 1;
-    c += 1;
-    d += 1;
-    e += 1;
-    f += 1;
+    int a = switchIdsA[0] + 1;
+    int b = switchIdsA[1] + 1;
+    int c = switchIdsA[2] + 1;
+    int d = switchIdsA[3] + 1;
+    int e = switchIdsA[4] + 1;
+    int f = switchIdsA[5] + 1;
 
     breakBond(a, d, 1, logger);
     breakBond(b, e, 1, logger);
     formBond(a, e, 1, logger);
     formBond(b, d, 1, logger);
 
-    int e1, e11, d1, d11;
+    int e1;
+    int e11;
+    int d1;
+    int d11;
     if (networkA.nodes[e - 1].netCnxs[0] == a - 1)
     {
         e1 = networkA.nodes[e - 1].netCnxs[1] + 1;
@@ -375,7 +334,7 @@ void LammpsObject::revertGraphene(VecF<int> switchIdsA, Network networkA, Logger
     }
     else
     {
-        std::cout << "e not connected to a" << std::endl;
+        logger->warn("e {} not connected to a {}, sleeping 10", e, a);
         sleep(10);
     }
     if (networkA.nodes[d - 1].netCnxs[0] == b - 1)
@@ -395,7 +354,7 @@ void LammpsObject::revertGraphene(VecF<int> switchIdsA, Network networkA, Logger
     }
     else
     {
-        std::cout << "d not connected to b" << std::endl;
+        logger->warn("d {} not connected to b {}, sleeping 10", d, b);
         sleep(10);
     }
 
@@ -420,38 +379,16 @@ void LammpsObject::revertGraphene(VecF<int> switchIdsA, Network networkA, Logger
     formAngle(d11, d, b);
 }
 
-void LammpsObject::switchTriangleRaft(VecF<int> switchIdsA, VecF<int> switchIdsB,
-                                      VecF<int> switchIdsT, Network networkT, LoggerPtr logger)
+void LammpsObject::switchTriangleRaft(VecF<int> switchIdsA, VecF<int> switchIdsT, LoggerPtr logger)
 {
     // unpck parameters
-    int a, b, c, d, e, f;
-    int u, v, w, x;
-    int alpha, beta, gamma, delta, eta;
-    a = switchIdsA[0];
-    b = switchIdsA[1];
-    c = switchIdsA[2];
-    d = switchIdsA[3];
-    e = switchIdsA[4];
-    f = switchIdsA[5];
-    u = switchIdsB[0];
-    v = switchIdsB[1];
-    w = switchIdsB[2];
-    x = switchIdsB[3];
+    int a = switchIdsA[0] + 1;
+    int b = switchIdsA[1] + 1;
 
-    alpha = switchIdsT[6];
-    beta = switchIdsT[7];
-    gamma = switchIdsT[8];
-    delta = switchIdsT[9];
-    eta = switchIdsT[10];
-
-    a += 1;
-    b += 1;
-
-    alpha += 1;
-    beta += 1;
-    gamma += 1;
-    delta += 1;
-    eta += 1;
+    int beta = switchIdsT[7] + 1;
+    int gamma = switchIdsT[8] + 1;
+    int delta = switchIdsT[9] + 1;
+    int eta = switchIdsT[10] + 1;
 
     // Corrections to
     //  -- Actually remove the bonds
@@ -478,38 +415,16 @@ void LammpsObject::switchTriangleRaft(VecF<int> switchIdsA, VecF<int> switchIdsB
     formBond(eta, gamma, 1, logger);
 }
 
-void LammpsObject::revertTriangleRaft(VecF<int> switchIdsA, VecF<int> switchIdsB,
-                                      VecF<int> switchIdsT, LoggerPtr logger)
+void LammpsObject::revertTriangleRaft(VecF<int> switchIdsA, VecF<int> switchIdsT, LoggerPtr logger)
 {
     // unpck parameters
-    int a, b, c, d, e, f;
-    int u, v, w, x;
-    int alpha, beta, gamma, delta, eta;
-    a = switchIdsA[0];
-    b = switchIdsA[1];
-    c = switchIdsA[2];
-    d = switchIdsA[3];
-    e = switchIdsA[4];
-    f = switchIdsA[5];
-    u = switchIdsB[0];
-    v = switchIdsB[1];
-    w = switchIdsB[2];
-    x = switchIdsB[3];
+    int a = switchIdsA[0] + 1;
+    int b = switchIdsA[1] + 1;
 
-    alpha = switchIdsT[6];
-    beta = switchIdsT[7];
-    gamma = switchIdsT[8];
-    delta = switchIdsT[9];
-    eta = switchIdsT[10];
-
-    a += 1;
-    b += 1;
-
-    alpha += 1;
-    beta += 1;
-    gamma += 1;
-    delta += 1;
-    eta += 1;
+    int beta = switchIdsT[7] + 1;
+    int gamma = switchIdsT[8] + 1;
+    int delta = switchIdsT[9] + 1;
+    int eta = switchIdsT[10] + 1;
 
     breakBond(a, delta, 2, logger);
     breakBond(b, gamma, 2, logger);
@@ -533,32 +448,17 @@ void LammpsObject::revertTriangleRaft(VecF<int> switchIdsA, VecF<int> switchIdsB
     formBond(delta, eta, 1, logger);
 }
 
-void LammpsObject::switchBilayer(VecF<int> switchIdsA, VecF<int> switchIdsB,
-                                 VecF<int> switchIdsT, LoggerPtr logger)
+void LammpsObject::switchBilayer(VecF<int> switchIdsA, VecF<int> switchIdsT, LoggerPtr logger)
 {
 
-    bool verbose = false;
     // unpck parameters
-    int a, b, c, d, e, f;
-    int u, v, w, x;
-    int alpha, beta, gamma, delta, eta;
+    int a = switchIdsA[0];
+    int b = switchIdsA[1];
 
-    a = switchIdsA[0];
-    b = switchIdsA[1];
-    c = switchIdsA[2];
-    d = switchIdsA[3];
-    e = switchIdsA[4];
-    f = switchIdsA[5];
-    u = switchIdsB[0];
-    v = switchIdsB[1];
-    w = switchIdsB[2];
-    x = switchIdsB[3];
-
-    alpha = switchIdsT[6];
-    beta = switchIdsT[7];
-    gamma = switchIdsT[8];
-    delta = switchIdsT[9];
-    eta = switchIdsT[10];
+    int beta = switchIdsT[7];
+    int gamma = switchIdsT[8];
+    int delta = switchIdsT[9];
+    int eta = switchIdsT[10];
 
     /*
      *
@@ -572,16 +472,26 @@ void LammpsObject::switchBilayer(VecF<int> switchIdsA, VecF<int> switchIdsB,
      *
      */
 
-    int nSi, nSi2, nO;
+    int nSi;
+    int nSi2;
     nSi = (int)(round(natoms / 3) + 0.5);
     nSi2 = (int)(round(nSi / 2) + 0.5);
-    nO = natoms - nSi;
 
-    int a_prime, a_prime_prime, b_prime, b_prime_prime;
-    int a_prime_prime_prime, b_prime_prime_prime;
+    int a_prime;
+    int a_prime_prime;
+    int b_prime;
+    int b_prime_prime;
+    int a_prime_prime_prime;
+    int b_prime_prime_prime;
 
-    int beta_prime, beta_prime_prime, gamma_prime, gamma_prime_prime;
-    int eta_prime, eta_prime_prime, delta_prime, delta_prime_prime;
+    int beta_prime;
+    int beta_prime_prime;
+    int gamma_prime;
+    int gamma_prime_prime;
+    int eta_prime;
+    int eta_prime_prime;
+    int delta_prime;
+    int delta_prime_prime;
 
     a_prime = 2 * a + 1;
     a_prime_prime = 2 * a + 2;
@@ -630,32 +540,17 @@ void LammpsObject::switchBilayer(VecF<int> switchIdsA, VecF<int> switchIdsB,
     formBond(b_prime_prime_prime, gamma_prime, 1, logger);
 }
 
-void LammpsObject::revertBilayer(VecF<int> switchIdsA, VecF<int> switchIdsB,
-                                 VecF<int> switchIdsT, LoggerPtr logger)
+void LammpsObject::revertBilayer(VecF<int> switchIdsA, VecF<int> switchIdsT, LoggerPtr logger)
 {
 
-    bool verbose = false;
     // unpck parameters
-    int a, b, c, d, e, f;
-    int u, v, w, x;
-    int alpha, beta, gamma, delta, eta;
+    int a = switchIdsA[0];
+    int b = switchIdsA[1];
 
-    a = switchIdsA[0];
-    b = switchIdsA[1];
-    c = switchIdsA[2];
-    d = switchIdsA[3];
-    e = switchIdsA[4];
-    f = switchIdsA[5];
-    u = switchIdsB[0];
-    v = switchIdsB[1];
-    w = switchIdsB[2];
-    x = switchIdsB[3];
-
-    alpha = switchIdsT[6];
-    beta = switchIdsT[7];
-    gamma = switchIdsT[8];
-    delta = switchIdsT[9];
-    eta = switchIdsT[10];
+    int beta = switchIdsT[7];
+    int gamma = switchIdsT[8];
+    int delta = switchIdsT[9];
+    int eta = switchIdsT[10];
 
     /*
      *
@@ -669,17 +564,28 @@ void LammpsObject::revertBilayer(VecF<int> switchIdsA, VecF<int> switchIdsB,
      *
      */
 
-    int nSi, nSi2, nO;
+    int nSi;
+    int nSi2;
+    int nO;
 
     nSi = (int)(round(natoms / 3) + 0.5);
     nSi2 = (int)(round(nSi / 2) + 0.5);
-    nO = natoms - nSi;
 
-    int a_prime, a_prime_prime, b_prime, b_prime_prime;
-    int a_prime_prime_prime, b_prime_prime_prime;
+    int a_prime;
+    int a_prime_prime;
+    int b_prime;
+    int b_prime_prime;
+    int a_prime_prime_prime;
+    int b_prime_prime_prime;
 
-    int beta_prime, beta_prime_prime, gamma_prime, gamma_prime_prime;
-    int eta_prime, eta_prime_prime, delta_prime, delta_prime_prime;
+    int beta_prime;
+    int beta_prime_prime;
+    int gamma_prime;
+    int gamma_prime_prime;
+    int eta_prime;
+    int eta_prime_prime;
+    int delta_prime;
+    int delta_prime_prime;
 
     a_prime = 2 * a + 1;
     a_prime_prime = 2 * a + 2;
@@ -697,8 +603,6 @@ void LammpsObject::revertBilayer(VecF<int> switchIdsA, VecF<int> switchIdsB,
     eta_prime_prime = eta_prime + 1;
     delta_prime = 3 * nSi2 + (delta - nSi2) * 2 + 1;
     delta_prime_prime = delta_prime + 1;
-
-    std::string command;
 
     breakBond(a_prime, delta_prime, 2, logger);
     breakBond(b_prime, gamma_prime, 2, logger);
@@ -726,29 +630,18 @@ void LammpsObject::revertBilayer(VecF<int> switchIdsA, VecF<int> switchIdsB,
     formBond(b_prime_prime_prime, delta_prime_prime, 1, logger);
 }
 
-void LammpsObject::switchBonds(VecF<int> switchIdsA, VecF<int> switchIdsB, VecF<int> switchIdsT)
+void LammpsObject::switchBonds(VecF<int> switchIdsA, VecF<int> switchIdsT)
 {
     // unpck parameters
-    int a, b, c, d, e, f;
-    int u, v, w, x;
-    int alpha, beta, gamma, delta, eta;
+    int a = switchIdsA[0];
+    int b = switchIdsA[1];
+    int d = switchIdsA[3];
+    int e = switchIdsA[4];
 
-    a = switchIdsA[0];
-    b = switchIdsA[1];
-    c = switchIdsA[2];
-    d = switchIdsA[3];
-    e = switchIdsA[4];
-    f = switchIdsA[5];
-    u = switchIdsB[0];
-    v = switchIdsB[1];
-    w = switchIdsB[2];
-    x = switchIdsB[3];
-
-    alpha = switchIdsT[6];
-    beta = switchIdsT[7];
-    gamma = switchIdsT[8];
-    delta = switchIdsT[9];
-    eta = switchIdsT[10];
+    int beta = switchIdsT[7];
+    int gamma = switchIdsT[8];
+    int delta = switchIdsT[9];
+    int eta = switchIdsT[10];
 
     /* Switch connectivities in lattice and dual
      * 3-3 coordination connection
@@ -836,15 +729,24 @@ void LammpsObject::switchBonds(VecF<int> switchIdsA, VecF<int> switchIdsB, VecF<
      *
      */
 
-    int nSi, nO;
+    int nSi;
     nSi = round(natoms / 3);
-    nO = round(2 * natoms / 3);
 
-    int a_prime, a_prime_prime, b_prime, b_prime_prime;
-    int a_prime_prime_prime, b_prime_prime_prime;
+    int a_prime;
+    int a_prime_prime;
+    int b_prime;
+    int b_prime_prime;
+    int a_prime_prime_prime;
+    int b_prime_prime_prime;
 
-    int beta_prime, beta_prime_prime, gamma_prime, gamma_prime_prime;
-    int eta_prime, eta_prime_prime, delta_prime, delta_prime_prime;
+    int beta_prime;
+    int beta_prime_prime;
+    int gamma_prime;
+    int gamma_prime_prime;
+    int eta_prime;
+    int eta_prime_prime;
+    int delta_prime;
+    int delta_prime_prime;
 
     a_prime = 2 * a;
     a_prime_prime = 2 * a + 1;
@@ -956,28 +858,18 @@ void LammpsObject::switchBonds(VecF<int> switchIdsA, VecF<int> switchIdsB, VecF<
     lammps_command(handle, command.c_str());
 }
 
-void LammpsObject::revertBonds(VecF<int> switchIdsA, VecF<int> switchIdsB, VecF<int> switchIdsT)
+void LammpsObject::revertBonds(VecF<int> switchIdsA, VecF<int> switchIdsT)
 {
     // unpck parameters
-    int a, b, c, d, e, f;
-    int u, v, w, x;
-    int alpha, beta, gamma, delta, eta;
-    a = switchIdsA[0];
-    b = switchIdsA[1];
-    c = switchIdsA[2];
-    d = switchIdsA[3];
-    e = switchIdsA[4];
-    f = switchIdsA[5];
-    u = switchIdsB[0];
-    v = switchIdsB[1];
-    w = switchIdsB[2];
-    x = switchIdsB[3];
+    int a = switchIdsA[0];
+    int b = switchIdsA[1];
+    int d = switchIdsA[3];
+    int e = switchIdsA[4];
 
-    alpha = switchIdsT[6];
-    beta = switchIdsT[7];
-    gamma = switchIdsT[8];
-    delta = switchIdsT[9];
-    eta = switchIdsT[10];
+    int beta = switchIdsT[7];
+    int gamma = switchIdsT[8];
+    int delta = switchIdsT[9];
+    int eta = switchIdsT[10];
     /* Switch connectivities in lattice and dual
      * 3-3 coordination connection
      * a,b,c,d,e,f are nodes in lattice A

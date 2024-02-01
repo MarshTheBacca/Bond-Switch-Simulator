@@ -4,15 +4,7 @@
 // ##### BASE POTENTIAL MODEL #####
 
 // Default constructor, no interactions
-BasePotentialModel::BasePotentialModel()
-{
-    useBnds = false;
-    useAngs = false;
-    useReps = false;
-    useIntx = false;
-    useFixd = false;
-    useGcns = false;
-}
+BasePotentialModel::BasePotentialModel() = default;
 
 // Setters: interactions types
 void BasePotentialModel::setBonds(VecF<int> bonds, VecF<double> params)
@@ -103,7 +95,8 @@ BasePotentialModel1D::BasePotentialModel1D() : BasePotentialModel(){};
 double BasePotentialModel1D::bndsPotential(VecF<double> &x)
 {
     double u = 0.0;
-    double x0, x1;
+    double x0;
+    double x1;
     for (int i = 0, j = 1, k = 0; i < bnds.n; i += 2, j += 2, ++k)
     {
         x0 = x[bnds[i]];
@@ -121,7 +114,8 @@ double BasePotentialModel1D::angsPotential(VecF<double> &x)
 double BasePotentialModel1D::repsPotential(VecF<double> &x)
 {
     double u = 0.0;
-    double x0, x1;
+    double x0;
+    double x1;
     for (int i = 0, j = 1, k = 0; i < reps.n; i += 2, j += 2, ++k)
     {
         x0 = x[reps[i]];
@@ -152,7 +146,8 @@ double BasePotentialModel1D::gcnsPotential(VecF<double> &x)
 void BasePotentialModel1D::bndsForce(VecF<double> &f, VecF<double> &x)
 {
 
-    int id0, id1;
+    int id0;
+    int id1;
     for (int i = 0, j = 1, k = 0; i < bnds.n; i += 2, j += 2, ++k)
     {
         id0 = bnds[i];
@@ -174,7 +169,8 @@ void BasePotentialModel1D::intxForce(VecF<double> &f, VecF<double> &x)
 void BasePotentialModel1D::repsForce(VecF<double> &f, VecF<double> &x)
 {
 
-    int id0, id1;
+    int id0;
+    int id1;
     for (int i = 0, j = 1, k = 0; i < reps.n; i += 2, j += 2, ++k)
     {
         id0 = reps[i];
@@ -212,16 +208,14 @@ BasePotentialModel2D::BasePotentialModel2D() : BasePotentialModel(){};
 double BasePotentialModel2D::bndsPotential(VecF<double> &x)
 {
     double u = 0.0;
-    int id0, id1;
     VecF<double> U(bnds.n / 2);
-    int i, j, k;
-#pragma omp parallel for private(id0, id1, i, j, k) num_threads(12)
-    for (k = 0; k < bnds.n / 2; k++)
+#pragma omp parallel for num_threads(12)
+    for (int k = 0; k < bnds.n / 2; k++)
     {
-        i = 2 * k;
-        j = 1 + 2 * k;
-        id0 = bnds[i];
-        id1 = bnds[j];
+        int i = 2 * k;
+        int j = 1 + 2 * k;
+        int id0 = bnds[i];
+        int id1 = bnds[j];
         U[k] = bndPotential(x[2 * id0], x[2 * id0 + 1], x[2 * id1], x[2 * id1 + 1], k);
     }
 
@@ -235,7 +229,9 @@ double BasePotentialModel2D::bndsPotential(VecF<double> &x)
 double BasePotentialModel2D::angsPotential(VecF<double> &x)
 {
     double u = 0.0;
-    int id0, id1, id2;
+    int id0;
+    int id1;
+    int id2;
     for (int i = 0, j = 1, k = 2, l = 0; i < angs.n; i += 3, j += 3, k += 3, ++l)
     {
         id0 = angs[i];
@@ -249,7 +245,8 @@ double BasePotentialModel2D::angsPotential(VecF<double> &x)
 double BasePotentialModel2D::repsPotential(VecF<double> &x)
 {
     double u = 0.0;
-    int id0, id1;
+    int id0;
+    int id1;
     for (int i = 0, j = 1, k = 0; i < reps.n; i += 2, j += 2, ++k)
     {
         id0 = reps[i];
@@ -262,7 +259,10 @@ double BasePotentialModel2D::repsPotential(VecF<double> &x)
 double BasePotentialModel2D::intxPotential(VecF<double> &x)
 {
     double u = 0.0;
-    int id0, id1, id2, id3;
+    int id0;
+    int id1;
+    int id2;
+    int id3;
     for (int i = 0, j = 1, k = 2, l = 3, m = 0; i < intx.n; i += 4, j += 4, k += 4, l += 4, ++m)
     {
         id0 = intx[i];
@@ -289,15 +289,13 @@ double BasePotentialModel2D::gcnsPotential(VecF<double> &x)
 // Forces
 void BasePotentialModel2D::bndsForce(VecF<double> &f, VecF<double> &x)
 {
-    int id0, id1;
-    int i, j, k;
-#pragma omp parallel for private(id0, id1, i, j, k) num_threads(12)
-    for (k = 0; k < bnds.n / 2; ++k)
+#pragma omp parallel for num_threads(12)
+    for (int k = 0; k < bnds.n / 2; ++k)
     {
-        i = 2 * k;
-        j = 2 * k + 1;
-        id0 = bnds[i];
-        id1 = bnds[j];
+        int i = 2 * k;
+        int j = 2 * k + 1;
+        int id0 = bnds[i];
+        int id1 = bnds[j];
         bndForce(x[2 * id0], x[2 * id0 + 1], x[2 * id1], x[2 * id1 + 1],
                  f[2 * id0], f[2 * id0 + 1], f[2 * id1], f[2 * id1 + 1], k);
     }
@@ -305,7 +303,9 @@ void BasePotentialModel2D::bndsForce(VecF<double> &f, VecF<double> &x)
 
 void BasePotentialModel2D::angsForce(VecF<double> &f, VecF<double> &x)
 {
-    int id0, id1, id2;
+    int id0;
+    int id1;
+    int id2;
     for (int i = 0, j = 1, k = 2, l = 0; i < angs.n; i += 3, j += 3, k += 3, ++l)
     {
         id0 = angs[i];
@@ -318,7 +318,8 @@ void BasePotentialModel2D::angsForce(VecF<double> &f, VecF<double> &x)
 
 void BasePotentialModel2D::repsForce(VecF<double> &f, VecF<double> &x)
 {
-    int id0, id1;
+    int id0;
+    int id1;
     for (int i = 0, j = 1, k = 0; i < reps.n; i += 2, j += 2, ++k)
     {
         id0 = reps[i];
@@ -330,7 +331,10 @@ void BasePotentialModel2D::repsForce(VecF<double> &f, VecF<double> &x)
 
 void BasePotentialModel2D::intxForce(VecF<double> &f, VecF<double> &x)
 {
-    int id0, id1, id2, id3;
+    int id0;
+    int id1;
+    int id2;
+    int id3;
     for (int i = 0, j = 1, k = 2, l = 3, m = 0; i < intx.n; i += 4, j += 4, k += 4, l += 4, ++m)
     {
         id0 = intx[i];
@@ -371,7 +375,8 @@ BasePotentialModel3D::BasePotentialModel3D() : BasePotentialModel(){};
 double BasePotentialModel3D::bndsPotential(VecF<double> &x)
 {
     double u = 0.0;
-    int id0, id1;
+    int id0;
+    int id1;
     for (int i = 0, j = 1, k = 0; i < bnds.n; i += 2, j += 2, ++k)
     {
         id0 = bnds[i];
@@ -384,7 +389,9 @@ double BasePotentialModel3D::bndsPotential(VecF<double> &x)
 double BasePotentialModel3D::angsPotential(VecF<double> &x)
 {
     double u = 0.0;
-    int id0, id1, id2;
+    int id0;
+    int id1;
+    int id2;
     for (int i = 0, j = 1, k = 2, l = 0; i < angs.n; i += 3, j += 3, k += 3, ++l)
     {
         id0 = angs[i];
@@ -398,7 +405,8 @@ double BasePotentialModel3D::angsPotential(VecF<double> &x)
 double BasePotentialModel3D::repsPotential(VecF<double> &x)
 {
     double u = 0.0;
-    int id0, id1;
+    int id0;
+    int id1;
     for (int i = 0, j = 1, k = 0; i < reps.n; i += 2, j += 2, ++k)
     {
         id0 = reps[i];
@@ -411,7 +419,10 @@ double BasePotentialModel3D::repsPotential(VecF<double> &x)
 double BasePotentialModel3D::intxPotential(VecF<double> &x)
 {
     double u = 0.0;
-    int id0, id1, id2, id3;
+    int id0;
+    int id1;
+    int id2;
+    int id3;
     for (int i = 0, j = 1, k = 2, l = 3, m = 0; i < intx.n; i += 4, j += 4, k += 4, l += 4, ++m)
     {
         id0 = intx[i];
@@ -438,7 +449,8 @@ double BasePotentialModel3D::gcnsPotential(VecF<double> &x)
 // Forces
 void BasePotentialModel3D::bndsForce(VecF<double> &f, VecF<double> &x)
 {
-    int id0, id1;
+    int id0;
+    int id1;
     for (int i = 0, j = 1, k = 0; i < bnds.n; i += 2, j += 2, ++k)
     {
         id0 = bnds[i];
@@ -450,7 +462,9 @@ void BasePotentialModel3D::bndsForce(VecF<double> &f, VecF<double> &x)
 
 void BasePotentialModel3D::angsForce(VecF<double> &f, VecF<double> &x)
 {
-    int id0, id1, id2;
+    int id0;
+    int id1;
+    int id2;
     for (int i = 0, j = 1, k = 2, l = 0; i < angs.n; i += 3, j += 3, k += 3, ++l)
     {
         id0 = angs[i];
@@ -463,7 +477,8 @@ void BasePotentialModel3D::angsForce(VecF<double> &f, VecF<double> &x)
 
 void BasePotentialModel3D::repsForce(VecF<double> &f, VecF<double> &x)
 {
-    int id0, id1;
+    int id0;
+    int id1;
     for (int i = 0, j = 1, k = 0; i < reps.n; i += 2, j += 2, ++k)
     {
         id0 = reps[i];
@@ -475,7 +490,10 @@ void BasePotentialModel3D::repsForce(VecF<double> &f, VecF<double> &x)
 
 void BasePotentialModel3D::intxForce(VecF<double> &f, VecF<double> &x)
 {
-    int id0, id1, id2, id3;
+    int id0;
+    int id1;
+    int id2;
+    int id3;
     for (int i = 0, j = 1, k = 2, l = 3, m = 0; i < intx.n; i += 4, j += 4, k += 4, l += 4, ++m)
     {
         id0 = intx[i];

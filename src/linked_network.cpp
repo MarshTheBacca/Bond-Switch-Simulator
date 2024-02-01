@@ -6,19 +6,24 @@
 #include <omp.h>
 
 // Default constructor
-LinkedNetwork::LinkedNetwork()
-{
-    //
-}
+LinkedNetwork::LinkedNetwork() = default;
 
-// Construct with defined A network, B generated as the dual of A
-LinkedNetwork::LinkedNetwork(int nodesA,
+/**
+ * @brief Construct from scratch using netmc.inpt parameters
+ * @param numRings the number of nodes in lattice A
+ * @param minCoordination the minimum coordination number
+ * @param maxCoordination the maximum coordination number
+ * @param minRingSize the minimum ring size
+ * @param maxRingSize the maximum ring size
+ * @param logger the logger object
+ */
+LinkedNetwork::LinkedNetwork(int numRings,
                              int minCoordination, int maxCoordination,
                              int minRingSize, int maxRingSize, LoggerPtr logger)
 {
 
     // Initialise lattices
-    networkB = Network(nodesA, "triangular", maxRingSize, logger);
+    networkB = Network(numRings, "triangular", maxRingSize, logger);
     networkA = networkB.constructDual(maxCoordination, logger);
     rescale(sqrt(3.0));
     networkB.generateAuxConnections(networkA, 0);
@@ -149,21 +154,21 @@ LinkedNetwork::LinkedNetwork(std::string inputFolder, std::string inputFilePrefi
     //  Linked Network can contain lammps objects for minimisation
     //  These will not necessarily have the same coordinate systems, bond orders, etc etc.
     if (isSimpleGrapheneEnabledArg)
-        SimpleGraphene = LammpsObject("SimpleGraphene", inputFolder, logger);
+        SimpleGraphene = LammpsObject("Si", inputFolder, logger);
     if (isTersoffGrapheneEnabledArg)
-        TersoffGraphene = LammpsObject("TersoffGraphene", inputFolder, logger);
+        TersoffGraphene = LammpsObject("C", inputFolder, logger);
     if (isTriangleRaftEnabledArg)
-        Triangle_Raft = LammpsObject("TriangleRaft", inputFolder, logger);
+        Triangle_Raft = LammpsObject("Si2O3", inputFolder, logger);
     if (isBilayerEnabledArg)
-        Bilayer = LammpsObject("Bilayer", inputFolder, logger);
+        Bilayer = LammpsObject("SiO2", inputFolder, logger);
     if (isBNEnabledArg)
         BN = LammpsObject("BN", inputFolder, logger);
 }
 
-void LinkedNetwork::pushPrefix(std::string prefixin, std::string prefixout)
+void LinkedNetwork::pushPrefix(const std::string &prefixInArg, const std::string &prefixOutArg)
 {
-    prefixIn = prefixin;
-    prefixOut = prefixout;
+    prefixIn = prefixInArg;
+    prefixOut = prefixOutArg;
 }
 
 /**
@@ -247,7 +252,6 @@ void LinkedNetwork::initialisePotentialModel(Network network,
 // Set up geometry optimisation parameters
 void LinkedNetwork::initialiseGeometryOpt(int iterations, double tau, double tolerance, int localExtent)
 {
-
     goptParamsA = VecF<int>(2);
     goptParamsA[0] = iterations;
     goptParamsA[1] = localExtent;
@@ -257,10 +261,10 @@ void LinkedNetwork::initialiseGeometryOpt(int iterations, double tau, double tol
 }
 
 // Set up monte carlo and random number generators
-void LinkedNetwork::initialiseMonteCarlo(Network network, double temperature, LoggerPtr logger, int seed)
+void LinkedNetwork::initialiseMonteCarlo(const Network &network, double temperature, LoggerPtr logger, int seed)
 {
-    logger->info("Collecting global energy");
-    double energy = globalPotentialEnergy(0, isMaintainConvexityEnabled, networkA);
+    logger->info("Collecting global energy...");
+    double energy = globalPotentialEnergy(false, isMaintainConvexityEnabled, network);
     logger->info("Global optimisation energy : {}", energy);
     mc = Metropolis(seed, temperature, energy);
     mtGen.seed(seed);
@@ -273,123 +277,6 @@ void LinkedNetwork::rescale(double scaleFactor)
     networkB.rescale(scaleFactor);
 }
 
-// Project lattice onto different geometry
-void LinkedNetwork::project(std::string projType, double param)
-{
-    if (projType == "sphere")
-    {
-        networkA.project(projType, param);
-        networkB.project(projType, param);
-    }
-}
-
-// Project lattice onto different geometry with optimal parameters
-void LinkedNetwork::optimalProjection(std::string projType, LoggerPtr logger)
-{
-    if (projType == "sphere")
-    {
-        // Geometry optimise changing sphere radius until hit minimum in energy
-
-        /* Find initial radius to nearest 1
-         * 1) may be multiple minima so try all values in range
-         * 2) find lowest value and take limits as radii either side */
-        int searchLim = 20;
-        VecF<double> saveCrdsA = crds;
-        VecF<double> energies(20);
-        energies[0] = std::numeric_limits<double>::infinity();
-        double radius = 1.0;
-        for (int i = 1; i < searchLim; ++i)
-        {
-            networkA.project(projType, radius);
-            potParamsC[1] = radius;
-            for (int j = 0; j < networkA.nodes.n; ++j)
-            {
-                crds[3 * j] = networkA.nodes[j].crd[0];
-                crds[3 * j + 1] = networkA.nodes[j].crd[1];
-                crds[3 * j + 2] = networkA.nodes[j].crd[2];
-            }
-            globalGeometryOptimisation(false, false, networkA);
-            energies[i] = globalPotentialEnergy(false, false, networkA);
-            logger->info("Initial spherical minimisation: {} {}", radius, energies[i]);
-            radius += 1.0;
-            crds = saveCrdsA;
-        }
-        int id0;
-        double e0 = energies[0], e1;
-        double lowerLim, upperLim, minRadius, minEnergy;
-        for (int i = 1; i < searchLim; ++i)
-        {
-            if (energies[i] < e0)
-            {
-                e0 = energies[i];
-                id0 = i;
-            }
-        }
-        if (id0 == searchLim - 1)
-            throw std::runtime_error("Initial spherical minimisation reached search limit");
-        else
-        {
-            lowerLim = id0 - 1.0;
-            minRadius = id0;
-            upperLim = id0 + 1.0;
-            networkA.project(projType, minRadius);
-            potParamsC[1] = minRadius;
-            for (int i = 0; i < networkA.nodes.n; ++i)
-            {
-                crds[3 * i] = networkA.nodes[i].crd[0];
-                crds[3 * i + 1] = networkA.nodes[i].crd[1];
-                crds[3 * i + 2] = networkA.nodes[i].crd[2];
-            }
-            saveCrdsA = crds;
-            globalGeometryOptimisation(false, false, networkA);
-            minEnergy = globalPotentialEnergy(false, false, networkA);
-        }
-
-        /* Refine minimimum
-         * 1) could have multiple minima if small - hence reset coordinates as can cause instability
-         * 2) search between lower and upper limits until pass through minimum
-         * 3) decrease search increment and search again */
-        double radiusInc = 0.1;
-        for (int i = 0; i < 3; ++i)
-        {
-            radius = lowerLim;
-            e0 = std::numeric_limits<double>::infinity();
-            for (;;)
-            {
-                networkA.project(projType, radius);
-                for (int i = 0; i < networkA.nodes.n; ++i)
-                {
-                    crds[3 * i] = networkA.nodes[i].crd[0];
-                    crds[3 * i + 1] = networkA.nodes[i].crd[1];
-                    crds[3 * i + 2] = networkA.nodes[i].crd[2];
-                }
-                potParamsC[1] = radius;
-                globalGeometryOptimisation(false, false, networkA);
-                e1 = globalPotentialEnergy(false, false, networkA);
-                logger->info("Spherical minimisation: {} {} {}", radius, e1, minEnergy);
-                if (e1 > e0 && e0 <= minEnergy)
-                {
-                    lowerLim = radius - 2 * radiusInc;
-                    minRadius = radius - radiusInc;
-                    upperLim = radius;
-                    minEnergy = e0;
-                    break;
-                }
-                else
-                    e0 = e1;
-                radius += radiusInc;
-                if (radius > upperLim)
-                    break;
-            }
-            radiusInc /= 10.0;
-        }
-
-        // Optimise with minimum radius
-        potParamsC[1] = minRadius;
-        globalGeometryOptimisation(false, false, networkA);
-    }
-}
-
 // Select nodes forming a random edge in lattice A, and linked nodes in lattice B, only for 3/4 coordinate nodes
 int LinkedNetwork::pickSpiralCnx34(int &a, int &b, int &u, int &v, std::mt19937 &gen)
 {
@@ -397,9 +284,11 @@ int LinkedNetwork::pickSpiralCnx34(int &a, int &b, int &u, int &v, std::mt19937 
 
     int n0 = a;
     int cnd0 = networkA.nodes[n0].netCnxs.n;
-    int n1, n1Ref;
+    int n1;
+    int n1Ref;
     double rn1 = -1;
-    VecF<double> aCnxs(3), rFixedLocal(3);
+    VecF<double> aCnxs(3);
+    VecF<double> rFixedLocal(3);
 
     for (int i = 0; i < cnd0; ++i)
     {
@@ -445,7 +334,6 @@ int LinkedNetwork::pickDiscreteCnx34(int &a, int &b, int &u, int &v, std::mt1993
     logger->info("Running Discrete Distribution...");
     std::discrete_distribution<> randomNode(weights.begin(), weights.end());
     logger->info("Discrete distribution created");
-    //    std::uniform_int_distribution<int> randomNode(0, networkA.nodes.n - 1);
     bool picking_acceptable_ring = true;
     int cnxType;
     bool includesFixed;
@@ -2392,14 +2280,17 @@ VecF<int> LinkedNetwork::SpiralmonteCarloSwitchMoveLAMMPS(int a, double &SimpleG
      * 4) accept or reject */
 
     // Select valid random connection - that will not violate connection limits
-    int b, u, v;
-    VecF<int> switchIdsA, switchIdsB, switchIdsT;
+    int b;
+    int u;
+    int v;
+    VecF<int> switchIdsA;
+    VecF<int> switchIdsB;
+    VecF<int> switchIdsT;
     bool foundValidMove = false;
     int cnxType;
 
     for (int i = 0; i < 10; ++i)
     {
-        // std::cout << "Failed pickSpiral" << std::endl;
         cnxType = pickSpiralCnx34(a, b, u, v, mtGen);
         foundValidMove = generateSwitchIds34(cnxType, switchIdsA, switchIdsB, switchIdsT, a, b, u, v);
         if (foundValidMove)
@@ -2439,14 +2330,13 @@ VecF<int> LinkedNetwork::SpiralmonteCarloSwitchMoveLAMMPS(int a, double &SimpleG
     {
         if (abs(TriangleRaftEnergy - Triangle_Raft.GlobalPotentialEnergy()) > 0.001)
         {
-            std::cout << "Triangle Raft" << std::endl;
-            std::cout << "Saved : " << TriangleRaftEnergy << " vs Calculated " << Triangle_Raft.GlobalPotentialEnergy()
-                      << std::endl;
+            logger->debug("Triangle Raft - Saved: {} vs Calculated: {}", TriangleRaftEnergy,
+                          Triangle_Raft.GlobalPotentialEnergy());
         }
     }
-    std::cout << crds[0] << std::endl;
+    logger->debug("crds[0] = {}", crds[0]);
     VecF<double> saveCrds = crds;
-    std::cout << "Saved crds" << std::endl;
+    logger->debug("Saved crds");
     double *saveCrdsSimpleGraphene;
     double *saveCrdsTersoffGraphene;
     double *saveCrdsTriangleRaft;
@@ -2468,7 +2358,9 @@ VecF<int> LinkedNetwork::SpiralmonteCarloSwitchMoveLAMMPS(int a, double &SimpleG
     VecF<int> saveNodeDistB = networkB.nodeDistribution;
     VecF<VecF<int>> saveEdgeDistA = networkA.edgeDistribution;
     VecF<VecF<int>> saveEdgeDistB = networkB.edgeDistribution;
-    VecF<Node> saveNodesA(switchIdsA.n), saveNodesB(switchIdsB.n), saveNodesT(switchIdsT.n);
+    VecF<Node> saveNodesA(switchIdsA.n);
+    VecF<Node> saveNodesB(switchIdsB.n);
+    VecF<Node> saveNodesT(switchIdsT.n);
     for (int i = 0; i < saveNodesA.n; ++i)
         saveNodesA[i] = networkA.nodes[switchIdsA[i]];
     for (int i = 0; i < saveNodesB.n; ++i)
@@ -2477,7 +2369,7 @@ VecF<int> LinkedNetwork::SpiralmonteCarloSwitchMoveLAMMPS(int a, double &SimpleG
         saveNodesT[i] = networkT.nodes[switchIdsT[i]];
 
     // Switch and geometry optimise
-    std::cout << "Switch" << std::endl;
+    logger->debug("Switching...");
     VecF<int> optStatus_networkA(2);
     VecF<int> optStatus_SimpleGraphene(2);
     VecF<int> optStatus_TersoffGraphene(2);
@@ -2493,9 +2385,9 @@ VecF<int> LinkedNetwork::SpiralmonteCarloSwitchMoveLAMMPS(int a, double &SimpleG
         if (isSimpleGrapheneEnabled)
             SimpleGraphene.switchGraphene(switchIdsA, networkA, logger);
         if (isTriangleRaftEnabled)
-            Triangle_Raft.switchTriangleRaft(switchIdsA, switchIdsB, switchIdsT, networkT, logger);
+            Triangle_Raft.switchTriangleRaft(switchIdsA, switchIdsT, logger);
         if (isBilayerEnabled)
-            Bilayer.switchBilayer(switchIdsA, switchIdsB, switchIdsT, logger);
+            Bilayer.switchBilayer(switchIdsA, switchIdsT, logger);
         if (isBNEnabled)
             BN.switchGraphene(switchIdsA, networkA, logger);
     }
@@ -2505,7 +2397,8 @@ VecF<int> LinkedNetwork::SpiralmonteCarloSwitchMoveLAMMPS(int a, double &SimpleG
         switchCnx43(switchIdsA, switchIdsB);
     else
     {
-        std::cout << "Not yet implemented (?)" << std::endl;
+        logger->error("Invalid cnxType: {}", cnxType);
+        throw std::runtime_error("Invalid cnxType");
     }
 
     // Rearrange nodes after switch
@@ -2555,14 +2448,17 @@ VecF<int> LinkedNetwork::SpiralmonteCarloSwitchMoveLAMMPS(int a, double &SimpleG
         if (isBNEnabled)
             localCrdsBN = BN.fetchCrds(2);
 
-        int natoms, nSi, nO;
+        int natoms;
+        int nSi;
+        int nO;
         if (isBilayerEnabled)
         {
             int natoms = Bilayer.natoms;
             int nSi = (int)(round(natoms / 3) + 0.5);
             int nO = natoms - nSi;
         }
-        double x, y;
+        double x;
+        double y;
         if (isTriangleRaftEnabled)
         {
             x = localCrdsTriangleRaft[2 * switchIdsT[6]] + localCrdsTriangleRaft[2 * switchIdsT[7]] + localCrdsTriangleRaft[2 * switchIdsT[9]];
@@ -2585,22 +2481,20 @@ VecF<int> LinkedNetwork::SpiralmonteCarloSwitchMoveLAMMPS(int a, double &SimpleG
         if (isBNEnabled)
             BN.pushCrds(2, localCrdsBN);
 
-        int nThreads = 0;
-
         if (isOpenMPIEnabled)
         {
-            optStatus_networkA = localGeometryOptimisation(a, b, goptParamsA[1], 0, isMaintainConvexityEnabled);
+            optStatus_networkA = localGeometryOptimisation(a, b, goptParamsA[1], false, isMaintainConvexityEnabled);
 #pragma omp parallel num_threads(3)
             {
-                if (omp_get_thread_num() == 0 and isTriangleRaftEnabled)
+                if (omp_get_thread_num() == 0 && isTriangleRaftEnabled)
                 {
                     optStatus_TriangleRaft = Triangle_Raft.GlobalPotentialMinimisation();
                 }
-                else if (omp_get_thread_num() == 1 and isTersoffGrapheneEnabled)
+                else if (omp_get_thread_num() == 1 && isTersoffGrapheneEnabled)
                 {
                     optStatus_TersoffGraphene = TersoffGraphene.GlobalPotentialMinimisation();
                 }
-                else if (omp_get_thread_num() == 2 and isBilayerEnabled)
+                else if (omp_get_thread_num() == 2 && isBilayerEnabled)
                 {
                     optStatus_Bilayer = Bilayer.GlobalPotentialMinimisation();
                 }
@@ -2658,13 +2552,26 @@ VecF<int> LinkedNetwork::SpiralmonteCarloSwitchMoveLAMMPS(int a, double &SimpleG
         isAccepted = mc.acceptanceCriterion(BNEnergy, saveEnergyBN, 7.0);
     if (isAccepted)
     {
-        std::cout << "               Rejected MC Move        Ei = ";
         if (MC_Routine == 1)
-            std::cout << saveEnergySimpleGraphene << " Ef = " << SimpleGrapheneEnergy << std::endl;
+            logger->debug("Accepted Move Ei = {}", saveEnergySimpleGraphene);
         else if (MC_Routine == 2)
-            std::cout << saveEnergyTriangleRaft << " Ef = " << TriangleRaftEnergy << std::endl;
+            logger->debug("Accepted Move Ei = {}", saveEnergyTriangleRaft);
         else if (MC_Routine == 5)
-            std::cout << saveEnergyBN << " Ef = " << BNEnergy << std::endl;
+            logger->debug("Accepted Move Ei = {}", saveEnergyBN);
+        else
+            logger->debug("Accepted Move Ei = {}", saveEnergySimpleGraphene);
+
+        syncCoordinates();
+    }
+    else
+    {
+
+        if (MC_Routine == 1)
+            logger->debug("Rejected Move Ei = {}", saveEnergySimpleGraphene);
+        else if (MC_Routine == 2)
+            logger->debug("Rejected Move Ei = {}", saveEnergyTriangleRaft);
+        else if (MC_Routine == 5)
+            logger->debug("Rejected Move Ei = {}", saveEnergyBN);
 
         crds = saveCrds;
         networkA.nodeDistribution = saveNodeDistA;
@@ -2696,12 +2603,12 @@ VecF<int> LinkedNetwork::SpiralmonteCarloSwitchMoveLAMMPS(int a, double &SimpleG
         }
         if (isTriangleRaftEnabled)
         {
-            Triangle_Raft.revertTriangleRaft(switchIdsA, switchIdsB, switchIdsT, logger);
+            Triangle_Raft.revertTriangleRaft(switchIdsA, switchIdsT, logger);
             Triangle_Raft.GlobalPotentialMinimisation();
         }
         if (isBilayerEnabled)
         {
-            Bilayer.revertBilayer(switchIdsA, switchIdsB, switchIdsT, logger);
+            Bilayer.revertBilayer(switchIdsA, switchIdsT, logger);
             Bilayer.GlobalPotentialMinimisation();
         }
         if (isBNEnabled)
@@ -2720,20 +2627,6 @@ VecF<int> LinkedNetwork::SpiralmonteCarloSwitchMoveLAMMPS(int a, double &SimpleG
             BilayerEnergy = Bilayer.GlobalPotentialEnergy();
         if (isBNEnabled)
             BNEnergy = BN.GlobalPotentialEnergy();
-    }
-    else
-    {
-        std::cout << "               Accepted MC Move        Ei = ";
-        if (MC_Routine == 1)
-            std::cout << saveEnergySimpleGraphene << " Ef = " << SimpleGrapheneEnergy << std::endl;
-        else if (MC_Routine == 2)
-            std::cout << saveEnergyTriangleRaft << " Ef = " << TriangleRaftEnergy << std::endl;
-        else if (MC_Routine == 5)
-            std::cout << saveEnergyBN << " Ef = " << BNEnergy << std::endl;
-        else
-            std::cout << "MC ROUTINE : " << MC_Routine << std::endl;
-
-        syncCoordinates();
     }
 
     /* Status report
@@ -2761,11 +2654,16 @@ VecF<int> LinkedNetwork::monteCarloSwitchMoveLAMMPS(double &SimpleGrapheneEnergy
      * 4) accept or reject */
 
     // Select valid random connection - that will not violate connection limits
-    int a, b, u, v;
-    VecF<int> switchIdsA, switchIdsB, switchIdsT;
+    int a;
+    int b;
+    int u;
+    int v;
+    VecF<int> switchIdsA;
+    VecF<int> switchIdsB;
+    VecF<int> switchIdsT;
     bool foundValidMove = false;
     int cnxType;
-    logger->info("Finding move...");
+    logger->debug("Finding move...");
     for (int i = 0; i < networkA.nodes.n * networkA.nodes.n; ++i)
     {
         if (MCWeighting == "weighted")
@@ -2778,12 +2676,12 @@ VecF<int> LinkedNetwork::monteCarloSwitchMoveLAMMPS(double &SimpleGrapheneEnergy
     }
     if (!foundValidMove)
     {
-        logger->critical("Cannot find any valid switch moves");
+        logger->error("Cannot find any valid switch moves");
         throw std::runtime_error("Cannot find any valid switch moves");
     }
 
     // Save current state
-    logger->info("Saving energies...");
+    logger->debug("Saving energies...");
     double saveEnergySimpleGraphene = SimpleGrapheneEnergy;
     double saveEnergyTersoffGraphene = TersoffGrapheneEnergy;
     double saveEnergyTriangleRaft = TriangleRaftEnergy;
@@ -2793,21 +2691,21 @@ VecF<int> LinkedNetwork::monteCarloSwitchMoveLAMMPS(double &SimpleGrapheneEnergy
     {
         if (abs(SimpleGrapheneEnergy - SimpleGraphene.GlobalPotentialEnergy()) > 0.001)
         {
-            logger->info("Saved simpleGraphene energy: {} vs calculated: {}", SimpleGrapheneEnergy, SimpleGraphene.GlobalPotentialEnergy());
+            logger->debug("Saved simpleGraphene energy: {} vs calculated: {}", SimpleGrapheneEnergy, SimpleGraphene.GlobalPotentialEnergy());
         }
     }
     if (isTriangleRaftEnabled)
     {
         if (abs(TriangleRaftEnergy - Triangle_Raft.GlobalPotentialEnergy()) > 0.001)
         {
-            logger->info("Saved triangleRaft energy: {} vs calculated: {}", TriangleRaftEnergy, Triangle_Raft.GlobalPotentialEnergy());
+            logger->debug("Saved triangleRaft energy: {} vs calculated: {}", TriangleRaftEnergy, Triangle_Raft.GlobalPotentialEnergy());
         }
         else
         {
-            logger->info("Triangle Raft : {}", Triangle_Raft.GlobalPotentialEnergy());
+            logger->debug("Triangle Raft : {}", Triangle_Raft.GlobalPotentialEnergy());
         }
     }
-    logger->info("Saving coordinates...");
+    logger->debug("Saving coordinates...");
     VecF<double> saveCrds = crds;
     double *saveCrdsSimpleGraphene;
     double *saveCrdsTersoffGraphene;
@@ -2817,27 +2715,27 @@ VecF<int> LinkedNetwork::monteCarloSwitchMoveLAMMPS(double &SimpleGrapheneEnergy
 
     if (isSimpleGrapheneEnabled)
     {
-        logger->info("Saving SimpleGraphene coordinates");
+        logger->debug("Saving SimpleGraphene coordinates");
         saveCrdsSimpleGraphene = SimpleGraphene.fetchCrds(2);
     }
     if (isTersoffGrapheneEnabled)
     {
-        logger->info("Saving TersoffGraphene coordinates");
+        logger->debug("Saving TersoffGraphene coordinates");
         saveCrdsTersoffGraphene = TersoffGraphene.fetchCrds(2);
     }
     if (isTriangleRaftEnabled)
     {
-        logger->info("Saving TriangleRaft coordinates");
+        logger->debug("Saving TriangleRaft coordinates");
         saveCrdsTriangleRaft = Triangle_Raft.fetchCrds(2);
     }
     if (isBilayerEnabled)
     {
-        logger->info("Saving Bilayer coordinates");
+        logger->debug("Saving Bilayer coordinates");
         saveCrdsBilayer = Bilayer.fetchCrds(3);
     }
     if (isBNEnabled)
     {
-        logger->info("Saving BN coordinates");
+        logger->debug("Saving BN coordinates");
         saveCrdsBN = BN.fetchCrds(2);
     }
     VecF<int> saveNodeDistA = networkA.nodeDistribution;
@@ -2846,7 +2744,9 @@ VecF<int> LinkedNetwork::monteCarloSwitchMoveLAMMPS(double &SimpleGrapheneEnergy
     VecF<VecF<int>> saveEdgeDistA = networkA.edgeDistribution;
     VecF<VecF<int>> saveEdgeDistB = networkB.edgeDistribution;
 
-    VecF<Node> saveNodesA(switchIdsA.n), saveNodesB(switchIdsB.n), saveNodesT(switchIdsT.n);
+    VecF<Node> saveNodesA(switchIdsA.n);
+    VecF<Node> saveNodesB(switchIdsB.n);
+    VecF<Node> saveNodesT(switchIdsT.n);
     for (int i = 0; i < saveNodesA.n; ++i)
         saveNodesA[i] = networkA.nodes[switchIdsA[i]];
 
@@ -2856,7 +2756,7 @@ VecF<int> LinkedNetwork::monteCarloSwitchMoveLAMMPS(double &SimpleGrapheneEnergy
         saveNodesT[i] = networkT.nodes[switchIdsT[i]];
 
     // Switch and geometry optimise
-    logger->info("Switching...");
+    logger->debug("Switching...");
     VecF<int> optStatus_networkA(2);
     VecF<int> optStatus_SimpleGraphene(2);
     VecF<int> optStatus_TersoffGraphene(2);
@@ -2872,19 +2772,19 @@ VecF<int> LinkedNetwork::monteCarloSwitchMoveLAMMPS(double &SimpleGrapheneEnergy
 
         if (isSimpleGrapheneEnabled)
         {
-            logger->info("Switching Simple Graphene");
+            logger->debug("Switching Simple Graphene");
             SimpleGraphene.switchGraphene(switchIdsA, networkA, logger);
         }
         if (isTriangleRaftEnabled)
         {
-            logger->info("Switching Triangle Raft");
-            Triangle_Raft.switchTriangleRaft(switchIdsA, switchIdsB, switchIdsT, networkT, logger);
+            logger->debug("Switching Triangle Raft");
+            Triangle_Raft.switchTriangleRaft(switchIdsA, switchIdsT, logger);
         }
         if (isBilayerEnabled)
-            Bilayer.switchBilayer(switchIdsA, switchIdsB, switchIdsT, logger);
+            Bilayer.switchBilayer(switchIdsA, switchIdsT, logger);
         if (isBNEnabled)
         {
-            logger->info("Switching BN");
+            logger->debug("Switching BN");
             BN.switchGraphene(switchIdsA, networkA, logger);
         }
     }
@@ -2898,7 +2798,7 @@ VecF<int> LinkedNetwork::monteCarloSwitchMoveLAMMPS(double &SimpleGrapheneEnergy
     }
     else
     {
-        logger->critical("Not yet implemented (?)");
+        logger->error("Not yet implemented (?)");
         throw std::runtime_error("Not yet implemented!");
     }
     // Rearrange nodes after switch
@@ -2925,9 +2825,10 @@ VecF<int> LinkedNetwork::monteCarloSwitchMoveLAMMPS(double &SimpleGrapheneEnergy
     }
     if (!geometryOK)
         optStatus_SimpleGraphene[0] = 4;
+    int nSi;
 
     // Geometry optimisation of local region
-    logger->info("Optimising geometry...");
+    logger->debug("Optimising geometry...");
     if (geometryOK)
     {
         optStatus_SimpleGraphene = SimpleGraphene.GlobalPotentialMinimisation();
@@ -2947,7 +2848,6 @@ VecF<int> LinkedNetwork::monteCarloSwitchMoveLAMMPS(double &SimpleGrapheneEnergy
             localCrdsBilayer = Bilayer.fetchCrds(3);
         if (isBNEnabled)
             localCrdsBN = BN.fetchCrds(2);
-        int natoms, nSi, nO;
         if (isBilayerEnabled)
         {
             int natoms = Bilayer.natoms;
@@ -2957,12 +2857,12 @@ VecF<int> LinkedNetwork::monteCarloSwitchMoveLAMMPS(double &SimpleGrapheneEnergy
 
         for (int i = 0; i < 6; ++i)
         {
-            if (isSimpleGrapheneEnabled and isTersoffGrapheneEnabled)
+            if (isSimpleGrapheneEnabled && isTersoffGrapheneEnabled)
             {
                 localCrdsTersoff[2 * switchIdsA[i]] = localCrdsSimpleGraphene[2 * switchIdsA[i]] * CScaling;
                 localCrdsTersoff[2 * switchIdsA[i] + 1] = localCrdsSimpleGraphene[2 * switchIdsA[i] + 1] * CScaling;
             }
-            if (isSimpleGrapheneEnabled and isBilayerEnabled)
+            if (isSimpleGrapheneEnabled && isBilayerEnabled)
             {
                 localCrdsBilayer[3 * (switchIdsA[i] * 2)] = localCrdsSimpleGraphene[2 * switchIdsA[i]] * SiScaling;
                 localCrdsBilayer[3 * (switchIdsA[i] * 2) + 1] =
@@ -2980,22 +2880,21 @@ VecF<int> LinkedNetwork::monteCarloSwitchMoveLAMMPS(double &SimpleGrapheneEnergy
         if (isBilayerEnabled)
             Bilayer.pushCrds(3, localCrdsBilayer);
 
-        int nThreads = 0;
         if (isOpenMPIEnabled)
         {
-            optStatus_networkA = localGeometryOptimisation(a, b, goptParamsA[1], 0, isMaintainConvexityEnabled);
+            optStatus_networkA = localGeometryOptimisation(a, b, goptParamsA[1], false, isMaintainConvexityEnabled);
 #pragma omp parallel num_threads(3)
             {
 
-                if (omp_get_thread_num() == 0 and isTriangleRaftEnabled)
+                if (omp_get_thread_num() == 0 && isTriangleRaftEnabled)
                 {
                     optStatus_TriangleRaft = Triangle_Raft.GlobalPotentialMinimisation();
                 }
-                else if (omp_get_thread_num() == 1 and isTersoffGrapheneEnabled)
+                else if (omp_get_thread_num() == 1 && isTersoffGrapheneEnabled)
                 {
                     optStatus_TersoffGraphene = TersoffGraphene.GlobalPotentialMinimisation();
                 }
-                else if (omp_get_thread_num() == 2 and isBilayerEnabled)
+                else if (omp_get_thread_num() == 2 && isBilayerEnabled)
                 {
                     optStatus_Bilayer = Bilayer.GlobalPotentialMinimisation();
                 }
@@ -3053,6 +2952,19 @@ VecF<int> LinkedNetwork::monteCarloSwitchMoveLAMMPS(double &SimpleGrapheneEnergy
     if (isAccepted)
     {
         if (MC_Routine == 1)
+            logger->info("Accepted Move, Ei = {} Ef = {}", saveEnergySimpleGraphene, SimpleGrapheneEnergy);
+        else if (MC_Routine == 2)
+            logger->info("Accepted Move, Ei = {} Ef = {}", saveEnergyTriangleRaft, TriangleRaftEnergy);
+        else if (MC_Routine == 5)
+            logger->info("Accepted Move, Ei = {} Ef = {}", saveEnergyBN, BNEnergy);
+        else
+            logger->info("MC ROUTINE : {}", MC_Routine);
+        logger->info("Syncing coordinates...");
+        syncCoordinates();
+    }
+    else
+    {
+        if (MC_Routine == 1)
             logger->info("Rejected Move, Ei = {} Ef = {}", saveEnergySimpleGraphene, SimpleGrapheneEnergy);
         else if (MC_Routine == 2)
             logger->info("Rejected Move, Ei = {} Ef = {}", saveEnergyTriangleRaft, TriangleRaftEnergy);
@@ -3100,12 +3012,12 @@ VecF<int> LinkedNetwork::monteCarloSwitchMoveLAMMPS(double &SimpleGrapheneEnergy
         }
         if (isTriangleRaftEnabled)
         {
-            Triangle_Raft.revertTriangleRaft(switchIdsA, switchIdsB, switchIdsT, logger);
+            Triangle_Raft.revertTriangleRaft(switchIdsA, switchIdsT, logger);
             Triangle_Raft.GlobalPotentialMinimisation();
         }
         if (isBilayerEnabled)
         {
-            Bilayer.revertBilayer(switchIdsA, switchIdsB, switchIdsT, logger);
+            Bilayer.revertBilayer(switchIdsA, switchIdsT, logger);
             Bilayer.GlobalPotentialMinimisation();
         }
         if (isBNEnabled)
@@ -3113,19 +3025,6 @@ VecF<int> LinkedNetwork::monteCarloSwitchMoveLAMMPS(double &SimpleGrapheneEnergy
             BN.revertGraphene(switchIdsA, networkA, logger);
             BN.GlobalPotentialMinimisation();
         }
-    }
-    else
-    {
-        if (MC_Routine == 1)
-            logger->info("Accepted Move, Ei = {} Ef = {}", saveEnergySimpleGraphene, SimpleGrapheneEnergy);
-        else if (MC_Routine == 2)
-            logger->info("Accepted Move, Ei = {} Ef = {}", saveEnergyTriangleRaft, TriangleRaftEnergy);
-        else if (MC_Routine == 5)
-            logger->info("Accepted Move, Ei = {} Ef = {}", saveEnergyBN, BNEnergy);
-        else
-            logger->info("MC ROUTINE : {}", MC_Routine);
-        logger->info("Syncing coordinates...");
-        syncCoordinates();
     }
     /* Status report
      * [0] accepted/rejected 1/0
@@ -3135,7 +3034,6 @@ VecF<int> LinkedNetwork::monteCarloSwitchMoveLAMMPS(double &SimpleGrapheneEnergy
     status[0] = isAccepted;
     status[1] = optStatus_SimpleGraphene[0];
     status[2] = optStatus_SimpleGraphene[1];
-    logger->info("Returning status");
     return status;
 }
 
@@ -3149,11 +3047,14 @@ VecF<int> LinkedNetwork::monteCarloSwitchMove(Network network, double &energy, L
      * 3) optimise and evaluate energy
      * 4) accept or reject */
 
-    double sum = 0;
-
     // Select valid random connection - that will not violate connection limits
-    int a, b, u, v;
-    VecF<int> switchIdsA, switchIdsB, switchIdsT;
+    int a;
+    int b;
+    int u;
+    int v;
+    VecF<int> switchIdsA;
+    VecF<int> switchIdsB;
+    VecF<int> switchIdsT;
     bool foundValidMove = false;
     int cnxType;
     for (int i = 0; i < networkA.nodes.n * networkA.nodes.n; ++i)
@@ -3176,7 +3077,9 @@ VecF<int> LinkedNetwork::monteCarloSwitchMove(Network network, double &energy, L
     VecF<int> saveNodeDistB = networkB.nodeDistribution;
     VecF<VecF<int>> saveEdgeDistA = networkA.edgeDistribution;
     VecF<VecF<int>> saveEdgeDistB = networkB.edgeDistribution;
-    VecF<Node> saveNodesA(switchIdsA.n), saveNodesB(switchIdsB.n), saveNodesT(switchIdsT.n);
+    VecF<Node> saveNodesA(switchIdsA.n);
+    VecF<Node> saveNodesB(switchIdsB.n);
+    VecF<Node> saveNodesT(switchIdsT.n);
     for (int i = 0; i < saveNodesA.n; ++i)
         saveNodesA[i] = networkA.nodes[switchIdsA[i]];
     for (int i = 0; i < saveNodesB.n; ++i)
@@ -3280,8 +3183,12 @@ VecF<int> LinkedNetwork::monteCarloMixMove(double &energy)
      * 4) accept or reject */
 
     // Select valid random connection - that will not violate connection limits
-    int a, b, u, v;
-    VecF<int> mixIdsA, mixIdsB;
+    int a;
+    int b;
+    int u;
+    int v;
+    VecF<int> mixIdsA;
+    VecF<int> mixIdsB;
     bool foundValidMove = false;
     int cnxType;
     for (int i = 0; i < networkA.nodes.n * networkA.nodes.n; ++i)
@@ -3302,7 +3209,8 @@ VecF<int> LinkedNetwork::monteCarloMixMove(double &energy)
     VecF<int> saveNodeDistB = networkB.nodeDistribution;
     VecF<VecF<int>> saveEdgeDistA = networkA.edgeDistribution;
     VecF<VecF<int>> saveEdgeDistB = networkB.edgeDistribution;
-    VecF<Node> saveNodesA(mixIdsA.n), saveNodesB(mixIdsB.n);
+    VecF<Node> saveNodesA(mixIdsA.n);
+    VecF<Node> saveNodesB(mixIdsB.n);
     for (int i = 0; i < saveNodesA.n; ++i)
         saveNodesA[i] = networkA.nodes[mixIdsA[i]];
     for (int i = 0; i < saveNodesB.n; ++i)
@@ -3372,7 +3280,7 @@ VecF<int> LinkedNetwork::monteCarloMixMove(double &energy)
 }
 
 // Calculate potential energy of entire system
-double LinkedNetwork::globalPotentialEnergy(bool useIntx, bool isMaintainConvexityEnabled, Network network)
+double LinkedNetwork::globalPotentialEnergy(bool useIntx, bool isMaintainConvexityEnabledArg, Network network)
 {
 
     /* Potential model
@@ -3383,8 +3291,10 @@ double LinkedNetwork::globalPotentialEnergy(bool useIntx, bool isMaintainConvexi
 
     // Set up potential model
     // Bond and angle harmonics
-    VecR<int> bonds(0, network.nodes.n * 6), angles(0, network.nodes.n * maxCnxs * 3);
-    VecR<double> bondParams(0, network.nodes.n * 6), angleParams(0, network.nodes.n * maxCnxs * 3);
+    VecR<int> bonds(0, network.nodes.n * 6);
+    VecR<int> angles(0, network.nodes.n * maxCnxs * 3);
+    VecR<double> bondParams(0, network.nodes.n * 6);
+    VecR<double> angleParams(0, network.nodes.n * maxCnxs * 3);
     if (network.nodes.n > networkA.nodes.n)
     {
         for (int i = 0; i < network.nodes.n; ++i)
@@ -3410,8 +3320,12 @@ double LinkedNetwork::globalPotentialEnergy(bool useIntx, bool isMaintainConvexi
     }
 
     // Assign to fixed size arrays
-    VecF<int> bnds(bonds.n), angs(angles.n), intx(intersections.n);
-    VecF<double> bndP(bondParams.n), angP(angleParams.n), intxP; // placeholder for intersections
+    VecF<int> bnds(bonds.n);
+    VecF<int> angs(angles.n);
+    VecF<int> intx(intersections.n);
+    VecF<double> bndP(bondParams.n);
+    VecF<double> angP(angleParams.n);
+    VecF<double> intxP; // placeholder for intersections
     for (int i = 0; i < bnds.n; ++i)
         bnds[i] = bonds[i];
     for (int i = 0; i < bndP.n; ++i)
@@ -3427,7 +3341,7 @@ double LinkedNetwork::globalPotentialEnergy(bool useIntx, bool isMaintainConvexi
     double potEnergy;
     if (network.geometryCode == "2DE")
     {
-        if (!isMaintainConvexityEnabled)
+        if (!isMaintainConvexityEnabledArg)
         {
             HI2DP potModel(network.pb[0], network.pb[1]);
             potModel.setBonds(bnds, bndP);
@@ -3470,7 +3384,7 @@ double LinkedNetwork::globalPotentialEnergy(bool useIntx, bool isMaintainConvexi
         potEnergy = potModel.function(crds);
     }
     // Convexity
-    if (isMaintainConvexityEnabled)
+    if (isMaintainConvexityEnabledArg)
     {
         bool convex = checkConvexity();
         if (!convex)
@@ -3510,8 +3424,12 @@ VecF<int> LinkedNetwork::globalGeometryOptimisation(bool useIntx, bool isMaintai
     VecR<int> intersections(0, network.nodes.n * 1000);
 
     // Assign to fixed size arrays
-    VecF<int> bnds(bonds.n), angs(angles.n), intx(intersections.n);
-    VecF<double> bndP(bondParams.n), angP(angleParams.n), intxP; // placeholder for intersections
+    VecF<int> bnds(bonds.n);
+    VecF<int> angs(angles.n);
+    VecF<int> intx(intersections.n);
+    VecF<double> bndP(bondParams.n);
+    VecF<double> angP(angleParams.n);
+    VecF<double> intxP; // placeholder for intersections
     for (int i = 0; i < bnds.n; ++i)
         bnds[i] = bonds[i];
     for (int i = 0; i < bndP.n; ++i)
@@ -3639,13 +3557,17 @@ VecF<int> LinkedNetwork::localGeometryOptimisation(int centreA, int centreB, int
      * 1) local (full interactions)
      * 2) fixed inner (interactions with local and fixed but immobile)
      * 3) fixed outer (interactions with fixed inner but immobile) */
-    VecR<int> local, fixedInner, fixedOuter;
+    VecR<int> local;
+    VecR<int> fixedInner;
+    VecR<int> fixedOuter;
     networkA.findLocalRegion(centreA, centreB, extent, local, fixedInner, fixedOuter);
 
     // Harmonics
     int reserveSize = (local.n + fixedInner.n) * maxACnxs * 3;
-    VecR<int> bonds(0, reserveSize), angles(0, reserveSize);
-    VecR<double> bondParams(0, reserveSize), angleParams(0, reserveSize);
+    VecR<int> bonds(0, reserveSize);
+    VecR<int> angles(0, reserveSize);
+    VecR<double> bondParams(0, reserveSize);
+    VecR<double> angleParams(0, reserveSize);
     for (int i = 0; i < local.n; ++i)
     {
         generateHarmonics(local[i], bonds, bondParams, angles, angleParams, networkA);
@@ -3659,8 +3581,13 @@ VecF<int> LinkedNetwork::localGeometryOptimisation(int centreA, int centreB, int
     VecR<int> intersections(0, local.n * 1000);
 
     // Assign to fixed size arrays
-    VecF<int> bnds(bonds.n), fixd(fixedInner.n + fixedOuter.n), angs(angles.n), intx(intersections.n);
-    VecF<double> bndP(bondParams.n), angP(angleParams.n), intxP; // placeholder for intersections
+    VecF<int> bnds(bonds.n);
+    VecF<int> fixd(fixedInner.n + fixedOuter.n);
+    VecF<int> angs(angles.n);
+    VecF<int> intx(intersections.n);
+    VecF<double> bndP(bondParams.n);
+    VecF<double> angP(angleParams.n);
+    VecF<double> intxP; // placeholder for intersections
     for (int i = 0; i < bnds.n; ++i)
         bnds[i] = bonds[i];
     for (int i = 0; i < bndP.n; ++i)
@@ -3724,9 +3651,12 @@ void LinkedNetwork::generateHarmonics(int id, VecR<int> &bonds, VecR<double> &bo
 {
 
     // Potential parameters
-    double bk = potParamsB[0], br = potParamsB[1]; // bond k and r0
-    double bk0 = bk, br0 = sqrt(3) * br;
-    double ak, act; // angle k, cos theta0
+    double bk = potParamsB[0];
+    double br = potParamsB[1]; // bond k and r0
+    double bk0 = bk;
+    double br0 = sqrt(3) * br;
+    double ak;
+    double act; // angle k, cos theta0
 
     // Harmonics
     int cnd; // coordination
@@ -3771,8 +3701,10 @@ void LinkedNetwork::generateHarmonicsOnly(int id, VecR<int> &bonds, VecR<double>
 {
 
     // Potential parameters
-    double bk = potParamsB[0], br = potParamsB[1]; // bond k and r0
-    double bk0 = bk, br0 = sqrt(3) * br;
+    double bk = potParamsB[0];
+    double br = potParamsB[1]; // bond k and r0
+    double bk0 = bk;
+    double br0 = sqrt(3) * br;
 
     // Harmonics
     int cnd; // coordination
@@ -3826,7 +3758,10 @@ void LinkedNetwork::generateRingIntersections(int rId, VecR<int> &intersections)
 
     int rCnd = networkB.nodes[rId].netCnxs.n;
     int nCnd = networkB.nodes[rId].dualCnxs.n;
-    int e0, e1, e2, e3;
+    int e0;
+    int e1;
+    int e2;
+    int e3;
     for (int i = 0; i < rCnd; ++i)
     { // loop over neighbouring rings
         int rId0 = networkB.nodes[rId].netCnxs[i];
@@ -3859,7 +3794,9 @@ void LinkedNetwork::generateConvexIntersections(int nId, VecR<int> &intersection
 {
 
     int cnd = networkA.nodes[nId].netCnxs.n;
-    int id0, id1, id2;
+    int id0;
+    int id1;
+    int id2;
     for (int i = 0; i < cnd; ++i)
     {
         id0 = networkA.nodes[nId].netCnxs[i];
@@ -3970,9 +3907,8 @@ void LinkedNetwork::syncCoordinatesTD()
 }
 
 // Get normalised probability distribution of nodes of each size in given lattice
-VecF<double> LinkedNetwork::getNodeDistribution(std::string lattice)
+VecF<double> LinkedNetwork::getNodeDistribution(const std::string &lattice)
 {
-
     if (lattice == "A")
         return networkA.getNodeDistribution();
     else
@@ -3980,7 +3916,7 @@ VecF<double> LinkedNetwork::getNodeDistribution(std::string lattice)
 }
 
 // Get unnormalised probability distribution of node connections in given lattice
-VecF<VecF<int>> LinkedNetwork::getEdgeDistribution(std::string lattice)
+VecF<VecF<int>> LinkedNetwork::getEdgeDistribution(const std::string &lattice)
 {
 
     if (lattice == "A")
@@ -3990,7 +3926,7 @@ VecF<VecF<int>> LinkedNetwork::getEdgeDistribution(std::string lattice)
 }
 
 // Get Aboav-Weaire fitting parameters
-VecF<double> LinkedNetwork::getAboavWeaire(std::string lattice)
+VecF<double> LinkedNetwork::getAboavWeaire(const std::string &lattice)
 {
 
     if (lattice == "A")
@@ -4000,7 +3936,7 @@ VecF<double> LinkedNetwork::getAboavWeaire(std::string lattice)
 }
 
 // Get assortativity
-double LinkedNetwork::getAssortativity(std::string lattice)
+double LinkedNetwork::getAssortativity(const std::string &lattice)
 {
 
     if (lattice == "A")
@@ -4010,7 +3946,7 @@ double LinkedNetwork::getAssortativity(std::string lattice)
 }
 
 // Get alpha estimate
-double LinkedNetwork::getAboavWeaireEstimate(std::string lattice)
+double LinkedNetwork::getAboavWeaireEstimate(const std::string &lattice)
 {
 
     if (lattice == "A")
@@ -4020,7 +3956,7 @@ double LinkedNetwork::getAboavWeaireEstimate(std::string lattice)
 }
 
 // Get entropy
-VecF<double> LinkedNetwork::getEntropy(std::string lattice)
+VecF<double> LinkedNetwork::getEntropy(const std::string &lattice)
 {
 
     if (lattice == "A")
@@ -4030,7 +3966,7 @@ VecF<double> LinkedNetwork::getEntropy(std::string lattice)
 }
 
 // Get cluster information
-double LinkedNetwork::getMaxCluster(std::string lattice, int nodeCnd)
+double LinkedNetwork::getMaxCluster(const std::string &lattice, int nodeCnd)
 {
 
     if (lattice == "A")
@@ -4040,7 +3976,7 @@ double LinkedNetwork::getMaxCluster(std::string lattice, int nodeCnd)
 }
 
 // Get cluster information
-VecF<int> LinkedNetwork::getMaxClusters(std::string lattice, int minCnd, int maxCnd)
+VecF<int> LinkedNetwork::getMaxClusters(const std::string &lattice, int minCnd, int maxCnd)
 {
 
     if (lattice == "A")
@@ -4079,7 +4015,8 @@ bool LinkedNetwork::checkCnxConsistency()
 
     // check mutual network connections
     bool mutualNetCnx = true;
-    int id0, id1;
+    int id0;
+    int id1;
     for (int i = 0; i < networkA.nodes.n; ++i)
     {
         id0 = i;
@@ -4217,7 +4154,8 @@ bool LinkedNetwork::checkDescriptorConsistency()
     VecF<VecF<int>> checkEdgeB(networkB.edgeDistribution);
 
     // Check node distribution
-    bool nodeA, nodeB;
+    bool nodeA;
+    bool nodeB;
     checkNodeA = 0;
     checkNodeB = 0;
     for (int i = 0; i < networkA.nodes.n; ++i)
@@ -4234,7 +4172,8 @@ bool LinkedNetwork::checkDescriptorConsistency()
     nodeB = checkNodeB == networkB.nodeDistribution;
 
     // Check edge distribution
-    bool edgeA = true, edgeB = true;
+    bool edgeA = true;
+    bool edgeB = true;
     for (int i = 0; i < checkEdgeA.n; ++i)
         checkEdgeA[i] = 0;
     for (int i = 0; i < checkEdgeB.n; ++i)
@@ -4283,14 +4222,12 @@ bool LinkedNetwork::checkDescriptorConsistency()
 // Check convexity of all angles
 bool LinkedNetwork::checkConvexity()
 {
-    bool convex;
     for (int i = 0; i < networkA.nodes.n; ++i)
     {
-        convex = checkConvexity(i);
-        if (!convex)
-            break;
+        if (!checkConvexity(i))
+            return false;
     }
-    return convex;
+    return true;
 }
 
 // Check convexity by summing angles around node
@@ -4298,13 +4235,18 @@ bool LinkedNetwork::checkConvexity(int id)
 {
     double angleSum = 0.0;
     // Coordinate vectors, coordination and pbc
-    VecF<double> v0(2), v1(2), v2(2);
+    VecF<double> v0(2);
+    VecF<double> v1(2);
+    VecF<double> v2(2);
     v0[0] = crds[2 * id];
     v0[1] = crds[2 * id + 1];
     int cnd = networkA.nodes[id].netCnxs.n;
-    int id1, id2;
-    double pbx = networkA.pb[0], pby = networkA.pb[1];
-    double pbrx = networkA.rpb[0], pbry = networkA.rpb[1];
+    int id1;
+    int id2;
+    double pbx = networkA.pb[0];
+    double pby = networkA.pb[1];
+    double pbrx = networkA.rpb[0];
+    double pbry = networkA.rpb[1];
     // Determine vectors to neighbours and sum angles
     for (int i = 0; i < cnd; ++i)
     {
@@ -4323,7 +4265,8 @@ bool LinkedNetwork::checkConvexity(int id)
         v2[0] -= pbx * nearbyint(v2[0] * pbrx);
         v2[1] -= pby * nearbyint(v2[1] * pbry);
         // Angle from dot product
-        double n1, n2;
+        double n1;
+        double n2;
         angleSum += vAngle(v1, v2, n1, n2);
     }
     if (fabs(angleSum - 2 * M_PI) < 1e-12)
@@ -4337,12 +4280,20 @@ VecF<double> LinkedNetwork::getOptimisationGeometry(Network network, VecF<double
 {
 
     // Calculate for current configuration
-    double x = 0.0, xSq = 0.0, y = 0.0, ySq = 0.0; // len and angle
-    int xN = 0, yN = 0;                            // count
+    double x = 0.0;
+    double xSq = 0.0;
+    double y = 0.0;
+    double ySq = 0.0; // len and angle
+    int xN = 0;
+    int yN = 0; // count
     int cnd;
-    VecF<double> v0(2), v1(2), v2(2);
-    double pbx = network.pb[0], pby = network.pb[1];
-    double pbrx = network.rpb[0], pbry = network.rpb[1];
+    VecF<double> v0(2);
+    VecF<double> v1(2);
+    VecF<double> v2(2);
+    double pbx = network.pb[0];
+    double pby = network.pb[1];
+    double pbrx = network.rpb[0];
+    double pbry = network.rpb[1];
     double lenBinWidth = 4.0 / 10000.0;
     double angBinWidth = 2 * M_PI / 10000.0;
     double bin;
@@ -4365,7 +4316,8 @@ VecF<double> LinkedNetwork::getOptimisationGeometry(Network network, VecF<double
             v1[1] -= pby * nearbyint(v1[1] * pbry);
             v2[0] -= pbx * nearbyint(v2[0] * pbrx);
             v2[1] -= pby * nearbyint(v2[1] * pbry);
-            double n1, n2;
+            double n1;
+            double n2;
             double theta = vAngle(v1, v2, n1, n2);
             // Edge lengths avoiding double counting
             if (i < id1)
@@ -4401,7 +4353,6 @@ VecF<double> LinkedNetwork::getOptimisationGeometry(Network network, VecF<double
         optGeom[7] = 0.0;
     else
         optGeom[7] = sqrt(optGeom[7]);
-
     return optGeom;
 }
 
@@ -4410,12 +4361,20 @@ VecF<double> LinkedNetwork::getOptimisationGeometryTD(VecF<double> &lenHist, Vec
 {
 
     // Calculate for current configuration
-    double x = 0.0, xSq = 0.0, y = 0.0, ySq = 0.0; // len and angle
-    int xN = 0, yN = 0;                            // count
+    double x = 0.0;
+    double xSq = 0.0;
+    double y = 0.0;
+    double ySq = 0.0; // len and angle
+    int xN = 0;
+    int yN = 0; // count
     int cnd;
-    VecF<double> v0(2), v1(2), v2(2);
-    double pbx = networkT.pb[0], pby = networkT.pb[1];
-    double pbrx = networkT.rpb[0], pbry = networkT.rpb[1];
+    VecF<double> v0(2);
+    VecF<double> v1(2);
+    VecF<double> v2(2);
+    double pbx = networkT.pb[0];
+    double pby = networkT.pb[1];
+    double pbrx = networkT.rpb[0];
+    double pbry = networkT.rpb[1];
     double lenBinWidth = 4.0 / 10000.0;
     double angBinWidth = 2 * M_PI / 10000.0;
     double bin;
@@ -4438,7 +4397,8 @@ VecF<double> LinkedNetwork::getOptimisationGeometryTD(VecF<double> &lenHist, Vec
             v1[1] -= pby * nearbyint(v1[1] * pbry);
             v2[0] -= pbx * nearbyint(v2[0] * pbrx);
             v2[1] -= pby * nearbyint(v2[1] * pbry);
-            double n1, n2;
+            double n1;
+            double n2;
             double theta = vAngle(v1, v2, n1, n2);
             // Edge lengths avoiding double counting
             if (i < id1)
@@ -4485,13 +4445,16 @@ void LinkedNetwork::getRingAreas(VecF<double> &areaSum, VecF<double> &areaSqSum)
     // Loop over rings, recentre and apply shoelace formula
     areaSum = 0.0;
     areaSqSum = 0.0;
-    double pbx = networkA.pb[0], pby = networkA.pb[1];
-    double pbrx = networkA.rpb[0], pbry = networkA.rpb[1];
+    double pbx = networkA.pb[0];
+    double pby = networkA.pb[1];
+    double pbrx = networkA.rpb[0];
+    double pbry = networkA.rpb[1];
     for (int i = 0; i < networkB.nodes.n; ++i)
     {
         VecR<int> ids = networkB.nodes[i].dualCnxs;
         int ringSize = ids.n;
-        VecF<double> xCrds(ringSize), yCrds(ringSize);
+        VecF<double> xCrds(ringSize);
+        VecF<double> yCrds(ringSize);
         for (int j = 0; j < ringSize; ++j)
         {
             xCrds[j] = crds[2 * ids[j]];
@@ -4533,7 +4496,7 @@ void LinkedNetwork::wrapCoordinates()
 }
 
 // Write xyz file format of networks
-void LinkedNetwork::writeXYZ(std::string prefix)
+void LinkedNetwork::writeXYZ(const std::string &prefix)
 {
     networkA.writeXYZ(prefix + "_A", "O");
     networkB.writeXYZ(prefix + "_B", "N");
@@ -4541,7 +4504,7 @@ void LinkedNetwork::writeXYZ(std::string prefix)
 }
 
 // Write networks in format that can be loaded and visualised
-void LinkedNetwork::write(std::string prefix)
+void LinkedNetwork::write(const std::string &prefix)
 {
     networkA.write(prefix + "_A");
     networkB.write(prefix + "_B");

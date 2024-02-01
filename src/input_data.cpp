@@ -25,8 +25,7 @@ bool InputData::stringToBool(const std::string &str)
         return true;
     else if (str == "false")
         return false;
-    else
-        throw std::invalid_argument("Invalid boolean: " + str);
+    throw std::invalid_argument("Invalid boolean: " + str);
 }
 
 /**

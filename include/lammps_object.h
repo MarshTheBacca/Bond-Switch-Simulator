@@ -50,9 +50,9 @@ public:
     LammpsObject();
     LammpsObject(const std::string &selector, const std::string &inputFolder, const LoggerPtr logger);
 
-    int write_data(int selector);
+    void write_data(const std::string &structureName);
     void write_restart(const std::string &structureName);
-    int finaliseLammpsObject(int selector);
+    void finaliseLAMMPSObject(const std::string &structureName);
 
     void runInput(const std::string &fname);
 
@@ -65,8 +65,6 @@ public:
 
     double *fetchBonds();
 
-    const int getNumAtoms();
-
     void breakBond(int atom1, int atom2, int type, LoggerPtr logger);
     void formBond(int atom1, int atom2, int type, LoggerPtr logger);
     void breakAngle(int atom1, int atom2, int atom3);
@@ -75,14 +73,14 @@ public:
     void switchGraphene(VecF<int> switchIdsA, Network networkA, LoggerPtr logger);
     void revertGraphene(VecF<int> switchIdsA, Network networkA, LoggerPtr logger);
 
-    void switchTriangleRaft(VecF<int> switchIdsA, VecF<int> switchIdsB, VecF<int> switchIdsT, Network networkT, LoggerPtr logger);
-    void revertTriangleRaft(VecF<int> switchIdsA, VecF<int> switchIdsB, VecF<int> switchIdsT, LoggerPtr logger);
+    void switchTriangleRaft(VecF<int> switchIdsA, VecF<int> switchIdsT, LoggerPtr logger);
+    void revertTriangleRaft(VecF<int> switchIdsA, VecF<int> switchIdsT, LoggerPtr logger);
 
-    void switchBilayer(VecF<int> switchIdsA, VecF<int> switchIdsB, VecF<int> switchIdsT, LoggerPtr logger);
-    void revertBilayer(VecF<int> switchIdsA, VecF<int> switchIdsB, VecF<int> switchIdsT, LoggerPtr logger);
+    void switchBilayer(VecF<int> switchIdsA, VecF<int> switchIdsT, LoggerPtr logger);
+    void revertBilayer(VecF<int> switchIdsA, VecF<int> switchIdsT, LoggerPtr logger);
 
-    void switchBonds(VecF<int> switchIdsA, VecF<int> switchIdsB, VecF<int> switchIdsT);
-    void revertBonds(VecF<int> switchIdsA, VecF<int> switchIdsB, VecF<int> switchIdsT);
+    void switchBonds(VecF<int> switchIdsA, VecF<int> switchIdsT);
+    void revertBonds(VecF<int> switchIdsA, VecF<int> switchIdsT);
 
     VecF<int> GlobalPotentialMinimisation();
     double GlobalPotentialEnergy();

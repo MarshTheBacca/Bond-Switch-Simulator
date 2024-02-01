@@ -24,7 +24,8 @@ class LinkedNetwork
 private:
 public:
     // Data members
-    Network networkA, networkB; // two reciprocal networks
+    Network networkA;
+    Network networkB; // two reciprocal networks
     Network networkT;
     LammpsObject SimpleGraphene;
     LammpsObject TersoffGraphene;
@@ -32,7 +33,8 @@ public:
     LammpsObject Bilayer;
     LammpsObject BN;
 
-    std::string prefixIn, prefixOut;
+    std::string prefixIn;
+    std::string prefixOut;
     bool isOpenMPIEnabled = false;
     bool isSimpleGrapheneEnabled = false;
     bool isTriangleRaftEnabled = false;
@@ -43,15 +45,17 @@ public:
     double CScaling = 1.420;
     double SiScaling = 1.609 * sqrt((32.0 / 9.0)) / 0.52917721090380;
 
-    VecF<double> crds;                               // copy of coordinates in network A (for efficient geometry optimisation)
-    std::string MCWeighting;                         // Either 'weighted' or 'random'
-    std::mt19937 mtGen;                              // mersenne twister random number generator
-    Metropolis mc;                                   // monte carlo metropolis condition
-    VecF<double> potParamsA, potParamsB, potParamsC; // potential model parameters (angles, bonds, constraints)
-    bool isMaintainConvexityEnabled;                 // maintain convexity of lattice
-    VecF<int> goptParamsA;                           // geometry optimisation parameters
-    VecF<double> goptParamsB;                        // geometry optimisation parameters
-    VecF<double> costParams;                         // cost function parameters
+    VecF<double> crds;       // copy of coordinates in network A (for efficient geometry optimisation)
+    std::string MCWeighting; // Either 'weighted' or 'random'
+    std::mt19937 mtGen;      // mersenne twister random number generator
+    Metropolis mc;           // monte carlo metropolis condition
+    VecF<double> potParamsA;
+    VecF<double> potParamsB;
+    VecF<double> potParamsC;         // potential model parameters (angles, bonds, constraints)
+    bool isMaintainConvexityEnabled; // maintain convexity of lattice
+    VecF<int> goptParamsA;           // geometry optimisation parameters
+    VecF<double> goptParamsB;        // geometry optimisation parameters
+    VecF<double> costParams;         // cost function parameters
 
     VecR<int> fixedRings; // IDs of the fixed rings
     VecR<int> rFixed;
@@ -60,7 +64,10 @@ public:
     int spiralRadius; // Radius at which MC moves are considered
 
     // Additional data members
-    int minACnxs, maxACnxs, minBCnxs, maxBCnxs;
+    int minACnxs;
+    int maxACnxs;
+    int minBCnxs;
+    int maxBCnxs;
 
     // Constructors
     LinkedNetwork();
@@ -72,7 +79,7 @@ public:
                   bool isBNEnabledArg, bool isRestartUsingLAMMPSObjectsEnabledArg,
                   LoggerPtr); // construct by loading from files
 
-    void pushPrefix(std::string prefixin, std::string prefixout);
+    void pushPrefix(const std::string &prefixin, const std::string &prefixout);
     void findFixedRings(bool fixed_rings, std::string filename, LoggerPtr logger);
 
     void makerFixed();
@@ -81,7 +88,7 @@ public:
                                   double harmonicAngleForceConstant, double harmonicBondForceConstant,
                                   double harmonicGeometryConstraint, bool isMaintainConvexityEnabled, LoggerPtr); // set up potential model parameters
     void initialiseGeometryOpt(int iterations, double tau, double tolerance, int localExtent);                    // set up geometry optimsiation parameters
-    void initialiseMonteCarlo(Network network, double temperature, LoggerPtr logger, int seed = 0);               // set up monte carlo
+    void initialiseMonteCarlo(const Network &network, double temperature, LoggerPtr logger, int seed = 0);        // set up monte carlo
     void initialiseCostFunction(double temperature, int seed, double pk, double rk);                              // set up cost function
     void rescale(double scaleFactor);                                                                             // rescale lattice dimensions
     void project(std::string projType, double param);                                                             // project lattice onto different geometry
@@ -123,17 +130,17 @@ public:
     void wrapCoordinates();                                                                                                                    // wrap coordinates if periodic
     void syncCoordinates();                                                                                                                    // update geometry optimised coordinates to networks
     void syncCoordinatesTD();                                                                                                                  // update geometry optimised coordinates to networks
-    VecF<double> getNodeDistribution(std::string lattice);                                                                                     // get proportion of nodes of each size
-    VecF<VecF<int>> getEdgeDistribution(std::string lattice);                                                                                  // get unnormalised proportion of node connections
-    VecF<double> getAboavWeaire(std::string lattice);                                                                                          // get aboav-weaire parameters
-    double getAssortativity(std::string lattice);                                                                                              // get network assortativity
-    double getAboavWeaireEstimate(std::string lattice);                                                                                        // get estimate of aw alpha parameter from assortativity
-    VecF<double> getEntropy(std::string lattice);                                                                                              // get node and edge distribution entropy
+    VecF<double> getNodeDistribution(const std::string &lattice);                                                                              // get proportion of nodes of each size
+    VecF<VecF<int>> getEdgeDistribution(const std::string &lattice);                                                                           // get unnormalised proportion of node connections
+    VecF<double> getAboavWeaire(const std::string &lattice);                                                                                   // get aboav-weaire parameters
+    double getAssortativity(const std::string &lattice);                                                                                       // get network assortativity
+    double getAboavWeaireEstimate(const std::string &lattice);                                                                                 // get estimate of aw alpha parameter from assortativity
+    VecF<double> getEntropy(const std::string &lattice);                                                                                       // get node and edge distribution entropy
     VecF<double> getOptimisationGeometry(Network network, VecF<double> &lenHist, VecF<double> &angHist);                                       // get bond/angle mean and standard deviation
     VecF<double> getOptimisationGeometryTD(VecF<double> &lenHist, VecF<double> &angHist);                                                      // get bond/angle mean and standard deviation
     void getRingAreas(VecF<double> &areaSum, VecF<double> &areaSqSum);                                                                         // get sum of areas and squared areas of each ring size
-    double getMaxCluster(std::string lattice, int nodeCnd);                                                                                    // get cluster statistics for given node coordination
-    VecF<int> getMaxClusters(std::string lattice, int minCnd, int maxCnd);                                                                     // get cluster statistics for node coordinations
+    double getMaxCluster(const std::string &lattice, int nodeCnd);                                                                             // get cluster statistics for given node coordination
+    VecF<int> getMaxClusters(const std::string &lattice, int minCnd, int maxCnd);                                                              // get cluster statistics for node coordinations
     bool checkConsistency();                                                                                                                   // check networks are consistent
     bool checkCnxConsistency();                                                                                                                // check for mutual connections
     bool checkDescriptorConsistency();                                                                                                         // check descriptors are accurate
@@ -141,8 +148,8 @@ public:
     bool checkConvexity(int id);                                                                                                               // check angles are convex around given node
 
     // Write Functions
-    void writeXYZ(std::string prefix);
-    void write(std::string prefix);
+    void writeXYZ(const std::string &prefix);
+    void write(const std::string &prefix);
 };
 
 #endif // NL_LINKED_NETWORK_H
