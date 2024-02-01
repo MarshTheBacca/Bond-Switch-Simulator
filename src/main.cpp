@@ -1,5 +1,6 @@
 #include <iostream>
 #include <sstream>
+#include <filesystem>
 #include "output_file.h"
 #include "linked_network.h"
 #include "lammps_object.h"
@@ -48,6 +49,13 @@ int main(int argc, char *argv[])
     // Read input file
     InputData inputData("./netmc.inpt", logger);
 
+    // Create output folder
+    if (!std::filesystem::create_directory(inputData.outputFolder))
+    {
+        logger->error("Error creating output folder {}", inputData.outputFolder);
+        return 1;
+    }
+
     OutputFile lammpsBondAngle(inputData.inputFolder + "/PARM_Si.lammps");
     lammpsBondAngle.write("bond_style harmonic");
     lammpsBondAngle.write("bond_coeff 1 " + std::to_string(inputData.harmonicBondForceConstant) + " 1.000");
@@ -55,7 +63,7 @@ int main(int argc, char *argv[])
     lammpsBondAngle.write("angle_coeff 1 " + std::to_string(inputData.harmonicAngleForceConstant) + " 120");
 
     // Initialise network
-    logger->info("Initialising network");
+    logger->info("Initialising network...");
     logger->debug("Number of rings: {}", inputData.numRings);
     logger->debug("Min ring size: {}", inputData.minRingSize);
     logger->debug("Max ring size: {}", inputData.maxRingSize);
@@ -67,16 +75,27 @@ int main(int argc, char *argv[])
     logger->debug("Monte carlo log temperature increment: {}", inputData.temperatureIncrement);
     logger->debug("Monte carlo steps per increment: {}", inputData.stepsPerTemperature);
     logger->debug("Equilibrium steps: {}", inputData.initialThermalisationSteps);
-
-    LinkedNetwork network(inputData.inputFolder, inputData.inputFilePrefix,
-                          inputData.outputFolder,
-                          inputData.minCoordination, inputData.maxCoordination,
-                          inputData.minRingSize, inputData.maxRingSize,
-                          inputData.isSimpleGrapheneEnabled,
-                          inputData.isTriangleRaftEnabled, inputData.isBilayerEnabled,
-                          inputData.isTersoffGrapheneEnabled,
-                          inputData.isBNEnabled,
-                          inputData.isRestartUsingLAMMPSObjectsEnabled, logger);
+    LinkedNetwork network;
+    if (inputData.isFromScratchEnabled)
+    {
+        logger->info("Creating network from scratch...");
+        network = LinkedNetwork(inputData.numRings, inputData.minCoordination, inputData.maxCoordination,
+                                inputData.minRingSize, inputData.maxRingSize,
+                                logger);
+    }
+    else
+    {
+        logger->info("Loading network from files...");
+        network = LinkedNetwork(inputData.inputFolder, inputData.inputFilePrefix,
+                                inputData.outputFolder,
+                                inputData.minCoordination, inputData.maxCoordination,
+                                inputData.minRingSize, inputData.maxRingSize,
+                                inputData.isSimpleGrapheneEnabled,
+                                inputData.isTriangleRaftEnabled, inputData.isBilayerEnabled,
+                                inputData.isTersoffGrapheneEnabled,
+                                inputData.isBNEnabled,
+                                inputData.isRestartUsingLAMMPSObjectsEnabled, logger);
+    }
 
     int maxRingSize = network.maxBCnxs;
 
@@ -115,15 +134,6 @@ int main(int argc, char *argv[])
 
     // Initialise output files
     logger->info("Initialising analysis output files...");
-    int status;
-
-    // Create output folder
-    status = mkdir(inputData.outputFolder.c_str(), 0777);
-    if (status == -1)
-    {
-        logger->error("Error creating output folder");
-        return 1;
-    }
 
     std::string prefixOut = inputData.outputFolder + "/" + inputData.outputFilePrefix;
     OutputFile outEnergyStats(prefixOut + "_e_compare.out");
@@ -360,7 +370,7 @@ int main(int argc, char *argv[])
             logger->info("Temperature: {}", mcT);
             for (int i = 1; i <= inputData.stepsPerTemperature; ++i)
             {
-                logger->info("Running: {}  -- Energies: {} {} {} {} {}",
+                logger->info("Running number: {} Energies: {} {} {} {} {}",
                              i, SimpleGrapheneEnergy, TersoffGrapheneEnergy, TriangleRaftEnergy, BilayerEnergy, BNEnergy);
                 if (lammps)
                 {
@@ -445,19 +455,19 @@ int main(int argc, char *argv[])
     if (inputData.isSimpleGrapheneEnabled)
     {
         logger->info("Writing Simple Graphene Results");
-        network.SimpleGraphene.write_data(0);
+        network.SimpleGraphene.write_data("Si");
         network.SimpleGraphene.write_restart("Si");
     }
     if (inputData.isTriangleRaftEnabled)
     {
         logger->info("Writing Triangle Raft Results");
-        network.Triangle_Raft.write_data(1);
+        network.Triangle_Raft.write_data("Si2O3");
         network.Triangle_Raft.write_restart("Si2O3");
     }
     if (inputData.isBNEnabled)
     {
         logger->info("Writing BN Results");
-        network.BN.write_data(4);
+        network.BN.write_data("BN");
         network.BN.write_restart("BN");
     }
 
