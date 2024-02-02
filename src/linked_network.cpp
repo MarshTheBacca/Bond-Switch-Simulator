@@ -1,6 +1,7 @@
 #include "linked_network.h"
 #include <iostream>
 #include <chrono>
+#include <algorithm>
 #include <ctime>
 #include <unistd.h>
 #include <omp.h>
@@ -20,46 +21,19 @@ LinkedNetwork::LinkedNetwork() = default;
 LinkedNetwork::LinkedNetwork(int numRings,
                              int minCoordination, int maxCoordination,
                              int minRingSize, int maxRingSize, LoggerPtr logger)
+    : minACnxs(minCoordination),
+      maxACnxs(maxCoordination),
+      minBCnxs(minRingSize),
+      maxBCnxs(maxRingSize),
+      networkB(numRings, "triangular", maxRingSize, logger)
 {
 
-    // Initialise lattices
-    networkB = Network(numRings, "triangular", maxRingSize, logger);
     networkA = networkB.constructDual(maxCoordination, logger);
+    networkA.maxNetCnxs = maxCoordination;
+    logger->info("Network A geometry code: {} ", networkA.geometryCode);
+    logger->info("Network B geometry code: {} ", networkB.geometryCode);
     rescale(sqrt(3.0));
     networkB.generateAuxConnections(networkA, 0);
-
-    if (minCoordination <= minACnxs)
-    {
-        minACnxs = minCoordination;
-    }
-    else
-    {
-        logger->warn("Initial network does not fit within allowed coordination numbers:  {} vs {}", minCoordination, minACnxs);
-    }
-    if (maxCoordination >= maxACnxs)
-    {
-        maxACnxs = maxCoordination;
-    }
-    else
-    {
-        logger->warn("Initial network does not fit within allowed coordination numbers:  {} vs {}", maxCoordination, maxACnxs);
-    }
-    if (minRingSize <= minBCnxs)
-    {
-        minBCnxs = minRingSize;
-    }
-    else
-    {
-        logger->warn("Initial network does not fit within allowed coordination numbers:  {} vs {}", minRingSize, minBCnxs);
-    }
-    if (maxRingSize >= maxBCnxs)
-    {
-        maxBCnxs = maxRingSize;
-    }
-    else
-    {
-        logger->warn("Initial network does not fit within allowed coordination numbers:  {} vs {}", maxRingSize, maxBCnxs);
-    }
 }
 
 // Construct by loading networks from files
@@ -67,7 +41,6 @@ LinkedNetwork::LinkedNetwork(int numRings,
  * @brief Construct by loading networks from files
  * @param inputFolder the folder containing the input files
  * @param inputFilePrefix the prefix of the input files
- * @param outputFolder the folder containing the output files
  * @param minCoordination the minimum coordination number
  * @param maxCoordination the maximum coordination number
  * @param minRingSize the minimum ring size
@@ -80,7 +53,7 @@ LinkedNetwork::LinkedNetwork(int numRings,
  * @param isRestartWithLAMMPSObjectsEnabledArg boolean to enable or disable restart with LAMMPS objects
  * @param logger the logger object
  */
-LinkedNetwork::LinkedNetwork(std::string inputFolder, std::string inputFilePrefix, std::string outputFolder,
+LinkedNetwork::LinkedNetwork(const std::string &inputFolder, const std::string &inputFilePrefix,
                              int minCoordination, int maxCoordination, int minRingSize, int maxRingSize,
                              bool isSimpleGrapheneEnabledArg, bool isTriangleRaftEnabledArg,
                              bool isBilayerEnabledArg, bool isTersoffGrapheneEnabledArg,
@@ -88,7 +61,8 @@ LinkedNetwork::LinkedNetwork(std::string inputFolder, std::string inputFilePrefi
 {
     std::string prefix = inputFolder + '/' + inputFilePrefix;
     networkA = Network(prefix + "_A", maxRingSize, maxRingSize, logger);
-    int ACnxs = 0, BCnxs = 0;
+    int ACnxs = 0;
+    int BCnxs = 0;
     minACnxs = 10;
     maxACnxs = 0;
     for (int i = 0; i < networkA.nodes.n; ++i)
@@ -165,7 +139,7 @@ LinkedNetwork::LinkedNetwork(std::string inputFolder, std::string inputFilePrefi
         BN = LammpsObject("BN", inputFolder, logger);
 }
 
-void LinkedNetwork::pushPrefix(const std::string &prefixInArg, const std::string &prefixOutArg)
+void LinkedNetwork::pushPrefix(std::string_view prefixInArg, std::string_view prefixOutArg)
 {
     prefixIn = prefixInArg;
     prefixOut = prefixOutArg;
@@ -214,8 +188,7 @@ void LinkedNetwork::findFixedRings(bool isFixedRingsEnabled, std::string filenam
 }
 
 // Set up potential model with single angle and bond parameter set
-void LinkedNetwork::initialisePotentialModel(Network network,
-                                             double harmonicAngleForceConstant, double harmonicBondForceConstant,
+void LinkedNetwork::initialisePotentialModel(double harmonicAngleForceConstant, double harmonicBondForceConstant,
                                              double harmonicGeometryConstraint, bool isMaintainConvexityEnabledArg, LoggerPtr logger)
 {
     // Make copy of lattice A coordinates
@@ -264,7 +237,7 @@ void LinkedNetwork::initialiseGeometryOpt(int iterations, double tau, double tol
 void LinkedNetwork::initialiseMonteCarlo(const Network &network, double temperature, LoggerPtr logger, int seed)
 {
     logger->info("Collecting global energy...");
-    double energy = globalPotentialEnergy(false, isMaintainConvexityEnabled, network);
+    double energy = globalPotentialEnergy(false, isMaintainConvexityEnabled, network, logger);
     logger->info("Global optimisation energy : {}", energy);
     mc = Metropolis(seed, temperature, energy);
     mtGen.seed(seed);
@@ -280,8 +253,6 @@ void LinkedNetwork::rescale(double scaleFactor)
 // Select nodes forming a random edge in lattice A, and linked nodes in lattice B, only for 3/4 coordinate nodes
 int LinkedNetwork::pickSpiralCnx34(int &a, int &b, int &u, int &v, std::mt19937 &gen)
 {
-    bool includesFixed = false;
-
     int n0 = a;
     int cnd0 = networkA.nodes[n0].netCnxs.n;
     int n1;
@@ -418,97 +389,107 @@ int LinkedNetwork::pickDiscreteCnx34(int &a, int &b, int &u, int &v, std::mt1993
     return cnxType;
 }
 
-// Select nodes forming a random edge in lattice A, and linked nodes in lattice B, only for 3/4 coordinate nodes
-int LinkedNetwork::pickRandomCnx34(int &a, int &b, int &u, int &v, std::mt19937 &gen)
+// Constants for connection types
+const int CNX_TYPE_33 = 33;
+const int CNX_TYPE_44 = 44;
+const int CNX_TYPE_43 = 43;
+
+// Helper function to assign a, b, and cnxType
+void assignValues(int &a, int &b, int &cnxType, int n0, int n1, int cnd0, int cnd1)
 {
-
-    // pick random node and one of its random connections
-    std::uniform_int_distribution<int> randomNode(0, networkA.nodes.n - 1);
-    bool picking_acceptable_ring = true;
-    int cnxType;
-    bool includesFixed;
-    while (picking_acceptable_ring)
+    if (cnd0 == 3 && cnd1 == 3)
     {
-        includesFixed = false;
+        cnxType = CNX_TYPE_33;
+        a = n0;
+        b = n1;
+    }
+    else if (cnd0 == 4 && cnd1 == 4)
+    {
+        cnxType = CNX_TYPE_44;
+        a = n0;
+        b = n1;
+    }
+    else if ((cnd0 == 3 && cnd1 == 4) || (cnd0 == 4 && cnd1 == 3))
+    {
+        cnxType = CNX_TYPE_43;
+        a = (cnd0 == 4) ? n0 : n1;
+        b = (cnd0 == 4) ? n1 : n0;
+    }
+    else
+    {
+        throw std::runtime_error("Error in random connection - incorrect coordinations");
+    }
+}
 
-        // MAYBE EXCLUDE SOME ATOMS ? //
-        int n0 = randomNode(gen);
-        int cnd0 = networkA.nodes[n0].netCnxs.n;
-        std::uniform_int_distribution<int> randomCnx(0, cnd0 - 1);
-        int n1 = networkA.nodes[n0].netCnxs[randomCnx(gen)];
-        int cnd1 = networkA.nodes[n1].netCnxs.n;
+/**
+ * @brief Selects a random connection between nodes in a network.
+ * @param nodeA Reference to an integer that will hold the ID of the first node in the selected connection.
+ * @param nodeB Reference to an integer that will hold the ID of the second node in the selected connection.
+ * @param nodeU Reference to an integer that will hold the ID of the first common node between nodeA and nodeB.
+ * @param nodeV Reference to an integer that will hold the ID of the second common node between nodeA and nodeB.
+ * @param randomGenerator Reference to a Mersenne Twister pseudo-random generator of 32-bit numbers with a state size of 19937 bits.
+ * @return The type of the selected connection.
+ */
+int LinkedNetwork::pickRandomCnx34(int &nodeA, int &nodeB, int &nodeU, int &nodeV, std::mt19937 &randomGenerator)
+{
+    // Set up a uniform distribution to select a random node from networkA
+    std::uniform_int_distribution<int> randomNode(0, networkA.nodes.n - 1);
+    bool isPickingAcceptableRing = true;
+    int connectionType;
+    bool includesFixedRingNode;
 
-        // find connection type and assign a,b
+    while (isPickingAcceptableRing)
+    {
+        includesFixedRingNode = false;
+        int node0 = randomNode(randomGenerator);
+        int node0NumConnections = networkA.nodes[node0].netCnxs.n;
 
-        if (cnd0 == 3 && cnd1 == 3)
-        {
-            cnxType = 33;
-            a = n0;
-            b = n1;
-        }
-        else if (cnd0 == 4 && cnd1 == 4)
-        {
-            cnxType = 44;
-            a = n0;
-            b = n1;
-        }
-        else if (cnd0 == 3 && cnd1 == 4)
-        {
-            cnxType = 43;
-            a = n1;
-            b = n0;
-        }
-        else if (cnd0 == 4 && cnd1 == 3)
-        {
-            cnxType = 43;
-            a = n0;
-            b = n1;
-        }
-        else
-            throw std::runtime_error("Error in random connection - incorrect coordinations");
+        // Set up a uniform distribution to select a random connection from node0
+        std::uniform_int_distribution<int> randomConnection(0, node0NumConnections - 1);
+        int node1 = networkA.nodes[node0].netCnxs[randomConnection(randomGenerator)];
+        int node1NumConnections = networkA.nodes[node1].netCnxs.n;
 
-        // get nodes in dual in random orientation
+        // Assign values to nodeA, nodeB, and connectionType based on the connections of node0 and node1
+        assignValues(nodeA, nodeB, connectionType, node0, node1, node0NumConnections, node1NumConnections);
+
+        // Set up a uniform distribution to select a random direction
         std::uniform_int_distribution<int> randomDirection(0, 1);
-        VecR<int> common = vCommonValues(networkA.nodes[a].dualCnxs, networkA.nodes[b].dualCnxs);
-        if (common.n == 2)
+        VecR<int> commonNodes = vCommonValues(networkA.nodes[nodeA].dualCnxs, networkA.nodes[nodeB].dualCnxs);
+        if (commonNodes.n == 2)
         {
-            int randIndex = randomDirection(gen);
-            u = common[randIndex];
-            v = common[1 - randIndex];
+            int randomIndex = randomDirection(randomGenerator);
+            nodeU = commonNodes[randomIndex];
+            nodeV = commonNodes[1 - randomIndex];
         }
         else
         {
             wrapCoordinates();
             syncCoordinates();
             write("debug");
-            std::cout << a << " " << b << " " << common << std::endl;
+            std::cout << nodeA << " " << nodeB << " " << commonNodes << std::endl;
             throw std::runtime_error("Error in random connection - incorrect dual ids");
         }
 
-        int fixed_ring;
+        int fixedRingIndex;
+        // Check if any of the fixedRings nodes include nodeA or nodeB
         for (int i = 0; i < fixedRings.n; ++i)
         {
-            fixed_ring = fixedRings[i];
-            for (int j = 0; j < networkB.nodes[fixed_ring].dualCnxs.n; ++j)
+            fixedRingIndex = fixedRings[i];
+            auto it = std::find_if(networkB.nodes[fixedRingIndex].dualCnxs.begin(), networkB.nodes[fixedRingIndex].dualCnxs.end(),
+                                   [nodeA, nodeB](int val)
+                                   { return val == nodeA || val == nodeB; });
+            if (it != networkB.nodes[fixedRingIndex].dualCnxs.end())
             {
-
-                if (a == networkB.nodes[fixed_ring].dualCnxs[j] || b == networkB.nodes[fixed_ring].dualCnxs[j])
-                {
-                    includesFixed = true;
-                }
+                includesFixedRingNode = true;
             }
         }
-        if (!includesFixed)
+        if (!includesFixedRingNode)
         {
-            picking_acceptable_ring = false;
+            isPickingAcceptableRing = false;
         }
     }
-
-    return cnxType;
+    return connectionType;
 }
-
-// pick weighted Cnx
-// pick sequential Cnxs
 
 // Select nodes forming a random edge in lattice A, and linked nodes in lattice B, for coordinations >=2
 int LinkedNetwork::pickRandomCnx(int &a, int &b, int &u, int &v, std::mt19937 &gen)
@@ -1515,32 +1496,29 @@ void LinkedNetwork::switchCnx44(VecF<int> switchIdsA, VecF<int> switchIdsB)
 {
 
     // unpck parameters
-    int a, b, c, d, e, f, g, h;
-    int u, v, w, x, y, z;
-    a = switchIdsA[0];
-    b = switchIdsA[1];
-    c = switchIdsA[2];
-    d = switchIdsA[3];
-    e = switchIdsA[4];
-    f = switchIdsA[5];
-    g = switchIdsA[6];
-    h = switchIdsA[7];
-    u = switchIdsB[0];
-    v = switchIdsB[1];
-    w = switchIdsB[2];
-    x = switchIdsB[3];
-    y = switchIdsB[4];
-    z = switchIdsB[5];
+    int a = switchIdsA[0];
+    int b = switchIdsA[1];
+    int c = switchIdsA[2];
+    int d = switchIdsA[3];
+    int e = switchIdsA[4];
+    int f = switchIdsA[5];
+    int g = switchIdsA[6];
+    int h = switchIdsA[7];
+    int u = switchIdsB[0];
+    int v = switchIdsB[1];
+    int w = switchIdsB[2];
+    int x = switchIdsB[3];
+    int y = switchIdsB[4];
+    int z = switchIdsB[5];
 
     // Apply changes to descriptors due to breaking connections
     // For network A node distribution and edge distribution will remain unchanged
 
     // For network B node and edge distribution will change
-    int nu, nv, nw, nx;
-    nu = networkB.nodes[u].netCnxs.n;
-    nv = networkB.nodes[v].netCnxs.n;
-    nw = networkB.nodes[w].netCnxs.n;
-    nx = networkB.nodes[x].netCnxs.n;
+    int nu = networkB.nodes[u].netCnxs.n;
+    int nv = networkB.nodes[v].netCnxs.n;
+    int nw = networkB.nodes[w].netCnxs.n;
+    int nx = networkB.nodes[x].netCnxs.n;
     --networkB.nodeDistribution[nu];
     --networkB.nodeDistribution[nv];
     --networkB.nodeDistribution[nw];
@@ -1667,39 +1645,35 @@ void LinkedNetwork::switchCnx43(VecF<int> switchIdsA, VecF<int> switchIdsB)
 {
 
     // unpck parameters
-    int a, b, c, d, e, f, g;
-    int u, v, w, x, y;
-    a = switchIdsA[0];
-    b = switchIdsA[1];
-    c = switchIdsA[2];
-    d = switchIdsA[3];
-    e = switchIdsA[4];
-    f = switchIdsA[5];
-    g = switchIdsA[6];
-    u = switchIdsB[0];
-    v = switchIdsB[1];
-    w = switchIdsB[2];
-    x = switchIdsB[3];
-    y = switchIdsB[4];
+    int a = switchIdsA[0];
+    int b = switchIdsA[1];
+    int c = switchIdsA[2];
+    int d = switchIdsA[3];
+    int e = switchIdsA[4];
+    int f = switchIdsA[5];
+    int g = switchIdsA[6];
+    int u = switchIdsB[0];
+    int v = switchIdsB[1];
+    int w = switchIdsB[2];
+    int x = switchIdsB[3];
+    int y = switchIdsB[4];
 
     // Apply changes to descriptors due to breaking connections
     // For network A node distribution will remain unchanged but edge distribution will change
-    int na, nb, nd, ne;
-    na = networkA.nodes[a].netCnxs.n;
-    nb = networkA.nodes[b].netCnxs.n;
-    nd = networkA.nodes[d].netCnxs.n;
-    ne = networkA.nodes[e].netCnxs.n;
+    int na = networkA.nodes[a].netCnxs.n;
+    int nb = networkA.nodes[b].netCnxs.n;
+    int nd = networkA.nodes[d].netCnxs.n;
+    int ne = networkA.nodes[e].netCnxs.n;
     --networkA.edgeDistribution[na][ne];
     --networkA.edgeDistribution[nb][nd];
     --networkA.edgeDistribution[ne][na];
     --networkA.edgeDistribution[nd][nb];
 
     // For network B node and edge distribution will change
-    int nu, nv, nw, nx;
-    nu = networkB.nodes[u].netCnxs.n;
-    nv = networkB.nodes[v].netCnxs.n;
-    nw = networkB.nodes[w].netCnxs.n;
-    nx = networkB.nodes[x].netCnxs.n;
+    int nu = networkB.nodes[u].netCnxs.n;
+    int nv = networkB.nodes[v].netCnxs.n;
+    int nw = networkB.nodes[w].netCnxs.n;
+    int nx = networkB.nodes[x].netCnxs.n;
     --networkB.nodeDistribution[nu];
     --networkB.nodeDistribution[nv];
     --networkB.nodeDistribution[nw];
@@ -1825,28 +1799,24 @@ void LinkedNetwork::switchCnx43(VecF<int> switchIdsA, VecF<int> switchIdsB)
 // Mix connectivities to exchange 3/4 coordination nodes
 void LinkedNetwork::mixCnx34(VecF<int> mixIdsA, VecF<int> mixIdsB)
 {
-
     // unpck parameters
-    int a, b, c, d, e, f, g;
-    int u, v, w, x, y;
-    a = mixIdsA[0];
-    b = mixIdsA[1];
-    c = mixIdsA[2];
-    d = mixIdsA[3];
-    e = mixIdsA[4];
-    f = mixIdsA[5];
-    g = mixIdsA[6];
-    u = mixIdsB[0];
-    v = mixIdsB[1];
-    w = mixIdsB[2];
-    x = mixIdsB[3];
-    y = mixIdsB[4];
+    int a = mixIdsA[0];
+    int b = mixIdsA[1];
+    int c = mixIdsA[2];
+    int d = mixIdsA[3];
+    int e = mixIdsA[4];
+    int f = mixIdsA[5];
+    int g = mixIdsA[6];
+    int u = mixIdsB[0];
+    int v = mixIdsB[1];
+    int w = mixIdsB[2];
+    int x = mixIdsB[3];
+    int y = mixIdsB[4];
 
     // Apply changes to descriptors due to breaking connections
     // For network A node distribution will remain unchanged but edge distribution will change
-    int na, nb;
-    na = networkA.nodes[a].netCnxs.n;
-    nb = networkA.nodes[b].netCnxs.n;
+    int na = networkA.nodes[a].netCnxs.n;
+    int nb = networkA.nodes[b].netCnxs.n;
     for (int i = 0; i < na; ++i)
     {
         int id = networkA.nodes[a].netCnxs[i];
@@ -1865,9 +1835,8 @@ void LinkedNetwork::mixCnx34(VecF<int> mixIdsA, VecF<int> mixIdsB)
     }
 
     // For network B node and edge distribution will change
-    int nv, nw;
-    nv = networkB.nodes[v].netCnxs.n;
-    nw = networkB.nodes[w].netCnxs.n;
+    int nv = networkB.nodes[v].netCnxs.n;
+    int nw = networkB.nodes[w].netCnxs.n;
     --networkB.nodeDistribution[nv];
     --networkB.nodeDistribution[nw];
     for (int i = 0; i < nv; ++i)
@@ -2322,7 +2291,7 @@ VecF<int> LinkedNetwork::SpiralmonteCarloSwitchMoveLAMMPS(int a, double &SimpleG
         }
         else
         {
-            VecF<double> gpe = globalPotentialEnergy(0, isMaintainConvexityEnabled, networkA);
+            VecF<double> gpe = globalPotentialEnergy(0, isMaintainConvexityEnabled, networkA, logger);
             logger->info("Simple Graphene : {} ({})", SimpleGraphene.GlobalPotentialEnergy(), gpe[2]);
         }
     }
@@ -2483,7 +2452,7 @@ VecF<int> LinkedNetwork::SpiralmonteCarloSwitchMoveLAMMPS(int a, double &SimpleG
 
         if (isOpenMPIEnabled)
         {
-            optStatus_networkA = localGeometryOptimisation(a, b, goptParamsA[1], false, isMaintainConvexityEnabled);
+            optStatus_networkA = localGeometryOptimisation(a, b, goptParamsA[1], false, isMaintainConvexityEnabled, logger);
 #pragma omp parallel num_threads(3)
             {
                 if (omp_get_thread_num() == 0 && isTriangleRaftEnabled)
@@ -2518,7 +2487,7 @@ VecF<int> LinkedNetwork::SpiralmonteCarloSwitchMoveLAMMPS(int a, double &SimpleG
             {
                 optStatus_BN = BN.GlobalPotentialEnergy();
             }
-            optStatus_networkA = localGeometryOptimisation(a, b, goptParamsA[1], 0, isMaintainConvexityEnabled);
+            optStatus_networkA = localGeometryOptimisation(a, b, goptParamsA[1], 0, isMaintainConvexityEnabled, logger);
         }
 
         if (isSimpleGrapheneEnabled)
@@ -2882,7 +2851,7 @@ VecF<int> LinkedNetwork::monteCarloSwitchMoveLAMMPS(double &SimpleGrapheneEnergy
 
         if (isOpenMPIEnabled)
         {
-            optStatus_networkA = localGeometryOptimisation(a, b, goptParamsA[1], false, isMaintainConvexityEnabled);
+            optStatus_networkA = localGeometryOptimisation(a, b, goptParamsA[1], false, isMaintainConvexityEnabled, logger);
 #pragma omp parallel num_threads(3)
             {
 
@@ -2919,7 +2888,7 @@ VecF<int> LinkedNetwork::monteCarloSwitchMoveLAMMPS(double &SimpleGrapheneEnergy
             {
                 optStauts_BN = BN.GlobalPotentialMinimisation();
             }
-            optStatus_networkA = localGeometryOptimisation(a, b, goptParamsA[1], 0, isMaintainConvexityEnabled);
+            optStatus_networkA = localGeometryOptimisation(a, b, goptParamsA[1], 0, isMaintainConvexityEnabled, logger);
         }
         if (isSimpleGrapheneEnabled)
             SimpleGrapheneEnergy = SimpleGraphene.GlobalPotentialEnergy();
@@ -3131,8 +3100,8 @@ VecF<int> LinkedNetwork::monteCarloSwitchMove(Network network, double &energy, L
     if (geometryOK)
     {
 
-        optStatus = globalGeometryOptimisation(false, false, network);
-        energy = globalPotentialEnergy(0, isMaintainConvexityEnabled, network);
+        optStatus = globalGeometryOptimisation(false, false, network, logger);
+        energy = globalPotentialEnergy(0, isMaintainConvexityEnabled, network, logger);
     }
     else
         energy = std::numeric_limits<double>::infinity();
@@ -3173,7 +3142,7 @@ VecF<int> LinkedNetwork::monteCarloSwitchMove(Network network, double &energy, L
 }
 
 // Single monte carlo mixing move
-VecF<int> LinkedNetwork::monteCarloMixMove(double &energy)
+VecF<int> LinkedNetwork::monteCarloMixMove(double &energy, LoggerPtr logger)
 {
 
     /* Single MC mix move (exchange 3<->4 coordination)
@@ -3226,7 +3195,7 @@ VecF<int> LinkedNetwork::monteCarloMixMove(double &energy)
     // UnisMaintainConvexityEnableded local optimisation of switched atoms
     if (geometryOK)
     {
-        optStatus = localGeometryOptimisation(a, b, 1, false, false); // bond switch atoms only
+        optStatus = localGeometryOptimisation(a, b, 1, false, false, logger); // bond switch atoms only
         if (isMaintainConvexityEnabled)
         {
             for (int i = 0; i < mixIdsA.n; ++i)
@@ -3245,8 +3214,8 @@ VecF<int> LinkedNetwork::monteCarloMixMove(double &energy)
     // isMaintainConvexityEnableded optimisation of local region
     if (geometryOK)
     {
-        optStatus = localGeometryOptimisation(a, b, goptParamsA[1], 0, isMaintainConvexityEnabled); // wider area
-        energy = globalPotentialEnergy(0, isMaintainConvexityEnabled, networkA);
+        optStatus = localGeometryOptimisation(a, b, goptParamsA[1], 0, isMaintainConvexityEnabled, logger); // wider area
+        energy = globalPotentialEnergy(0, isMaintainConvexityEnabled, networkA, logger);
     }
     else
         energy = std::numeric_limits<double>::infinity();
@@ -3280,21 +3249,22 @@ VecF<int> LinkedNetwork::monteCarloMixMove(double &energy)
 }
 
 // Calculate potential energy of entire system
-double LinkedNetwork::globalPotentialEnergy(bool useIntx, bool isMaintainConvexityEnabledArg, Network network)
+double LinkedNetwork::globalPotentialEnergy(bool useIntx, bool isMaintainConvexityEnabledArg, Network network, LoggerPtr logger)
 {
 
     /* Potential model
      * Bonds as harmonic
      * Angles as harmonic
      * Local line intersections */
-    int maxCnxs = network.maxNetCnxs;
 
     // Set up potential model
     // Bond and angle harmonics
+    logger->info("Creating vectors");
     VecR<int> bonds(0, network.nodes.n * 6);
-    VecR<int> angles(0, network.nodes.n * maxCnxs * 3);
+    logger->info("network.nodes.n= {}, network.maxNetCnxs = {}", network.nodes.n, network.maxNetCnxs);
+    VecR<int> angles(0, network.nodes.n * network.maxNetCnxs * 3);
     VecR<double> bondParams(0, network.nodes.n * 6);
-    VecR<double> angleParams(0, network.nodes.n * maxCnxs * 3);
+    VecR<double> angleParams(0, network.nodes.n * network.maxNetCnxs * 3);
     if (network.nodes.n > networkA.nodes.n)
     {
         for (int i = 0; i < network.nodes.n; ++i)
@@ -3306,7 +3276,7 @@ double LinkedNetwork::globalPotentialEnergy(bool useIntx, bool isMaintainConvexi
     {
         for (int i = 0; i < network.nodes.n; ++i)
         {
-            generateHarmonics(i, bonds, bondParams, angles, angleParams, network);
+            generateHarmonics(i, bonds, bondParams, angles, angleParams, network, logger);
         }
     }
     // Intersections
@@ -3338,7 +3308,7 @@ double LinkedNetwork::globalPotentialEnergy(bool useIntx, bool isMaintainConvexi
         intx[i] = intersections[i];
 
     // Potential model based on geometry code
-    double potEnergy;
+    double potEnergy = 0.0;
     if (network.geometryCode == "2DE")
     {
         if (!isMaintainConvexityEnabledArg)
@@ -3383,6 +3353,11 @@ double LinkedNetwork::globalPotentialEnergy(bool useIntx, bool isMaintainConvexi
             potModel.setIntersections(intx, intxP);
         potEnergy = potModel.function(crds);
     }
+    else
+    {
+        logger->critical("Not yet implemented geometry code: {}", network.geometryCode);
+        throw std::runtime_error("Not yet implemented");
+    }
     // Convexity
     if (isMaintainConvexityEnabledArg)
     {
@@ -3394,7 +3369,8 @@ double LinkedNetwork::globalPotentialEnergy(bool useIntx, bool isMaintainConvexi
 }
 
 // Geometry optimise entire system
-VecF<int> LinkedNetwork::globalGeometryOptimisation(bool useIntx, bool isMaintainConvexityEnabled, Network network)
+VecF<int> LinkedNetwork::globalGeometryOptimisation(bool useIntx, bool isMaintainConvexityEnabledArg,
+                                                    Network network, LoggerPtr logger)
 {
     auto start_GEO = std::chrono::system_clock::now();
     /* Potential model
@@ -3404,8 +3380,10 @@ VecF<int> LinkedNetwork::globalGeometryOptimisation(bool useIntx, bool isMaintai
     int maxCnxs = network.maxNetCnxs;
     // Set up potential model
     // Bond and angle harmonics
-    VecR<int> bonds(0, network.nodes.n * maxCnxs * 2), angles(0, network.nodes.n * maxCnxs * 3);
-    VecR<double> bondParams(0, network.nodes.n * maxCnxs * 3), angleParams(0, network.nodes.n * maxCnxs * 3);
+    VecR<int> bonds(0, network.nodes.n * maxCnxs * 2);
+    VecR<int> angles(0, network.nodes.n * maxCnxs * 3);
+    VecR<double> bondParams(0, network.nodes.n * maxCnxs * 3);
+    VecR<double> angleParams(0, network.nodes.n * maxCnxs * 3);
     if (network.nodes.n > networkA.nodes.n)
     {
         for (int i = 0; i < network.nodes.n; ++i)
@@ -3417,7 +3395,7 @@ VecF<int> LinkedNetwork::globalGeometryOptimisation(bool useIntx, bool isMaintai
     {
         for (int i = 0; i < network.nodes.n; ++i)
         {
-            generateHarmonics(i, bonds, bondParams, angles, angleParams, network);
+            generateHarmonics(i, bonds, bondParams, angles, angleParams, network, logger);
         }
     }
     // Intersections
@@ -3446,7 +3424,7 @@ VecF<int> LinkedNetwork::globalGeometryOptimisation(bool useIntx, bool isMaintai
     // Geometry optimise
     if (network.geometryCode == "2DE")
     {
-        if (!isMaintainConvexityEnabled)
+        if (!isMaintainConvexityEnabledArg)
         {
             HI2DP potModel(network.pb[0], network.pb[1]);
             potModel.setBonds(bnds, bndP);
@@ -3529,7 +3507,7 @@ VecF<int> LinkedNetwork::globalGeometryOptimisation(bool useIntx, bool isMaintai
     }
     else if (network.geometryCode == "2DEtr")
     {
-        std::cout << "Minimise Triangle Raft" << std::endl;
+        logger->info("Minimising Triangle Raft...");
         HLJ2DP potModel(network.pb[0], network.pb[1]);
         potModel.setBonds(bnds, bndP);
         if (potModel.function(crds) < std::numeric_limits<double>::infinity())
@@ -3545,13 +3523,13 @@ VecF<int> LinkedNetwork::globalGeometryOptimisation(bool useIntx, bool isMaintai
     }
     auto end_GEO = std::chrono::system_clock::now();
     std::chrono::duration<double> elapsed_GEO = end_GEO - start_GEO;
-    std::cout << "GEO took " << elapsed_GEO.count() << std::endl;
+    logger->info("Global geometry optimisation took {} seconds", elapsed_GEO.count());
     return optStatus;
 }
 
 // Geometry optimise subsection of system by only including interactions in a specified range
 VecF<int> LinkedNetwork::localGeometryOptimisation(int centreA, int centreB, int extent,
-                                                   bool useIntx, bool isMaintainConvexityEnabled)
+                                                   bool useIntx, bool isMaintainConvexityEnabledArg, LoggerPtr logger)
 {
     /* Find three regions
      * 1) local (full interactions)
@@ -3570,11 +3548,11 @@ VecF<int> LinkedNetwork::localGeometryOptimisation(int centreA, int centreB, int
     VecR<double> angleParams(0, reserveSize);
     for (int i = 0; i < local.n; ++i)
     {
-        generateHarmonics(local[i], bonds, bondParams, angles, angleParams, networkA);
+        generateHarmonics(local[i], bonds, bondParams, angles, angleParams, networkA, logger);
     }
     for (int i = 0; i < fixedInner.n; ++i)
     {
-        generateHarmonics(fixedInner[i], bonds, bondParams, angles, angleParams, networkA);
+        generateHarmonics(fixedInner[i], bonds, bondParams, angles, angleParams, networkA, logger);
     }
 
     // Intersections - Expensive, turn off and use in global potential energy
@@ -3605,7 +3583,7 @@ VecF<int> LinkedNetwork::localGeometryOptimisation(int centreA, int centreB, int
 
     // Geometry optimise
     VecF<int> optStatus(2);
-    if (!isMaintainConvexityEnabled)
+    if (!isMaintainConvexityEnabledArg)
     {
         HI2DP potModel(networkA.pb[0], networkA.pb[1]);
         potModel.setBonds(bnds, bndP);
@@ -3647,20 +3625,20 @@ VecF<int> LinkedNetwork::localGeometryOptimisation(int centreA, int centreB, int
 }
 
 // Generate harmonic potentials corresponding to bonds and angles associated with a given node in lattice A
-void LinkedNetwork::generateHarmonics(int id, VecR<int> &bonds, VecR<double> &bondParams, VecR<int> &angles, VecR<double> &angleParams, Network network)
+void LinkedNetwork::generateHarmonics(int id, VecR<int> &bonds, VecR<double> &bondParams, VecR<int> &angles,
+                                      VecR<double> &angleParams, Network network, LoggerPtr logger)
 {
-
     // Potential parameters
     double bk = potParamsB[0];
     double br = potParamsB[1]; // bond k and r0
-    double bk0 = bk;
     double br0 = sqrt(3) * br;
     double ak;
     double act; // angle k, cos theta0
-
     // Harmonics
     int cnd; // coordination
-    int id0 = id, id1, id2;
+    int id0 = id;
+    int id1;
+    int id2;
     cnd = network.nodes[id0].netCnxs.n;
     ak = potParamsA[0];
     act = cos(2.0 * M_PI / cnd);
@@ -3703,12 +3681,13 @@ void LinkedNetwork::generateHarmonicsOnly(int id, VecR<int> &bonds, VecR<double>
     // Potential parameters
     double bk = potParamsB[0];
     double br = potParamsB[1]; // bond k and r0
-    double bk0 = bk;
     double br0 = sqrt(3) * br;
 
     // Harmonics
     int cnd; // coordination
-    int id0 = id, id1, id2;
+    int id0 = id;
+    int id1;
+    int id2;
     cnd = network.nodes[id0].netCnxs.n;
 
     int sio_bond_count = 0;
@@ -3907,7 +3886,7 @@ void LinkedNetwork::syncCoordinatesTD()
 }
 
 // Get normalised probability distribution of nodes of each size in given lattice
-VecF<double> LinkedNetwork::getNodeDistribution(const std::string &lattice)
+VecF<double> LinkedNetwork::getNodeDistribution(std::string_view lattice)
 {
     if (lattice == "A")
         return networkA.getNodeDistribution();
@@ -3916,7 +3895,7 @@ VecF<double> LinkedNetwork::getNodeDistribution(const std::string &lattice)
 }
 
 // Get unnormalised probability distribution of node connections in given lattice
-VecF<VecF<int>> LinkedNetwork::getEdgeDistribution(const std::string &lattice)
+VecF<VecF<int>> LinkedNetwork::getEdgeDistribution(std::string_view lattice)
 {
 
     if (lattice == "A")
@@ -3926,7 +3905,7 @@ VecF<VecF<int>> LinkedNetwork::getEdgeDistribution(const std::string &lattice)
 }
 
 // Get Aboav-Weaire fitting parameters
-VecF<double> LinkedNetwork::getAboavWeaire(const std::string &lattice)
+VecF<double> LinkedNetwork::getAboavWeaire(std::string_view lattice)
 {
 
     if (lattice == "A")
@@ -3936,7 +3915,7 @@ VecF<double> LinkedNetwork::getAboavWeaire(const std::string &lattice)
 }
 
 // Get assortativity
-double LinkedNetwork::getAssortativity(const std::string &lattice)
+double LinkedNetwork::getAssortativity(std::string_view lattice)
 {
 
     if (lattice == "A")
@@ -3946,7 +3925,7 @@ double LinkedNetwork::getAssortativity(const std::string &lattice)
 }
 
 // Get alpha estimate
-double LinkedNetwork::getAboavWeaireEstimate(const std::string &lattice)
+double LinkedNetwork::getAboavWeaireEstimate(std::string_view lattice)
 {
 
     if (lattice == "A")
@@ -3956,7 +3935,7 @@ double LinkedNetwork::getAboavWeaireEstimate(const std::string &lattice)
 }
 
 // Get entropy
-VecF<double> LinkedNetwork::getEntropy(const std::string &lattice)
+VecF<double> LinkedNetwork::getEntropy(std::string_view lattice)
 {
 
     if (lattice == "A")
@@ -3966,7 +3945,7 @@ VecF<double> LinkedNetwork::getEntropy(const std::string &lattice)
 }
 
 // Get cluster information
-double LinkedNetwork::getMaxCluster(const std::string &lattice, int nodeCnd)
+double LinkedNetwork::getMaxCluster(std::string_view lattice, int nodeCnd)
 {
 
     if (lattice == "A")
@@ -3976,7 +3955,7 @@ double LinkedNetwork::getMaxCluster(const std::string &lattice, int nodeCnd)
 }
 
 // Get cluster information
-VecF<int> LinkedNetwork::getMaxClusters(const std::string &lattice, int minCnd, int maxCnd)
+VecF<int> LinkedNetwork::getMaxClusters(std::string_view lattice, int minCnd, int maxCnd)
 {
 
     if (lattice == "A")
