@@ -5,8 +5,17 @@
 #include <unistd.h>
 #include <fstream>
 
+/**
+ * @brief Default constructor for a blank Lammps Object
+ */
 LammpsObject::LammpsObject() = default;
 
+/**
+ * @brief Constructor for a Lammps Object
+ * @param selector The selector for the structure to be created
+ * @param inputFolder The folder containing the input files
+ * @param logger The logger object
+ */
 LammpsObject::LammpsObject(const std::string &selector, const std::string &inputFolder, const LoggerPtr logger)
 {
     logger->info("Creating Lammps Object");
