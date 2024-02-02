@@ -5,6 +5,10 @@
 #include <iostream>
 #include <limits>
 #include <cmath>
+#include <sstream>
+#include <spdlog/spdlog.h>
+
+using LoggerPtr = std::shared_ptr<spdlog::logger>;
 
 // Vector class
 template <typename T>
@@ -61,6 +65,8 @@ public:
             output << source.v[i] << std::endl;
         return output;
     };
+
+    void toLog(LoggerPtr logger);
 };
 
 #include "vecf.tpp"

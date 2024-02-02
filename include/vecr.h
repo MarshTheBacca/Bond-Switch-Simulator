@@ -5,6 +5,10 @@
 #include <iostream>
 #include <limits>
 #include <cmath>
+#include <sstream>
+#include <spdlog/spdlog.h>
+
+using LoggerPtr = std::shared_ptr<spdlog::logger>;
 
 /* Vector class with reserved size
  * Maximum size defines limit on the number of values
@@ -15,8 +19,9 @@ class VecR
 
 public:
     // Data members
-    int n, nMax; // number of values, maximum number of values
-    T *v;        // values
+    int n;    // number of values
+    int nMax; // maximum number of values
+    T *v;     // values
 
     // Constructors, copy constructor, destructor
     VecR();
@@ -63,6 +68,8 @@ public:
     VecR operator/(const VecR &source);
     // Unary operators
     VecR operator-();
+    T *begin() { return v; }
+    T *end() { return v + n; }
 
     // Stream
     friend std::ostream &operator<<(std::ostream &output, const VecR &source)
@@ -71,6 +78,8 @@ public:
             output << source.v[i] << std::endl;
         return output;
     };
+
+    void toLog(LoggerPtr logger);
 };
 
 #include "vecr.tpp"

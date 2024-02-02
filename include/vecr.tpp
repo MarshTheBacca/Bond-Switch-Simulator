@@ -3,7 +3,10 @@
 #include <sstream>
 // ##### VECTOR RESERVED SIZE CLASS #####
 
-// Default constructor
+/**
+ * @brief Default constructor for an empty VecR object with a maximum size of 1
+ * @typedef T The type of the vector
+ */
 template <typename T>
 VecR<T>::VecR()
 {
@@ -12,7 +15,11 @@ VecR<T>::VecR()
     this->v = new T[this->nMax]();
 }
 
-// Construct with maximum size
+/**
+ * @brief Construct a new VecR object with a given maximum size
+ * @param maxSize The maximum size of the vector
+ * @typedef T The type of the vector
+ */
 template <typename T>
 VecR<T>::VecR(int maxSize)
 {
@@ -23,7 +30,12 @@ VecR<T>::VecR(int maxSize)
     this->v = new T[this->nMax]();
 }
 
-// Construct with size and maximum size
+/**
+ * @brief Construct a new VecR object with a given size and maximum size
+ * @param size The size of the vector
+ * @param maxSize The maximum size of the vector
+ * @typedef T The type of the vector
+ */
 template <typename T>
 VecR<T>::VecR(int size, int maxSize)
 {
@@ -34,7 +46,11 @@ VecR<T>::VecR(int size, int maxSize)
     this->v = new T[this->nMax]();
 }
 
-// Construct from VecR
+/**
+ * @brief Construct a new VecR object by copying another
+ * @param source The source VecR object
+ * @typedef T The type of the vector
+ */
 template <typename T>
 VecR<T>::VecR(const VecR &source)
 {
@@ -45,7 +61,10 @@ VecR<T>::VecR(const VecR &source)
         this->v[i] = source.v[i];
 }
 
-// Destructor, clear allocated memory
+/**
+ * @brief Destroy the VecR object
+ * @typedef T The type of the vector
+ */
 template <typename T>
 VecR<T>::~VecR()
 {
@@ -59,62 +78,79 @@ bool VecR<T>::equals(const T &a, const T &b)
     return a == b || abs(a - b) < abs(std::min(a, b)) * std::numeric_limits<T>::epsilon();
 }
 
-// Set current size of vector
+/**
+ * @brief Set the current size of the vector
+ * @param size The new size of the vector
+ * @typedef T The type of the vector
+ */
 template <typename T>
 void VecR<T>::setSize(int size)
 {
     if (size > this->nMax)
-        throw std::runtime_error("Cannot set vector size larger than reserved size");
+    {
+        std::stringstream ss;
+        ss << "Cannot set vector size larger than reserved size, nMax = " << this->nMax;
+        throw std::runtime_error(ss.str());
+    }
     this->n = size;
 }
 
-// Reset maximum size of vector
+/**
+ * @brief Reset the maximum size of the vector
+ * @param maxSize The new maximum size of the vector, setting additional values to 0
+ * @typedef T The type of the vector
+ */
 template <typename T>
 void VecR<T>::resetMaxSize(int maxSize)
 {
     if (maxSize != this->nMax)
     {
-        T *vCopy = new T[this->n]();
-        for (int i = 0; i < this->n; ++i)
-            vCopy[i] = this->v[i];
-        delete[] this->v;
+        auto newV = std::make_unique<T[]>(maxSize);
+        std::copy(this->v, this->v + this->n, newV.get());
         this->nMax = maxSize;
-        this->v = new T[this->nMax]();
-        for (int i = 0; i < this->n; ++i)
-            this->v[i] = vCopy[i];
-        delete[] vCopy;
+        this->v = newV.release();
     }
 }
 
-// Add value to end of vector
+/**
+ * @brief Add a value to the end of the vector
+ * @param value The value to add
+ * @typedef T The type of the vector
+ */
 template <typename T>
 void VecR<T>::addValue(T value)
 {
     if (this->n == this->nMax)
-        throw std::runtime_error("Cannot add to vector to make larger than reserved size");
+    {
+        std::stringstream ss;
+        ss << "Cannot add to vector to make larger than reserved size, nMax = " << this->nMax;
+        throw std::runtime_error(ss.str());
+    }
     this->v[this->n] = value;
     ++this->n;
 }
 
-// Deletes first instance of value from vector
+/**
+ * @brief Delete the first instance of a value from the vector
+ * @param value The value to delete
+ * @typedef T The type of the vector
+ */
 template <typename T>
 void VecR<T>::delValue(T value)
 {
-    bool del = false;
     int d;
-    for (int i = 0; i < this->n; ++i)
+    for (d = 0; d < this->n; ++d)
     {
-        if (equals(this->v[i], value))
+        if (equals(this->v[d], value))
         {
-            d = i;
-            del = true;
             break;
         }
     }
-    if (!del)
+    if (d == this->n)
+    {
         throw std::runtime_error("Cannot delete value as not present in vector");
-    for (int i = d; i < this->n - 1; ++i)
-        this->v[i] = this->v[i + 1];
+    }
+    std::move(this->v + d + 1, this->v + this->n, this->v + d);
     --this->n;
 }
 
@@ -209,12 +245,9 @@ void VecR<T>::swapValue(T vDel, T vAdd, T vBetween0, T vBetween1)
             swap = true;
         }
     }
-
     if (swap)
         return;
-
-    if (!swap)
-        std::cout << "Sequence not present in vector" << std::endl;
+    std::cout << "Sequence not present in vector" << std::endl;
     throw std::runtime_error("Cannot swap value between values as sequence not present in vector");
 }
 
@@ -492,4 +525,23 @@ VecR<T> VecR<T>::operator-()
     for (int i = 0; i < this->n; ++i)
         vec[i] = -this->v[i];
     return vec;
+}
+
+/**
+ * @brief Log the vector to the console
+ * @param logger The logger to use
+ */
+template <typename T>
+void VecR<T>::toLog(LoggerPtr logger)
+{
+    std::stringstream ss;
+    ss << "[";
+    for (int i = 0; i < this->n; ++i)
+    {
+        ss << this->v[i];
+        if (i < this->n - 1)
+            ss << ", ";
+    }
+    ss << "]";
+    logger->info(ss.str());
 }

@@ -1,5 +1,4 @@
 #include "vecf.h"
-
 // ##### VECTOR FIXED SIZE CLASS #####
 
 // Default constructor
@@ -281,4 +280,22 @@ VecF<T> VecF<T>::operator-()
     for (int i = 0; i < this->n; ++i)
         vec[i] = -this->v[i];
     return vec;
+}
+/**
+ * @brief Log the vector to the console
+ * @param logger The logger to use
+ */
+template <typename T>
+void VecF<T>::toLog(LoggerPtr logger)
+{
+    std::stringstream ss;
+    ss << "[";
+    for (int i = 0; i < this->n; ++i)
+    {
+        ss << this->v[i];
+        if (i < this->n - 1)
+            ss << ", ";
+    }
+    ss << "]";
+    logger->info(ss.str());
 }
