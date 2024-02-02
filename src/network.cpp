@@ -18,7 +18,7 @@ Network::Network(int nNodes, int maxCnxs)
 }
 
 // Construct with choice of default lattice
-Network::Network(int nNodes, const std::string &lattice, int maxCnxs, LoggerPtr logger)
+Network::Network(int nNodes, std::string_view lattice, int maxCnxs, LoggerPtr logger)
 {
     if (lattice == "triangular")
         initialiseTriangularLattice(sqrt(nNodes), maxCnxs);
@@ -495,7 +495,6 @@ void Network::initialiseTriangularLattice(int dim, int &maxCnxs)
 Network Network::constructDual(int maxCnxs, LoggerPtr logger)
 {
     // Doesn't need to be very optimised as only used during initialisation
-
     // find number of unique dual nodes and initialise
     int nNodes = -1;
     for (int i = 0; i < nodes.n; ++i)

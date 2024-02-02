@@ -42,7 +42,7 @@ public:
     // Constructors
     Network();
     Network(int nNodes, int maxCnxs);
-    Network(int nNodes, const std::string &lattice, int maxCnxs, LoggerPtr logger);          // construct with default lattice
+    Network(int nNodes, std::string_view lattice, int maxCnxs, LoggerPtr logger);            // construct with default lattice
     Network(const std::string &prefix, int maxNetCnxsA, int maxDualCnxsA, LoggerPtr logger); // construct by loading from files
     Network(VecR<Node> nodesA, VecF<double> pbA, VecF<double> rpbA, const std::string &type, int maxNetCnxsA, int maxDualCnxsA);
 
