@@ -2,7 +2,7 @@ LAMMPS-NetMC input file
 --------------------------------------------------
 I/O
 ./output_files  Output Folder prefix
-testA            	Output File prefix
+test            	Output File prefix
 ./input_files       Input Folder prefix
 testA            	Input File prefix
 true               Create Network from scratch?

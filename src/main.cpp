@@ -79,6 +79,9 @@ int main(int argc, char *argv[])
     if (inputData.isFromScratchEnabled)
     {
         logger->info("Creating network from scratch...");
+        logger->info("numRings: {}, minCoordination: {}, maxCoordination: {}, minRingSize: {}, maxRingSize: {}",
+                     inputData.numRings, inputData.minCoordination, inputData.maxCoordination,
+                     inputData.minRingSize, inputData.maxRingSize);
         network = LinkedNetwork(inputData.numRings, inputData.minCoordination, inputData.maxCoordination,
                                 inputData.minRingSize, inputData.maxRingSize,
                                 logger);
@@ -104,7 +107,7 @@ int main(int argc, char *argv[])
     network.findFixedRings(inputData.isFixRingsEnabled, inputData.inputFolder + "/" + inputData.fixedRingsFile, logger);
 
     logger->info("Initialising potential model...");
-    network.initialisePotentialModel(network.networkA, inputData.harmonicAngleForceConstant,
+    network.initialisePotentialModel(inputData.harmonicAngleForceConstant,
                                      inputData.harmonicBondForceConstant,
                                      inputData.harmonicGeometryConstraint,
                                      inputData.isMaintainConvexityEnabled, logger);
@@ -174,9 +177,7 @@ int main(int argc, char *argv[])
     lenHist = 0.0;
     angHist = 0.0;
 
-    // Run monte carlo
-    logger->info("Running Monte Carlo...");
-    logger->info("Initial energy: {}", network.mc.getEnergy());
+    // Initialise Monte Carlo variables
     int numAcceptedMoves = 0;
     int optIterations = 0;
     VecF<int> optCodes(5);
@@ -187,17 +188,19 @@ int main(int argc, char *argv[])
     logger->info("Running Monte Carlo thermalisation...");
     double energy = network.mc.getEnergy();
     logger->info("Initial energy: {}", energy);
+    double SimpleGrapheneEnergy = 0.0;
+    double TersoffGrapheneEnergy = 0.0;
+    double TriangleRaftEnergy = 0.0;
+    double BilayerEnergy = 0.0;
+    double BNEnergy = 0.0;
     try
     {
-
-        double SimpleGrapheneEnergy = 0.0;
-        double TersoffGrapheneEnergy = 0.0;
-        double TriangleRaftEnergy = 0.0;
-        double BilayerEnergy = 0.0;
-        double BNEnergy = 0.0;
+        logger->info("Hi");
         if (inputData.isSimpleGrapheneEnabled)
         {
+            logger->info("Bye");
             SimpleGrapheneEnergy = network.SimpleGraphene.GlobalPotentialEnergy();
+            logger->info("sigh");
         }
         if (inputData.isTersoffGrapheneEnabled)
         {
@@ -297,7 +300,7 @@ int main(int argc, char *argv[])
                                                                 TriangleRaftEnergy, BilayerEnergy, BNEnergy, logger);
             }
             else
-                moveStatus = network.monteCarloMixMove(energy);
+                moveStatus = network.monteCarloMixMove(energy, logger);
 
             if (moveStatus[0])
                 numAcceptedMoves++;
@@ -379,7 +382,7 @@ int main(int argc, char *argv[])
                                                                     BNEnergy, logger);
                 }
                 else
-                    moveStatus = network.monteCarloMixMove(energy);
+                    moveStatus = network.monteCarloMixMove(energy, logger);
                 if (moveStatus[0])
                     numAcceptedMoves++;
                 optCodes[moveStatus[1]] += 1;
