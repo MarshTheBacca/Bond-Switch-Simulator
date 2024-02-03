@@ -2284,23 +2284,23 @@ VecF<int> LinkedNetwork::SpiralmonteCarloSwitchMoveLAMMPS(int a, double &SimpleG
     double saveEnergyBN = BNEnergy;
     if (isSimpleGrapheneEnabled)
     {
-        if (abs(SimpleGrapheneEnergy - SimpleGraphene.GlobalPotentialEnergy()) > 0.001)
+        if (abs(SimpleGrapheneEnergy - SimpleGraphene.globalPotentialEnergy()) > 0.001)
         {
             logger->info("SimpleGraphene - Saved: {} vs Calculated: {}", SimpleGrapheneEnergy,
-                         SimpleGraphene.GlobalPotentialEnergy());
+                         SimpleGraphene.globalPotentialEnergy());
         }
         else
         {
             VecF<double> gpe = globalPotentialEnergy(0, isMaintainConvexityEnabled, networkA, logger);
-            logger->info("Simple Graphene : {} ({})", SimpleGraphene.GlobalPotentialEnergy(), gpe[2]);
+            logger->info("Simple Graphene : {} ({})", SimpleGraphene.globalPotentialEnergy(), gpe[2]);
         }
     }
     if (isTriangleRaftEnabled)
     {
-        if (abs(TriangleRaftEnergy - Triangle_Raft.GlobalPotentialEnergy()) > 0.001)
+        if (abs(TriangleRaftEnergy - Triangle_Raft.globalPotentialEnergy()) > 0.001)
         {
             logger->debug("Triangle Raft - Saved: {} vs Calculated: {}", TriangleRaftEnergy,
-                          Triangle_Raft.GlobalPotentialEnergy());
+                          Triangle_Raft.globalPotentialEnergy());
         }
     }
     logger->debug("crds[0] = {}", crds[0]);
@@ -2485,21 +2485,21 @@ VecF<int> LinkedNetwork::SpiralmonteCarloSwitchMoveLAMMPS(int a, double &SimpleG
             }
             if (isBNEnabled)
             {
-                optStatus_BN = BN.GlobalPotentialEnergy();
+                optStatus_BN = BN.globalPotentialEnergy();
             }
             optStatus_networkA = localGeometryOptimisation(a, b, goptParamsA[1], 0, isMaintainConvexityEnabled, logger);
         }
 
         if (isSimpleGrapheneEnabled)
-            SimpleGrapheneEnergy = SimpleGraphene.GlobalPotentialEnergy();
+            SimpleGrapheneEnergy = SimpleGraphene.globalPotentialEnergy();
         if (isTriangleRaftEnabled)
-            TriangleRaftEnergy = Triangle_Raft.GlobalPotentialEnergy();
+            TriangleRaftEnergy = Triangle_Raft.globalPotentialEnergy();
         if (isTersoffGrapheneEnabled)
-            TersoffGrapheneEnergy = TersoffGraphene.GlobalPotentialEnergy();
+            TersoffGrapheneEnergy = TersoffGraphene.globalPotentialEnergy();
         if (isBilayerEnabled)
-            BilayerEnergy = Bilayer.GlobalPotentialEnergy();
+            BilayerEnergy = Bilayer.globalPotentialEnergy();
         if (isBNEnabled)
-            BNEnergy = BN.GlobalPotentialEnergy();
+            BNEnergy = BN.globalPotentialEnergy();
         syncCoordinates();
     }
     else
@@ -2587,15 +2587,15 @@ VecF<int> LinkedNetwork::SpiralmonteCarloSwitchMoveLAMMPS(int a, double &SimpleG
         }
 
         if (isSimpleGrapheneEnabled)
-            SimpleGrapheneEnergy = SimpleGraphene.GlobalPotentialEnergy();
+            SimpleGrapheneEnergy = SimpleGraphene.globalPotentialEnergy();
         if (isTriangleRaftEnabled)
-            TriangleRaftEnergy = Triangle_Raft.GlobalPotentialEnergy();
+            TriangleRaftEnergy = Triangle_Raft.globalPotentialEnergy();
         if (isTersoffGrapheneEnabled)
-            TersoffGrapheneEnergy = TersoffGraphene.GlobalPotentialEnergy();
+            TersoffGrapheneEnergy = TersoffGraphene.globalPotentialEnergy();
         if (isBilayerEnabled)
-            BilayerEnergy = Bilayer.GlobalPotentialEnergy();
+            BilayerEnergy = Bilayer.globalPotentialEnergy();
         if (isBNEnabled)
-            BNEnergy = BN.GlobalPotentialEnergy();
+            BNEnergy = BN.globalPotentialEnergy();
     }
 
     /* Status report
@@ -2658,20 +2658,20 @@ VecF<int> LinkedNetwork::monteCarloSwitchMoveLAMMPS(double &SimpleGrapheneEnergy
     double saveEnergyBN = BNEnergy;
     if (isSimpleGrapheneEnabled)
     {
-        if (abs(SimpleGrapheneEnergy - SimpleGraphene.GlobalPotentialEnergy()) > 0.001)
+        if (abs(SimpleGrapheneEnergy - SimpleGraphene.globalPotentialEnergy()) > 0.001)
         {
-            logger->debug("Saved simpleGraphene energy: {} vs calculated: {}", SimpleGrapheneEnergy, SimpleGraphene.GlobalPotentialEnergy());
+            logger->debug("Saved simpleGraphene energy: {} vs calculated: {}", SimpleGrapheneEnergy, SimpleGraphene.globalPotentialEnergy());
         }
     }
     if (isTriangleRaftEnabled)
     {
-        if (abs(TriangleRaftEnergy - Triangle_Raft.GlobalPotentialEnergy()) > 0.001)
+        if (abs(TriangleRaftEnergy - Triangle_Raft.globalPotentialEnergy()) > 0.001)
         {
-            logger->debug("Saved triangleRaft energy: {} vs calculated: {}", TriangleRaftEnergy, Triangle_Raft.GlobalPotentialEnergy());
+            logger->debug("Saved triangleRaft energy: {} vs calculated: {}", TriangleRaftEnergy, Triangle_Raft.globalPotentialEnergy());
         }
         else
         {
-            logger->debug("Triangle Raft : {}", Triangle_Raft.GlobalPotentialEnergy());
+            logger->debug("Triangle Raft : {}", Triangle_Raft.globalPotentialEnergy());
         }
     }
     logger->debug("Saving coordinates...");
@@ -2891,15 +2891,15 @@ VecF<int> LinkedNetwork::monteCarloSwitchMoveLAMMPS(double &SimpleGrapheneEnergy
             optStatus_networkA = localGeometryOptimisation(a, b, goptParamsA[1], 0, isMaintainConvexityEnabled, logger);
         }
         if (isSimpleGrapheneEnabled)
-            SimpleGrapheneEnergy = SimpleGraphene.GlobalPotentialEnergy();
+            SimpleGrapheneEnergy = SimpleGraphene.globalPotentialEnergy();
         if (isTriangleRaftEnabled)
-            TriangleRaftEnergy = Triangle_Raft.GlobalPotentialEnergy();
+            TriangleRaftEnergy = Triangle_Raft.globalPotentialEnergy();
         if (isTersoffGrapheneEnabled)
-            TersoffGrapheneEnergy = TersoffGraphene.GlobalPotentialEnergy();
+            TersoffGrapheneEnergy = TersoffGraphene.globalPotentialEnergy();
         if (isBilayerEnabled)
-            BilayerEnergy = Bilayer.GlobalPotentialEnergy();
+            BilayerEnergy = Bilayer.globalPotentialEnergy();
         if (isBNEnabled)
-            BNEnergy = BN.GlobalPotentialEnergy();
+            BNEnergy = BN.globalPotentialEnergy();
         syncCoordinates();
     }
     else

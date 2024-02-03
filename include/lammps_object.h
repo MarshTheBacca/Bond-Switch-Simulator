@@ -54,8 +54,6 @@ public:
     void write_restart(const std::string &structureName);
     void finaliseLAMMPSObject(const std::string &structureName);
 
-    void runInput(const std::string &fname);
-
     double pbx();
     double pby();
     double pbz();
@@ -83,7 +81,7 @@ public:
     void revertBonds(VecF<int> switchIdsA, VecF<int> switchIdsT);
 
     VecF<int> GlobalPotentialMinimisation();
-    double GlobalPotentialEnergy();
+    double globalPotentialEnergy();
 
     double probeE();
 };

@@ -90,7 +90,6 @@ int main(int argc, char *argv[])
     {
         logger->info("Loading network from files...");
         network = LinkedNetwork(inputData.inputFolder, inputData.inputFilePrefix,
-                                inputData.outputFolder,
                                 inputData.minCoordination, inputData.maxCoordination,
                                 inputData.minRingSize, inputData.maxRingSize,
                                 inputData.isSimpleGrapheneEnabled,
@@ -199,24 +198,24 @@ int main(int argc, char *argv[])
         if (inputData.isSimpleGrapheneEnabled)
         {
             logger->info("Bye");
-            SimpleGrapheneEnergy = network.SimpleGraphene.GlobalPotentialEnergy();
+            SimpleGrapheneEnergy = network.SimpleGraphene.globalPotentialEnergy();
             logger->info("sigh");
         }
         if (inputData.isTersoffGrapheneEnabled)
         {
-            TersoffGrapheneEnergy = network.TersoffGraphene.GlobalPotentialEnergy();
+            TersoffGrapheneEnergy = network.TersoffGraphene.globalPotentialEnergy();
         }
         if (inputData.isTriangleRaftEnabled)
         {
-            TriangleRaftEnergy = network.Triangle_Raft.GlobalPotentialEnergy();
+            TriangleRaftEnergy = network.Triangle_Raft.globalPotentialEnergy();
         }
         if (inputData.isBilayerEnabled)
         {
-            BilayerEnergy = network.Bilayer.GlobalPotentialEnergy();
+            BilayerEnergy = network.Bilayer.globalPotentialEnergy();
         }
         if (inputData.isBNEnabled)
         {
-            BNEnergy = network.BN.GlobalPotentialEnergy();
+            BNEnergy = network.BN.globalPotentialEnergy();
         }
 
         logger->info("Calculated energies for running systems");

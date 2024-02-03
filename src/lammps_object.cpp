@@ -16,7 +16,7 @@ LammpsObject::LammpsObject() = default;
  * @param inputFolder The folder containing the input files
  * @param logger The logger object
  */
-LammpsObject::LammpsObject(const std::string &selector, const std::string &inputFolder, const LoggerPtr logger)
+LammpsObject::LammpsObject(const std::string &structureName, const std::string &inputFolder, const LoggerPtr logger)
 {
     logger->info("Creating Lammps Object");
     const char *lmpargv[] = {"liblammps", "-screen", "none"};
@@ -41,13 +41,13 @@ LammpsObject::LammpsObject(const std::string &selector, const std::string &input
         {"C", "C.in"},
         {"BN", "BN.in"}};
 
-    if (selectorToFile.find(selector) == selectorToFile.end())
+    if (selectorToFile.find(structureName) == selectorToFile.end())
     {
         logger->critical("Invalid Selector");
         throw std::runtime_error("Invalid Selector");
     }
 
-    std::string inputFilePath = inputFolder + "/" + selectorToFile[selector];
+    std::string inputFilePath = inputFolder + "/" + selectorToFile[structureName];
     logger->info("Executing LAMMPS Script: {}", inputFilePath);
     lammps_file(handle, inputFilePath.c_str());
     natoms = (int)(lammps_get_natoms(handle) + 0.5);
@@ -128,13 +128,6 @@ void LammpsObject::finaliseLAMMPSObject(const std::string &structureName)
     std::string command = "write_data " + prefixFolderOut + "/" + iterator->second;
     lammps_command(handle, command.c_str());
     lammps_close(handle);
-}
-
-void LammpsObject::runInput(const std::string &fname)
-{
-    lammps_file(handle, fname.c_str());
-    nbonds = std::intptr_t(lammps_extract_global(handle, "nbonds"));
-    nangles = std::intptr_t(lammps_extract_global(handle, "nangles"));
 }
 
 double LammpsObject::pbx()
@@ -963,7 +956,7 @@ VecF<int> LammpsObject::GlobalPotentialMinimisation()
     return optstatus;
 }
 
-double LammpsObject::GlobalPotentialEnergy()
+double LammpsObject::globalPotentialEnergy()
 {
     return lammps_get_thermo(handle, "pe");
 }
