@@ -46,8 +46,6 @@ struct InputData {
     // Monte Carlo Process Data
     std::string moveType;
     int randomSeed;
-    bool isSpiralEnabled;
-    int spiralRadius;
     std::string randomOrWeighted;
 
     // Monte Carlo Energy Search Data
