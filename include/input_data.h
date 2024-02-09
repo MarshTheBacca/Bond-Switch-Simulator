@@ -1,20 +1,19 @@
 #ifndef INPUT_DATA_H
 #define INPUT_DATA_H
 
-#include <string>
+#include "output_file.h"
 #include <fstream>
+#include <limits>
+#include <set>
+#include <spdlog/spdlog.h>
 #include <sstream>
 #include <stdexcept>
-#include <limits>
+#include <string>
 #include <type_traits>
-#include <set>
-#include "output_file.h"
-#include <spdlog/spdlog.h>
 
 using LoggerPtr = std::shared_ptr<spdlog::logger>;
 
-struct InputData
-{
+struct InputData {
     // Used for error messages
     int lineNumber = 0;
 
@@ -86,10 +85,10 @@ struct InputData
     template <typename... Args>
     void readSection(std::ifstream &inputFile, const std::string &section, const LoggerPtr &logger, Args &...args);
     template <typename T>
-    void checkInRange(const T value, const T lower, const T upper, const std::string &errorMessage);
+    void checkInRange(const T value, const T lower, const T upper, const std::string &errorMessage) const;
 
     // Declare non-template functions
-    bool stringToBool(const std::string &str);
+    bool stringToBool(const std::string &str) const;
     std::string getFirstWord(std::ifstream &inputFile, std::istringstream &iss);
     void readIO(std::ifstream &inputFile, const LoggerPtr &logger);
     void readNetworkProperties(std::ifstream &inputFile, const LoggerPtr &logger);
@@ -100,8 +99,8 @@ struct InputData
     void readGeometryOptimisation(std::ifstream &inputFile, const LoggerPtr &logger);
     void readAnalysis(std::ifstream &inputFile, const LoggerPtr &logger);
     void readOutput(std::ifstream &inputFile, const LoggerPtr &logger);
-    void checkInSet(const std::string &value, const std::set<std::string> &validValues, const std::string &errorMessage);
-    void checkFileExists(const std::string &filename);
+    void checkInSet(const std::string &value, const std::set<std::string, std::less<>> &validValues, const std::string &errorMessage) const;
+    void checkFileExists(const std::string &filename) const;
     void validate();
     InputData(const std::string &filePath, const LoggerPtr &logger);
 };

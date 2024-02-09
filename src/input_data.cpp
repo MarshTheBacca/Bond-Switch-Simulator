@@ -1,17 +1,17 @@
 #include "input_data.h"
 #include "output_file.h"
-#include <map>
-#include <utility>
-#include <numeric>
-#include <fstream>
 #include <climits>
-#include <set>
-#include <stdexcept>
-#include <limits>
-#include <type_traits>
-#include <sstream>
+#include <fstream>
 #include <functional>
+#include <limits>
+#include <map>
+#include <numeric>
+#include <set>
 #include <spdlog/spdlog.h>
+#include <sstream>
+#include <stdexcept>
+#include <type_traits>
+#include <utility>
 
 /**
  * @brief Converts a string to a boolean
@@ -19,8 +19,7 @@
  * @return The boolean value
  * @throws std::invalid_argument if the string is not "true" or "false"
  */
-bool InputData::stringToBool(const std::string &str)
-{
+bool InputData::stringToBool(const std::string &str) const {
     if (str == "true")
         return true;
     else if (str == "false")
@@ -34,8 +33,8 @@ bool InputData::stringToBool(const std::string &str)
  * @param iss The input string stream
  * @return The first word from the line
  */
-std::string InputData::getFirstWord(std::ifstream &inputFile, std::istringstream &iss)
-{
+std::string InputData::getFirstWord(std::ifstream &inputFile,
+                                    std::istringstream &iss) {
     std::string line;
     getline(inputFile, line);
     lineNumber++;
@@ -51,114 +50,79 @@ std::string InputData::getFirstWord(std::ifstream &inputFile, std::istringstream
  * @param inputFile The input file stream
  * @param logger The log file
  */
-void InputData::readIO(std::ifstream &inputFile, const LoggerPtr &logger)
-{
-    readSection(inputFile, "IO", logger,
-                outputFolder,
-                outputFilePrefix,
-                inputFolder,
-                inputFilePrefix,
-                isFromScratchEnabled,
+void InputData::readIO(std::ifstream &inputFile, const LoggerPtr &logger) {
+    readSection(inputFile, "IO", logger, outputFolder, outputFilePrefix,
+                inputFolder, inputFilePrefix, isFromScratchEnabled,
                 isRestartUsingLAMMPSObjectsEnabled);
 }
 
-void InputData::readNetworkProperties(std::ifstream &inputFile, const LoggerPtr &logger)
-{
-    readSection(inputFile, "Network Properties", logger,
-                numRings,
-                minRingSize,
-                maxRingSize,
-                minCoordination,
-                maxCoordination,
-                isFixRingsEnabled,
+void InputData::readNetworkProperties(std::ifstream &inputFile,
+                                      const LoggerPtr &logger) {
+    readSection(inputFile, "Network Properties", logger, numRings, minRingSize,
+                maxRingSize, minCoordination, maxCoordination, isFixRingsEnabled,
                 fixedRingsFile);
 }
 
-void InputData::readNetworkMinimisationProtocols(std::ifstream &inputFile, const LoggerPtr &logger)
-{
+void InputData::readNetworkMinimisationProtocols(std::ifstream &inputFile,
+                                                 const LoggerPtr &logger) {
     readSection(inputFile, "Network Minimisation Protocols", logger,
-                isOpenMPIEnabled,
-                isSimpleGrapheneEnabled,
-                isTriangleRaftEnabled,
-                isBilayerEnabled,
-                isTersoffGrapheneEnabled,
-                isBNEnabled,
+                isOpenMPIEnabled, isSimpleGrapheneEnabled, isTriangleRaftEnabled,
+                isBilayerEnabled, isTersoffGrapheneEnabled, isBNEnabled,
                 selectedMinimisationProtocol);
 }
 
-void InputData::readMonteCarloProcess(std::ifstream &inputFile, const LoggerPtr &logger)
-{
-    readSection(inputFile, "Monte Carlo Process", logger,
-                moveType,
-                randomSeed,
-                isSpiralEnabled,
-                spiralRadius,
-                randomOrWeighted);
+void InputData::readMonteCarloProcess(std::ifstream &inputFile,
+                                      const LoggerPtr &logger) {
+    readSection(inputFile, "Monte Carlo Process", logger, moveType, randomSeed, spiralRadius, randomOrWeighted);
 }
 
-void InputData::readMonteCarloEnergySearch(std::ifstream &inputFile, const LoggerPtr &logger)
-{
-    readSection(inputFile, "Monte Carlo Energy Search", logger,
-                startTemperature,
-                endTemperature,
-                temperatureIncrement,
-                thermalisationTemperature,
-                stepsPerTemperature,
-                initialThermalisationSteps);
+void InputData::readMonteCarloEnergySearch(std::ifstream &inputFile,
+                                           const LoggerPtr &logger) {
+    readSection(inputFile, "Monte Carlo Energy Search", logger, startTemperature,
+                endTemperature, temperatureIncrement, thermalisationTemperature,
+                stepsPerTemperature, initialThermalisationSteps);
 }
 
-void InputData::readPotentialModel(std::ifstream &inputFile, const LoggerPtr &logger)
-{
-    readSection(inputFile, "Potential Model", logger,
-                harmonicBondForceConstant,
-                harmonicAngleForceConstant,
-                harmonicGeometryConstraint,
+void InputData::readPotentialModel(std::ifstream &inputFile,
+                                   const LoggerPtr &logger) {
+    readSection(inputFile, "Potential Model", logger, harmonicBondForceConstant,
+                harmonicAngleForceConstant, harmonicGeometryConstraint,
                 isMaintainConvexityEnabled);
 }
 
-void InputData::readGeometryOptimisation(std::ifstream &inputFile, const LoggerPtr &logger)
-{
+void InputData::readGeometryOptimisation(std::ifstream &inputFile,
+                                         const LoggerPtr &logger) {
     readSection(inputFile, "Geometry Optimisation", logger,
-                monteCarloLocalMaxIterations,
-                globalMinimisationMaxIterations,
-                tauBacktrackingParameter,
-                tolerance,
-                localRegionSize);
+                monteCarloLocalMaxIterations, globalMinimisationMaxIterations,
+                tauBacktrackingParameter, tolerance, localRegionSize);
 }
 
-void InputData::readAnalysis(std::ifstream &inputFile, const LoggerPtr &logger)
-{
-    readSection(inputFile, "Analysis", logger,
-                analysisWriteFrequency,
-                isWriteSamplingStructuresEnabled,
-                structureWriteFrequency);
+void InputData::readAnalysis(std::ifstream &inputFile,
+                             const LoggerPtr &logger) {
+    readSection(inputFile, "Analysis", logger, analysisWriteFrequency,
+                isWriteSamplingStructuresEnabled, structureWriteFrequency);
 }
 
-void InputData::readOutput(std::ifstream &inputFile, const LoggerPtr &logger)
-{
-    readSection(inputFile, "Output", logger,
-                ljPairsCalculationDistance);
+void InputData::readOutput(std::ifstream &inputFile, const LoggerPtr &logger) {
+    readSection(inputFile, "Output", logger, ljPairsCalculationDistance);
 }
 
-void InputData::checkInSet(const std::string &value, const std::set<std::string> &validValues, const std::string &errorMessage)
-{
-    if (validValues.count(value) == 0)
-    {
+void InputData::checkInSet(const std::string &value,
+                           const std::set<std::string, std::less<>> &validValues,
+                           const std::string &errorMessage) const {
+    if (validValues.count(value) == 0) {
         throw std::runtime_error(errorMessage);
     }
 }
 
-void InputData::checkFileExists(const std::string &filename)
-{
+void InputData::checkFileExists(const std::string &filename) const {
     std::ifstream file(filename);
-    if (!file)
-    {
+    if (!file) {
         throw std::runtime_error("File does not exist: " + filename);
     }
 }
 
-void InputData::validate()
-{
+void InputData::validate() {
     double maxDouble = std::numeric_limits<double>::max();
     // Network Properties
     checkInRange(numRings, 1, INT_MAX, "Number of rings must be at least 1");
@@ -166,8 +130,7 @@ void InputData::validate()
     checkInRange(maxRingSize, minRingSize, INT_MAX, "Maximum ring size must be at least the minimum ring size");
     checkInRange(minCoordination, 1, INT_MAX, "Minimum coordination must be at least 1");
     checkInRange(maxCoordination, minCoordination, INT_MAX, "Maximum coordination must be at least the minimum coordination");
-    if (isFixRingsEnabled)
-    {
+    if (isFixRingsEnabled) {
         checkFileExists(fixedRingsFile);
     }
 
@@ -179,44 +142,45 @@ void InputData::validate()
         {4, {&isTersoffGrapheneEnabled, "Tersoff Graphene"}},
         {5, {&isBNEnabled, "BN"}}};
 
-    if (protocolMap.count(selectedMinimisationProtocol) == 1)
-    {
+    if (protocolMap.count(selectedMinimisationProtocol) == 1) {
         auto &[isEnabled, protocolName] = protocolMap[selectedMinimisationProtocol];
-        if (!*isEnabled)
-        {
-            throw std::runtime_error("Selected minimisation protocol is " +
-                                     std::to_string(selectedMinimisationProtocol) + " but " + protocolName + " is disabled");
+        if (!*isEnabled) {
+            throw std::runtime_error("Selected minimisation protocol is " + std::to_string(selectedMinimisationProtocol) +
+                                     " but " + protocolName + " is disabled");
         }
-    }
-    else
-    {
-        throw std::runtime_error("Selected minimisation protocol, " +
-                                 std::to_string(selectedMinimisationProtocol) + " is out of range");
+    } else {
+        throw std::runtime_error("Selected minimisation protocol, " + std::to_string(selectedMinimisationProtocol) +
+                                 " is out of range");
     }
 
     // Monte Carlo Process
-    checkInSet(moveType, {"switch", "mix"}, "Invalid move type: " + moveType + " must be either 'switch' or 'mix'");
+    checkInSet(moveType, {"switch", "mix"},
+               "Invalid move type: " + moveType + " must be either 'switch' or 'mix'");
     checkInRange(randomSeed, 0, INT_MAX, "Random seed must be at least 0");
-    if (isSpiralEnabled)
-    {
-        checkInRange(spiralRadius, 1, INT_MAX, "Spiral radius must be at least 1");
-    }
-    checkInSet(randomOrWeighted, {"random", "weighted"}, "Invalid random or weighted: " + randomOrWeighted + " must be either 'random' or 'weighted'");
+    checkInSet(randomOrWeighted, {"random", "weighted"},
+               "Invalid random or weighted: " + randomOrWeighted + " must be either 'random' or 'weighted'");
 
     // Potential Model
-    checkInRange(harmonicBondForceConstant, 0.0, maxDouble, "Harmonic bond force constant must be at least 0");
-    checkInRange(harmonicAngleForceConstant, 0.0, maxDouble, "Harmonic angle force constant must be at least 0");
-    checkInRange(harmonicGeometryConstraint, 0.0, maxDouble, "Harmonic geometry constraint must be at least 0");
+    checkInRange(harmonicBondForceConstant, 0.0, maxDouble,
+                 "Harmonic bond force constant must be at least 0");
+    checkInRange(harmonicAngleForceConstant, 0.0, maxDouble,
+                 "Harmonic angle force constant must be at least 0");
+    checkInRange(harmonicGeometryConstraint, 0.0, maxDouble,
+                 "Harmonic geometry constraint must be at least 0");
 
     // Geometry Optimisation
-    checkInRange(monteCarloLocalMaxIterations, 0, INT_MAX, "Monte Carlo local max iterations must be at least 0");
-    checkInRange(globalMinimisationMaxIterations, 0, INT_MAX, "Global minimisation max iterations must be at least 0");
+    checkInRange(monteCarloLocalMaxIterations, 0, INT_MAX,
+                 "Monte Carlo local max iterations must be at least 0");
+    checkInRange(globalMinimisationMaxIterations, 0, INT_MAX,
+                 "Global minimisation max iterations must be at least 0");
 
     // Analysis
-    checkInRange(analysisWriteFrequency, 0, 1000, "Analysis write frequency must be between 0 and 1000");
+    checkInRange(analysisWriteFrequency, 0, 1000,
+                 "Analysis write frequency must be between 0 and 1000");
 
     // Output
-    checkInRange(ljPairsCalculationDistance, 0, INT_MAX, "LJ pairs calculation distance must be at least 0");
+    checkInRange(ljPairsCalculationDistance, 0, INT_MAX,
+                 "LJ pairs calculation distance must be at least 0");
 }
 
 /**
@@ -224,14 +188,12 @@ void InputData::validate()
  * @param filePath The path to the input file
  * @param logger The log file
  */
-InputData::InputData(const std::string &filePath, const LoggerPtr &logger)
-{
+InputData::InputData(const std::string &filePath, const LoggerPtr &logger) {
     // Open the input file
     std::ifstream inputFile(filePath);
 
     // Check if the file was opened successfully
-    if (!inputFile.is_open())
-    {
+    if (!inputFile.is_open()) {
         throw std::runtime_error("Unable to open file: " + filePath);
     }
     logger->info("Reading input file: " + filePath);
