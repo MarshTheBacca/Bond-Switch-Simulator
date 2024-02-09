@@ -1,9 +1,9 @@
 // Created by olwhi on 24/07/2023, edited by Marshall Hunt 28/01/2024.
 #include "lammps_object.h"
-#include <stdio.h>
 #include <cstdint>
-#include <unistd.h>
 #include <fstream>
+#include <stdio.h>
+#include <unistd.h>
 
 /**
  * @brief Default constructor for a blank Lammps Object
@@ -16,16 +16,14 @@ LammpsObject::LammpsObject() = default;
  * @param inputFolder The folder containing the input files
  * @param logger The logger object
  */
-LammpsObject::LammpsObject(const std::string &structureName, const std::string &inputFolder, const LoggerPtr logger)
-{
+LammpsObject::LammpsObject(const std::string &structureName, const std::string &inputFolder, const LoggerPtr logger) {
     logger->info("Creating Lammps Object");
     const char *lmpargv[] = {"liblammps", "-screen", "none"};
     int lmpargc = sizeof(lmpargv) / sizeof(const char *);
     logger->info("lmpargc -> {} ", lmpargc);
     handle = lammps_open_no_mpi(lmpargc, const_cast<char **>(lmpargv), nullptr);
 
-    if (handle == nullptr)
-    {
+    if (handle == nullptr) {
         logger->critical("LAMMPS initialization failed");
         lammps_mpi_finalize();
         throw std::runtime_error("LAMMPS initialization failed");
@@ -41,8 +39,7 @@ LammpsObject::LammpsObject(const std::string &structureName, const std::string &
         {"C", "C.in"},
         {"BN", "BN.in"}};
 
-    if (selectorToFile.find(structureName) == selectorToFile.end())
-    {
+    if (selectorToFile.find(structureName) == selectorToFile.end()) {
         logger->critical("Invalid Selector");
         throw std::runtime_error("Invalid Selector");
     }
@@ -52,29 +49,22 @@ LammpsObject::LammpsObject(const std::string &structureName, const std::string &
     lammps_file(handle, inputFilePath.c_str());
     natoms = (int)(lammps_get_natoms(handle) + 0.5);
     logger->info("LAMMPS Number of atoms {}", natoms);
-    if (const auto nbonds_ptr = static_cast<const int *>(lammps_extract_global(handle, "nbonds")); nbonds_ptr)
-    {
+    if (const auto nbonds_ptr = static_cast<const int *>(lammps_extract_global(handle, "nbonds")); nbonds_ptr) {
         nbonds = *nbonds_ptr;
         logger->info("LAMMPS Number of bonds {}", nbonds);
-    }
-    else
-    {
+    } else {
         logger->error("Failed to extract number of bonds");
     }
 
-    if (const auto nangles_ptr = static_cast<int *>(lammps_extract_global(handle, "nangles")); nangles_ptr)
-    {
+    if (const auto nangles_ptr = static_cast<int *>(lammps_extract_global(handle, "nangles")); nangles_ptr) {
         nangles = *nangles_ptr;
         logger->info("LAMMPS Number of angles {}", nangles);
-    }
-    else
-    {
+    } else {
         logger->error("Failed to extract number of angles");
     }
 }
 
-void LammpsObject::write_data(const std::string &structureName)
-{
+void LammpsObject::write_data(const std::string &structureName) {
     std::unordered_map<std::string, std::string> selectorToFile = {
         {"Si", "Si_results.in"},
         {"Si2O3", "Si2O3_results.in"},
@@ -83,16 +73,14 @@ void LammpsObject::write_data(const std::string &structureName)
         {"BN", "BN_results.in"}};
 
     auto iterator = selectorToFile.find(structureName);
-    if (iterator == selectorToFile.end())
-    {
+    if (iterator == selectorToFile.end()) {
         throw std::runtime_error("Invalid structure name");
     }
     std::string command = "write_data " + prefixFolderOut + "/" + iterator->second;
     lammps_command(handle, command.c_str());
 }
 
-void LammpsObject::write_restart(const std::string &structureName)
-{
+void LammpsObject::write_restart(const std::string &structureName) {
     std::unordered_map<std::string, std::string> structureToFile = {
         {"Si", "Si_restart.restart"},
         {"Si2O3", "Si2O3_restart.restart"},
@@ -102,8 +90,7 @@ void LammpsObject::write_restart(const std::string &structureName)
 
     // the iterator is a pointer to a key value pair
     auto iterator = structureToFile.find(structureName);
-    if (iterator == structureToFile.end())
-    {
+    if (iterator == structureToFile.end()) {
         throw std::runtime_error("Invalid structure name");
     }
 
@@ -112,8 +99,7 @@ void LammpsObject::write_restart(const std::string &structureName)
     lammps_command(handle, command.c_str());
 }
 
-void LammpsObject::finaliseLAMMPSObject(const std::string &structureName)
-{
+void LammpsObject::finaliseLAMMPSObject(const std::string &structureName) {
     std::unordered_map<std::string, std::string> structureToFile = {
         {"Si", "Si_restart.restart"},
         {"Si2O3", "Si2O3_restart.restart"},
@@ -121,8 +107,7 @@ void LammpsObject::finaliseLAMMPSObject(const std::string &structureName)
         {"C", "C_restart.restart"},
         {"BN", "BN_restart.restart"}};
     auto iterator = structureToFile.find(structureName);
-    if (iterator == structureToFile.end())
-    {
+    if (iterator == structureToFile.end()) {
         throw std::runtime_error("Invalid structure name");
     }
     std::string command = "write_data " + prefixFolderOut + "/" + iterator->second;
@@ -130,43 +115,27 @@ void LammpsObject::finaliseLAMMPSObject(const std::string &structureName)
     lammps_close(handle);
 }
 
-double LammpsObject::pbx()
-{
+double LammpsObject::pbx() {
     return *(double *)lammps_extract_global(handle, "boxxhi");
 }
-double LammpsObject::pby()
-{
+double LammpsObject::pby() {
     return *(double *)lammps_extract_global(handle, "boxyhi");
 }
-double LammpsObject::pbz()
-{
+double LammpsObject::pbz() {
     return *(double *)lammps_extract_global(handle, "boxzhi");
 }
 
-double *LammpsObject::fetchCrds(int dim)
-{
+double *LammpsObject::fetchCrds(int dim) {
     coords = new double[dim * natoms];
     lammps_gather_atoms(handle, "x", 1, dim, coords);
     return coords;
 }
 
-void LammpsObject::pushCrds(int dim, double *old_coords)
-{
+void LammpsObject::pushCrds(int dim, double *old_coords) {
     lammps_scatter_atoms(handle, "x", 1, dim, old_coords);
 }
 
-double *LammpsObject::fetchBonds()
-{
-    double initialBondCount = lammps_get_thermo(handle, "bonds");
-    int bond_size = 3 * initialBondCount;
-    std::cout << bond_size << std::endl;
-    bonds = new double[bond_size];
-    lammps_gather_bonds(handle, bonds);
-    return bonds;
-}
-
-void LammpsObject::breakBond(int atom1, int atom2, int type, LoggerPtr logger)
-{
+void LammpsObject::breakBond(int atom1, int atom2, int type, LoggerPtr logger) {
     logger->debug("Breaking bond between {} and {} of type {}", atom1, atom2, type);
     double initialBondCount = lammps_get_thermo(handle, "bonds");
     std::string command;
@@ -176,8 +145,7 @@ void LammpsObject::breakBond(int atom1, int atom2, int type, LoggerPtr logger)
     lammps_command(handle, command.c_str());
     lammps_command(handle, "group switch delete");
     double finalBondCount = lammps_get_thermo(handle, "bonds");
-    if (finalBondCount != initialBondCount - 1)
-    {
+    if (finalBondCount != initialBondCount - 1) {
         std::ostringstream oss;
         oss << "Error in Bond Counts while breaking bond, initial: " << finalBondCount << " final: " << initialBondCount;
         logger->critical(oss.str());
@@ -185,42 +153,58 @@ void LammpsObject::breakBond(int atom1, int atom2, int type, LoggerPtr logger)
     }
 }
 
-void LammpsObject::formBond(int atom1, int atom2, int type, LoggerPtr logger)
-{
+void LammpsObject::formBond(int atom1, int atom2, int type, LoggerPtr logger) {
     logger->debug("Forming bond between {} and {} of type {}", atom1, atom2, type);
     std::string command;
     command = "create_bonds single/bond " + std::to_string(type) + " " + std::to_string(atom1) + " " + std::to_string(atom2);
     lammps_command(handle, command.c_str());
 }
 
-void LammpsObject::breakAngle(int atom1, int atom2, int atom3)
-{
+void LammpsObject::breakAngle(int atom1, int atom2, int atom3, LoggerPtr logger) {
     double initialAngleCount = lammps_get_thermo(handle, "angles");
-
     std::string command;
+    // Define a group, "switch", containing the atoms in the angle
     command = "group switch id " + std::to_string(atom1) + " " + std::to_string(atom2) + " " + std::to_string(atom3);
     lammps_command(handle, command.c_str());
     lammps_command(handle, "delete_bonds switch angle 1 remove");
+
+    // Delete the user defined group
     lammps_command(handle, "group switch delete");
+
+    // Check that the number of angles has decreased by 1
     double finalAngleCount = lammps_get_thermo(handle, "angles");
-    if (finalAngleCount != initialAngleCount - 1)
-    {
-        std::cout << "Error in Angle Counts" << std::endl;
-        exit(7);
+    if (finalAngleCount != initialAngleCount - 1) {
+        std::stringstream error;
+        error << "Error in Angle Counts, initial: " << finalAngleCount << " final: " << initialAngleCount;
+        logger->critical(error.str());
+        throw std::runtime_error(error.str());
     }
 }
 
-void LammpsObject::formAngle(int atom1, int atom2, int atom3)
-{
+void LammpsObject::formAngle(int atom1, int atom2, int atom3, LoggerPtr logger) {
     std::string command;
     command = "create_bonds single/angle 1 " + std::to_string(atom1) + " " + std::to_string(atom2) + " " + std::to_string(atom3);
     lammps_command(handle, command.c_str());
 }
 
-// solution here likely involves grabbing angles and bonds from Network
-void LammpsObject::switchGraphene(VecF<int> switchIdsA, Network networkA, LoggerPtr logger)
-{
-    // unpck parameters
+/**
+ * @brief perform bond switch in the lattice using NetMC node IDs, ie, zero indexed
+ * @param switchIdsA The node IDs of the atoms to be switched
+ * @param logger The logger object
+ */
+void LammpsObject::switchGraphene(VecF<int> switchIdsA, LoggerPtr logger) {
+    /*
+     * 3           4         3     4
+     *  \         /           \   /
+     *   \       /             \ /
+     *    1-----2     --->      1
+     *   /       \              |
+     *  /         \             2
+     * 5           6           /  \
+     *                        /    \
+     *                       5      6
+     */
+
     int atom1 = switchIdsA[0] + 1;
     int atom2 = switchIdsA[1] + 1;
     int atom3 = switchIdsA[2] + 1;
@@ -233,156 +217,38 @@ void LammpsObject::switchGraphene(VecF<int> switchIdsA, Network networkA, Logger
     formBond(atom1, atom4, 1, logger);
     formBond(atom2, atom5, 1, logger);
 
-    int e1;
-    int e11;
-    int d1;
-    int d11;
-    if (networkA.nodes[atom5 - 1].netCnxs[0] == atom2 - 1)
-    {
-        e1 = networkA.nodes[atom5 - 1].netCnxs[1] + 1;
-        e11 = networkA.nodes[atom5 - 1].netCnxs[2] + 1;
-    }
-    else if (networkA.nodes[atom5 - 1].netCnxs[1] == atom2 - 1)
-    {
-        e1 = networkA.nodes[atom5 - 1].netCnxs[0] + 1;
-        e11 = networkA.nodes[atom5 - 1].netCnxs[2] + 1;
-    }
-    else if (networkA.nodes[atom5 - 1].netCnxs[2] == atom2 - 1)
-    {
-        e1 = networkA.nodes[atom5 - 1].netCnxs[0] + 1;
-        e11 = networkA.nodes[atom5 - 1].netCnxs[1] + 1;
-    }
-    else
-    {
-        logger->warn("atom5 {} not connected to atom2 {}", atom5, atom2);
-        sleep(10);
-    }
-    if (networkA.nodes[atom4 - 1].netCnxs[0] == atom1 - 1)
-    {
-        d1 = networkA.nodes[atom4 - 1].netCnxs[1] + 1;
-        d11 = networkA.nodes[atom4 - 1].netCnxs[2] + 1;
-    }
-    else if (networkA.nodes[atom4 - 1].netCnxs[1] == atom1 - 1)
-    {
-        d1 = networkA.nodes[atom4 - 1].netCnxs[0] + 1;
-        d11 = networkA.nodes[atom4 - 1].netCnxs[2] + 1;
-    }
-    else if (networkA.nodes[atom4 - 1].netCnxs[2] == atom1 - 1)
-    {
-        d1 = networkA.nodes[atom4 - 1].netCnxs[0] + 1;
-        d11 = networkA.nodes[atom4 - 1].netCnxs[1] + 1;
-    }
-    else
-    {
-        logger->warn("atom4 {} not connected to atom1 {}", atom4, atom1);
-        sleep(10);
-    }
+    breakAngle(atom3, atom1, atom5, logger);
+    breakAngle(atom2, atom1, atom5, logger);
+    breakAngle(atom4, atom2, atom6, logger);
 
-    breakAngle(atom3, atom1, atom5);
-    breakAngle(atom2, atom1, atom5);
-    breakAngle(atom4, atom2, atom6);
-    breakAngle(atom4, atom2, atom1);
-
-    breakAngle(e1, atom5, atom1);
-    breakAngle(e11, atom5, atom1);
-    breakAngle(d1, atom4, atom2);
-    breakAngle(d11, atom4, atom2);
-
-    formAngle(atom3, atom1, atom4);
-    formAngle(atom2, atom1, atom4);
-    formAngle(atom6, atom2, atom5);
-    formAngle(atom1, atom2, atom5);
-
-    formAngle(e1, atom5, atom2);
-    formAngle(e11, atom5, atom2);
-    formAngle(d1, atom4, atom1);
-    formAngle(d11, atom4, atom1);
+    formAngle(atom3, atom1, atom4, logger);
+    formAngle(atom6, atom2, atom5, logger);
+    formAngle(atom3, atom1, atom4, logger);
 }
 
-void LammpsObject::revertGraphene(VecF<int> switchIdsA, Network networkA, LoggerPtr logger)
-{
+void LammpsObject::revertGraphene(VecF<int> switchIdsA, LoggerPtr logger) {
+    int atom1 = switchIdsA[0] + 1;
+    int atom2 = switchIdsA[1] + 1;
+    int atom3 = switchIdsA[2] + 1;
+    int atom4 = switchIdsA[3] + 1;
+    int atom5 = switchIdsA[4] + 1;
+    int atom6 = switchIdsA[5] + 1;
 
-    // unpck parameters
-    int a = switchIdsA[0] + 1;
-    int b = switchIdsA[1] + 1;
-    int c = switchIdsA[2] + 1;
-    int d = switchIdsA[3] + 1;
-    int e = switchIdsA[4] + 1;
-    int f = switchIdsA[5] + 1;
+    breakBond(atom1, atom4, 1, logger);
+    breakBond(atom2, atom5, 1, logger);
+    formBond(atom1, atom5, 1, logger);
+    formBond(atom2, atom4, 1, logger);
 
-    breakBond(a, d, 1, logger);
-    breakBond(b, e, 1, logger);
-    formBond(a, e, 1, logger);
-    formBond(b, d, 1, logger);
+    breakAngle(atom3, atom1, atom4, logger);
+    breakAngle(atom6, atom2, atom5, logger);
+    breakAngle(atom3, atom1, atom4, logger);
 
-    int e1;
-    int e11;
-    int d1;
-    int d11;
-    if (networkA.nodes[e - 1].netCnxs[0] == a - 1)
-    {
-        e1 = networkA.nodes[e - 1].netCnxs[1] + 1;
-        e11 = networkA.nodes[e - 1].netCnxs[2] + 1;
-    }
-    else if (networkA.nodes[e - 1].netCnxs[1] == a - 1)
-    {
-        e1 = networkA.nodes[e - 1].netCnxs[0] + 1;
-        e11 = networkA.nodes[e - 1].netCnxs[2] + 1;
-    }
-    else if (networkA.nodes[e - 1].netCnxs[2] == a - 1)
-    {
-        e1 = networkA.nodes[e - 1].netCnxs[0] + 1;
-        e11 = networkA.nodes[e - 1].netCnxs[1] + 1;
-    }
-    else
-    {
-        logger->warn("e {} not connected to a {}, sleeping 10", e, a);
-        sleep(10);
-    }
-    if (networkA.nodes[d - 1].netCnxs[0] == b - 1)
-    {
-        d1 = networkA.nodes[d - 1].netCnxs[1] + 1;
-        d11 = networkA.nodes[d - 1].netCnxs[2] + 1;
-    }
-    else if (networkA.nodes[d - 1].netCnxs[1] == b - 1)
-    {
-        d1 = networkA.nodes[d - 1].netCnxs[0] + 1;
-        d11 = networkA.nodes[d - 1].netCnxs[2] + 1;
-    }
-    else if (networkA.nodes[d - 1].netCnxs[2] == b - 1)
-    {
-        d1 = networkA.nodes[d - 1].netCnxs[0] + 1;
-        d11 = networkA.nodes[d - 1].netCnxs[1] + 1;
-    }
-    else
-    {
-        logger->warn("d {} not connected to b {}, sleeping 10", d, b);
-        sleep(10);
-    }
-
-    breakAngle(c, a, d);
-    breakAngle(b, a, d);
-    breakAngle(f, b, e);
-    breakAngle(a, b, e);
-
-    breakAngle(e1, e, b);
-    breakAngle(e11, e, b);
-    breakAngle(d1, d, a);
-    breakAngle(d11, d, a);
-
-    formAngle(c, a, e);
-    formAngle(b, a, e);
-    formAngle(d, b, f);
-    formAngle(d, b, a);
-
-    formAngle(e1, e, a);
-    formAngle(e11, e, a);
-    formAngle(d1, d, b);
-    formAngle(d11, d, b);
+    formAngle(atom3, atom1, atom5, logger);
+    formAngle(atom2, atom1, atom5, logger);
+    formAngle(atom4, atom2, atom6, logger);
 }
 
-void LammpsObject::switchTriangleRaft(VecF<int> switchIdsA, VecF<int> switchIdsT, LoggerPtr logger)
-{
+void LammpsObject::switchTriangleRaft(VecF<int> switchIdsA, VecF<int> switchIdsT, LoggerPtr logger) {
     // unpck parameters
     int a = switchIdsA[0] + 1;
     int b = switchIdsA[1] + 1;
@@ -417,8 +283,7 @@ void LammpsObject::switchTriangleRaft(VecF<int> switchIdsA, VecF<int> switchIdsT
     formBond(eta, gamma, 1, logger);
 }
 
-void LammpsObject::revertTriangleRaft(VecF<int> switchIdsA, VecF<int> switchIdsT, LoggerPtr logger)
-{
+void LammpsObject::revertTriangleRaft(VecF<int> switchIdsA, VecF<int> switchIdsT, LoggerPtr logger) {
     // unpck parameters
     int a = switchIdsA[0] + 1;
     int b = switchIdsA[1] + 1;
@@ -450,8 +315,7 @@ void LammpsObject::revertTriangleRaft(VecF<int> switchIdsA, VecF<int> switchIdsT
     formBond(delta, eta, 1, logger);
 }
 
-void LammpsObject::switchBilayer(VecF<int> switchIdsA, VecF<int> switchIdsT, LoggerPtr logger)
-{
+void LammpsObject::switchBilayer(VecF<int> switchIdsA, VecF<int> switchIdsT, LoggerPtr logger) {
 
     // unpck parameters
     int a = switchIdsA[0];
@@ -542,8 +406,7 @@ void LammpsObject::switchBilayer(VecF<int> switchIdsA, VecF<int> switchIdsT, Log
     formBond(b_prime_prime_prime, gamma_prime, 1, logger);
 }
 
-void LammpsObject::revertBilayer(VecF<int> switchIdsA, VecF<int> switchIdsT, LoggerPtr logger)
-{
+void LammpsObject::revertBilayer(VecF<int> switchIdsA, VecF<int> switchIdsT, LoggerPtr logger) {
 
     // unpck parameters
     int a = switchIdsA[0];
@@ -566,45 +429,25 @@ void LammpsObject::revertBilayer(VecF<int> switchIdsA, VecF<int> switchIdsT, Log
      *
      */
 
-    int nSi;
-    int nSi2;
-    int nO;
+    auto nSi = static_cast<int>(round(natoms / 3) + 0.5);
+    auto nSi2 = static_cast<int>(round(nSi / 2) + 0.5);
 
-    nSi = (int)(round(natoms / 3) + 0.5);
-    nSi2 = (int)(round(nSi / 2) + 0.5);
+    int a_prime = 2 * a + 1;
+    int a_prime_prime = 2 * a + 2;
+    int a_prime_prime_prime = nSi + a + 1;
 
-    int a_prime;
-    int a_prime_prime;
-    int b_prime;
-    int b_prime_prime;
-    int a_prime_prime_prime;
-    int b_prime_prime_prime;
+    int b_prime = 2 * b + 1;
+    int b_prime_prime = 2 * b + 2;
+    int b_prime_prime_prime = nSi + b + 1;
 
-    int beta_prime;
-    int beta_prime_prime;
-    int gamma_prime;
-    int gamma_prime_prime;
-    int eta_prime;
-    int eta_prime_prime;
-    int delta_prime;
-    int delta_prime_prime;
-
-    a_prime = 2 * a + 1;
-    a_prime_prime = 2 * a + 2;
-    a_prime_prime_prime = nSi + a + 1;
-
-    b_prime = 2 * b + 1;
-    b_prime_prime = 2 * b + 2;
-    b_prime_prime_prime = nSi + b + 1;
-
-    beta_prime = 3 * nSi2 + (beta - nSi2) * 2 + 1;
-    beta_prime_prime = beta_prime + 1;
-    gamma_prime = 3 * nSi2 + (gamma - nSi2) * 2 + 1;
-    gamma_prime_prime = gamma_prime + 1;
-    eta_prime = 3 * nSi2 + (eta - nSi2) * 2 + 1;
-    eta_prime_prime = eta_prime + 1;
-    delta_prime = 3 * nSi2 + (delta - nSi2) * 2 + 1;
-    delta_prime_prime = delta_prime + 1;
+    int beta_prime = 3 * nSi2 + (beta - nSi2) * 2 + 1;
+    int beta_prime_prime = beta_prime + 1;
+    int gamma_prime = 3 * nSi2 + (gamma - nSi2) * 2 + 1;
+    int gamma_prime_prime = gamma_prime + 1;
+    int eta_prime = 3 * nSi2 + (eta - nSi2) * 2 + 1;
+    int eta_prime_prime = eta_prime + 1;
+    int delta_prime = 3 * nSi2 + (delta - nSi2) * 2 + 1;
+    int delta_prime_prime = delta_prime + 1;
 
     breakBond(a_prime, delta_prime, 2, logger);
     breakBond(b_prime, gamma_prime, 2, logger);
@@ -632,8 +475,7 @@ void LammpsObject::revertBilayer(VecF<int> switchIdsA, VecF<int> switchIdsT, Log
     formBond(b_prime_prime_prime, delta_prime_prime, 1, logger);
 }
 
-void LammpsObject::switchBonds(VecF<int> switchIdsA, VecF<int> switchIdsT)
-{
+void LammpsObject::switchBonds(VecF<int> switchIdsA, VecF<int> switchIdsT) {
     // unpck parameters
     int a = switchIdsA[0];
     int b = switchIdsA[1];
@@ -731,41 +573,24 @@ void LammpsObject::switchBonds(VecF<int> switchIdsA, VecF<int> switchIdsT)
      *
      */
 
-    int nSi;
-    nSi = round(natoms / 3);
+    auto nSi = static_cast<int>(round(natoms / 3) + 0.5);
 
-    int a_prime;
-    int a_prime_prime;
-    int b_prime;
-    int b_prime_prime;
-    int a_prime_prime_prime;
-    int b_prime_prime_prime;
+    int a_prime = 2 * a;
+    int a_prime_prime = 2 * a + 1;
+    int a_prime_prime_prime = 3 * a;
 
-    int beta_prime;
-    int beta_prime_prime;
-    int gamma_prime;
-    int gamma_prime_prime;
-    int eta_prime;
-    int eta_prime_prime;
-    int delta_prime;
-    int delta_prime_prime;
+    int b_prime = 2 * b;
+    int b_prime_prime = 2 * b + 1;
+    int b_prime_prime_prime = 3 * b;
 
-    a_prime = 2 * a;
-    a_prime_prime = 2 * a + 1;
-    a_prime_prime_prime = 3 * a;
-
-    b_prime = 2 * b;
-    b_prime_prime = 2 * b + 1;
-    b_prime_prime_prime = 3 * b;
-
-    beta_prime = 3 * nSi + (beta - nSi) * 2;
-    beta_prime_prime = beta_prime + 1;
-    gamma_prime = 3 * nSi + (gamma - nSi) * 2;
-    gamma_prime_prime = gamma_prime + 1;
-    eta_prime = 3 * nSi + (eta - nSi) * 2;
-    eta_prime_prime = eta_prime + 1;
-    delta_prime = 3 * nSi + (delta - nSi) * 2;
-    delta_prime_prime = delta_prime + 1;
+    int beta_prime = 3 * nSi + (beta - nSi) * 2;
+    int beta_prime_prime = beta_prime + 1;
+    int gamma_prime = 3 * nSi + (gamma - nSi) * 2;
+    int gamma_prime_prime = gamma_prime + 1;
+    int eta_prime = 3 * nSi + (eta - nSi) * 2;
+    int eta_prime_prime = eta_prime + 1;
+    int delta_prime = 3 * nSi + (delta - nSi) * 2;
+    int delta_prime_prime = delta_prime + 1;
 
     //      Top layer
 
@@ -860,8 +685,7 @@ void LammpsObject::switchBonds(VecF<int> switchIdsA, VecF<int> switchIdsT)
     lammps_command(handle, command.c_str());
 }
 
-void LammpsObject::revertBonds(VecF<int> switchIdsA, VecF<int> switchIdsT)
-{
+void LammpsObject::revertBonds(VecF<int> switchIdsA, VecF<int> switchIdsT) {
     // unpck parameters
     int a = switchIdsA[0];
     int b = switchIdsA[1];
@@ -892,8 +716,7 @@ void LammpsObject::revertBonds(VecF<int> switchIdsA, VecF<int> switchIdsT)
      *
      */
 
-    std::string command;
-    command = "group switch id " + std::to_string(a) + " " + std::to_string(d);
+    std::string command = "group switch id " + std::to_string(a) + " " + std::to_string(d);
     lammps_command(handle, command.c_str());
     lammps_command(handle, "group switch delete");
 
@@ -947,8 +770,7 @@ void LammpsObject::revertBonds(VecF<int> switchIdsA, VecF<int> switchIdsT)
     lammps_command(handle, command.c_str());
 }
 
-VecF<int> LammpsObject::GlobalPotentialMinimisation()
-{
+VecF<int> LammpsObject::globalPotentialMinimisation() {
     lammps_command(handle, "minimize 1.0e-6 0.0 1000000 10000000");
     VecF<int> optstatus(2);
     optstatus[0] = 0;
@@ -956,12 +778,10 @@ VecF<int> LammpsObject::GlobalPotentialMinimisation()
     return optstatus;
 }
 
-double LammpsObject::globalPotentialEnergy()
-{
+double LammpsObject::globalPotentialEnergy() {
     return lammps_get_thermo(handle, "pe");
 }
 
-double LammpsObject::probeE()
-{
+double LammpsObject::probeE() {
     return lammps_get_thermo(handle, "etotal");
 }
