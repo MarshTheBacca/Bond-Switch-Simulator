@@ -3,15 +3,14 @@
 #ifndef NL_NODE_H
 #define NL_NODE_H
 
-#include <iostream>
+#include "vec_func.h"
 #include "vecf.h"
 #include "vecr.h"
-#include "vec_func.h"
+#include <iostream>
 
 // Node in network, aka vertex in graph
-class Node
-{
-public:
+class Node {
+  public:
     // Data members
     int id;             // unique id used by other nodes for connections
     VecF<double> crd;   // coordinate
@@ -25,6 +24,7 @@ public:
     Node(int nodeId, int maxNetCnxs, int maxDualCnxs, int maxAuxCnxs);
     Node(const Node &source);
     Node &operator=(const Node &source);
+    double distanceFrom(VecF<double> &crd2);
 };
 
 #endif // NL_NODE_H
