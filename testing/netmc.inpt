@@ -29,8 +29,6 @@ false           Enable BN?
 Monte Carlo Process
 switch      move type (switch/mix)
 0           random seed
-false       Enable Spiral?
-10          spiral radius
 weighted    random/weighted MC
 --------------------------------------------------
 Monte Carlo Energy Search
