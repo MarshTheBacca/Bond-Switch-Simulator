@@ -73,7 +73,7 @@ void InputData::readNetworkMinimisationProtocols(std::ifstream &inputFile,
 
 void InputData::readMonteCarloProcess(std::ifstream &inputFile,
                                       const LoggerPtr &logger) {
-    readSection(inputFile, "Monte Carlo Process", logger, moveType, randomSeed, spiralRadius, randomOrWeighted);
+    readSection(inputFile, "Monte Carlo Process", logger, moveType, randomSeed, randomOrWeighted);
 }
 
 void InputData::readMonteCarloEnergySearch(std::ifstream &inputFile,
