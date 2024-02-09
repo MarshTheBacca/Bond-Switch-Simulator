@@ -2,11 +2,11 @@
 #ifndef NL_VECR_H
 #define NL_VECR_H
 
+#include <cmath>
 #include <iostream>
 #include <limits>
-#include <cmath>
-#include <sstream>
 #include <spdlog/spdlog.h>
+#include <sstream>
 
 using LoggerPtr = std::shared_ptr<spdlog::logger>;
 
@@ -14,10 +14,9 @@ using LoggerPtr = std::shared_ptr<spdlog::logger>;
  * Maximum size defines limit on the number of values
  * Current size determines accessible number of values */
 template <typename T>
-class VecR
-{
+class VecR {
 
-public:
+  public:
     // Data members
     int n;    // number of values
     int nMax; // maximum number of values
@@ -25,13 +24,13 @@ public:
 
     // Constructors, copy constructor, destructor
     VecR();
-    VecR(int maxSize);
+    explicit VecR(int maxSize);
     VecR(int size, int maxSize);
     VecR(const VecR &source);
     ~VecR();
 
     // Member functions
-    inline bool equals(const T &a, const T &b);               // check for equality
+    bool equals(const T &a, const T &b) const;                // check for equality
     void setSize(int size);                                   // set current size
     void resetMaxSize(int maxSize);                           // reset maximum size
     void addValue(T value);                                   // add value to end
@@ -72,14 +71,14 @@ public:
     T *end() { return v + n; }
 
     // Stream
-    friend std::ostream &operator<<(std::ostream &output, const VecR &source)
-    {
+    friend std::ostream &operator<<(std::ostream &output, const VecR &source) {
         for (int i = 0; i < source.n; ++i)
             output << source.v[i] << std::endl;
         return output;
     };
 
     void toLog(LoggerPtr logger);
+    bool contains(T value);
 };
 
 #include "vecr.tpp"
