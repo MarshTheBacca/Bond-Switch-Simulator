@@ -9,7 +9,9 @@ const int TRIANGULAR_NODE_DUAL_CNXS = 6;
  * @param num Number to calculate the rounded square root of
  * @return Rounded square root of the number
  */
-int roundedSqrt(int num) { return std::round(std::sqrt(num)); }
+inline int roundedSqrt(int num) {
+    return std::round(std::sqrt(num));
+}
 
 // Default constructor
 Network::Network() : nodes(VecR<Node>(0, 1)) {}
@@ -1552,13 +1554,10 @@ Network::Network(VecR<Node> nodesA, VecF<double> pbA, VecF<double> rpbA,
             }
         }
     }
-    int atom1;
-    int atom2;
-    int atom3;
     for (int i = 0; i < nodesA.n; ++i) {
-        atom1 = nodes[i].netCnxs[0];
-        atom2 = nodes[i].netCnxs[1];
-        atom3 = nodes[i].netCnxs[2];
+        int atom1 = nodes[i].netCnxs[0];
+        int atom2 = nodes[i].netCnxs[1];
+        int atom3 = nodes[i].netCnxs[2];
 
         nodes[atom1].netCnxs.addValue(atom2);
         nodes[atom2].netCnxs.addValue(atom1);
@@ -1578,6 +1577,7 @@ int Network::getMaxCnxs() {
             maxNetCnxs = nodes[i].netCnxs.n;
         }
     }
+    return maxNetCnxs;
 }
 
 int Network::getMinCnxs() {
@@ -1587,4 +1587,5 @@ int Network::getMinCnxs() {
             minNetCnxs = nodes[i].netCnxs.n;
         }
     }
+    return minNetCnxs;
 }
