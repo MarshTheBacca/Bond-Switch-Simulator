@@ -218,33 +218,31 @@ void VecR<T>::swapValue(T vDel, T vAdd, T vBetween0, T vBetween1) {
 // Insert value in vector between two others
 template <typename T>
 void VecR<T>::insertValue(T vInsert, T vBetween0, T vBetween1) {
-    if (this->n == this->nMax)
+    if (n == nMax)
         throw std::runtime_error("Cannot insert to vector to make larger than reserved size");
     bool insert = false;
     int insertPos = -1;
 
-    for (int i = 0; i < this->n; ++i) {
-        if (this->v[i] == vBetween0 && this->v[(i + 1) % this->n] == vBetween1) {
-            insertPos = (i + 1) % this->n;
-            insert = true;
-        } else if (this->v[i] == vBetween1 && this->v[(i + 1) % this->n] == vBetween0) {
-            insertPos = (i + 1) % this->n;
+    for (int i = 0; i < n; ++i) {
+        if ((v[i] == vBetween0 && v[(i + 1) % n] == vBetween1) || (v[i] == vBetween1 && v[(i + 1) % n] == vBetween0)) {
+            insertPos = (i + 1) % n;
             insert = true;
         }
         if (insert)
             break;
     }
     if (!insert) {
-        for (int i = 0; i < this->n; ++i)
-            std::cout << this->v[i] << std::endl;
-        throw std::runtime_error("Cannot insert value as surrounding values not present in vector");
+        std::ostringstream oss;
+        oss << "Cannot insert " << vInsert << " between " << vBetween0 << " and " << vBetween1 << " in vector: ";
+        for (int i = 0; i < n; ++i)
+            oss << v[i] << " ";
+        throw std::runtime_error(oss.str());
     }
-    for (int i = this->n; i > insertPos; --i)
-        this->v[i] = this->v[i - 1];
-    this->v[insertPos] = vInsert;
-    ++this->n;
+    for (int i = n; i > insertPos; --i)
+        v[i] = v[i - 1];
+    v[insertPos] = vInsert;
+    ++n;
 }
-
 // Subscript operator
 template <typename T>
 T &VecR<T>::operator[](int i) {
