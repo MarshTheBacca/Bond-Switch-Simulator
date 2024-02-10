@@ -40,7 +40,3 @@ Node &Node::operator=(const Node &source) {
     }
     return *this;
 }
-
-inline double Node::distanceFrom(VecF<double> &crd2) {
-    return sqrt(pow(crd[0] - crd2[0], 2) + pow(crd[1] - crd2[1], 2));
-}

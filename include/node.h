@@ -24,7 +24,9 @@ class Node {
     Node(int nodeId, int maxNetCnxs, int maxDualCnxs, int maxAuxCnxs);
     Node(const Node &source);
     Node &operator=(const Node &source);
-    double distanceFrom(VecF<double> &crd2);
+    inline double distanceFrom(VecF<double> &coordinate) {
+        return sqrt(pow(crd[0] - coordinate[0], 2) + pow(crd[1] - coordinate[1], 2));
+    }
 };
 
 #endif // NL_NODE_H
