@@ -32,7 +32,7 @@ LinkedNetwork::LinkedNetwork(int numRings, LoggerPtr logger)
  * @param inputData the input data object
  * @param logger the logger object
  */
-LinkedNetwork::LinkedNetwork(InputData &inputData, LoggerPtr logger) {
+LinkedNetwork::LinkedNetwork(InputData &inputData, LoggerPtr logger) : centreCoords(2) {
     std::string prefix = inputData.inputFolder + '/' + inputData.inputFilePrefix;
 
     networkA = Network(prefix + "_A", inputData.maxRingSize, inputData.maxRingSize, logger);
@@ -42,6 +42,11 @@ LinkedNetwork::LinkedNetwork(InputData &inputData, LoggerPtr logger) {
     networkB = Network(prefix + "_B", inputData.maxRingSize, inputData.maxRingSize, logger);
     minBCnxs = networkB.getMinCnxs();
     maxBCnxs = networkB.getMaxCnxs();
+
+    dimensions = networkA.dimensions;
+    centreCoords[0] = dimensions[0] / 2;
+    centreCoords[1] = dimensions[1] / 2;
+
     if (inputData.minCoordination <= minACnxs) {
         minACnxs = inputData.minCoordination;
     } else {
@@ -232,8 +237,8 @@ const int CNX_TYPE_43 = 43;
  * @param randNodeConnectionCoordination Coordination of the second random node.
  * @param logger The logger object.
  */
-void assignValues(int &a, int &b, int &cnxType, int randNode, int randNodeConnection,
-                  int randNodeCoordination, int randNodeConnectionCoordination) {
+void LinkedNetwork::assignValues(int &a, int &b, int &cnxType, int randNode, int randNodeConnection,
+                                 int randNodeCoordination, int randNodeConnectionCoordination) {
     if (randNodeCoordination == 3 && randNodeConnectionCoordination == 3) {
         cnxType = CNX_TYPE_33;
         a = randNode;
@@ -301,7 +306,6 @@ int LinkedNetwork::pickRandomConnection(int &baseNode1, int &baseNode2, int &rin
 
     // Create a discrete distribution based on the weights
     std::discrete_distribution<> distribution(weights.begin(), weights.end());
-
     int cnxType;
     bool pickingAcceptableRing = true;
     while (pickingAcceptableRing) {
@@ -319,7 +323,6 @@ int LinkedNetwork::pickRandomConnection(int &baseNode1, int &baseNode2, int &rin
             logger->critical(e.what());
             throw;
         }
-
         // Two connected nodes should always share two ring nodes.
         if (VecR<int> commonRings = vCommonValues(networkA.nodes[baseNode1].dualCnxs, networkA.nodes[baseNode2].dualCnxs);
             commonRings.n == 2) {
@@ -2468,47 +2471,7 @@ LinkedNetwork::globalGeometryOptimisation(bool useIntx,
             if (potModel.function(crds) <
                 std::numeric_limits<double>::infinity()) { // only optimise if no line
                                                            // intersections
-                SteepestDescentArmijoMultiDim<HRI2DP> optimiser(
-                    goptParamsA[0], goptParamsB[0], goptParamsB[1]);
-                optStatus = optimiser(potModel, crds);
-            } else {
-                optStatus[0] = 3;
-                optStatus[1] = 0;
-            }
-        }
-    } else if (network.geometryCode == "2DS") {
-        VecF<int> constrained(network.nodes.n);
-        for (int i = 0; i < network.nodes.n; ++i)
-            constrained[i] = i;
-        if (!isMaintainConvexityEnabled) {
-            HI3DS potModel;
-            potModel.setBonds(bnds, bndP);
-            potModel.setAngles(angs, angP);
-            potModel.setGeomConstraints(constrained, potParamsC);
-            if (useIntx)
-                potModel.setIntersections(intx, intxP);
-            if (potModel.function(crds) <
-                std::numeric_limits<double>::infinity()) { // only optimise if no line
-                                                           // intersections
-                SteepestDescentArmijoMultiDim<HI3DS> optimiser(
-                    goptParamsA[0], goptParamsB[0], goptParamsB[1]);
-                optStatus = optimiser(potModel, crds);
-            } else {
-                optStatus[0] = 3;
-                optStatus[1] = 0;
-            }
-        } else {
-            HRI3DS potModel;
-            potModel.setBonds(bnds, bndP);
-            potModel.setAngles(angs, angP);
-            potModel.setGeomConstraints(constrained, potParamsC);
-            if (useIntx)
-                potModel.setIntersections(intx, intxP);
-            if (potModel.function(crds) <
-                std::numeric_limits<double>::infinity()) { // only optimise if no line
-                                                           // intersections
-                SteepestDescentArmijoMultiDim<HRI3DS> optimiser(
-                    goptParamsA[0], goptParamsB[0], goptParamsB[1]);
+                SteepestDescentArmijoMultiDim<HRI2DP> optimiser(goptParamsA[0], goptParamsB[0], goptParamsB[1]);
                 optStatus = optimiser(potModel, crds);
             } else {
                 optStatus[0] = 3;
