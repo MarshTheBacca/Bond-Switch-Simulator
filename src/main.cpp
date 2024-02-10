@@ -164,11 +164,8 @@ int main(int argc, char *argv[]) {
     double BilayerEnergy = 0.0;
     double BNEnergy = 0.0;
     try {
-        logger->info("Hi");
         if (inputData.isSimpleGrapheneEnabled) {
-            logger->info("Bye");
             SimpleGrapheneEnergy = network.SimpleGraphene.globalPotentialEnergy();
-            logger->info("sigh");
         }
         if (inputData.isTersoffGrapheneEnabled) {
             TersoffGrapheneEnergy = network.TersoffGraphene.globalPotentialEnergy();
@@ -359,8 +356,8 @@ int main(int argc, char *argv[]) {
     logger->debug("Checking consistency and convexity");
     bool consistent = network.checkConsistency();
     bool convex = network.checkConvexity();
-    logger->debug("Network consistent: {}", consistent);
-    logger->debug("Rings convex: {}", convex);
+    logger->debug("Network consistent: {}", consistent ? "true" : "false");
+    logger->debug("Rings convex: {}", convex ? "true" : "false");
     logger->debug("Monte Carlo acceptance: {}",
                   (double)numAcceptedMoves / inputData.stepsPerTemperature);
     logger->debug("Geometry optimisation codes: {}");
