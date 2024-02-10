@@ -1,16 +1,15 @@
 log Si.log
-
 units electron                                                   
-dimension 2                                                          
+dimension 2    
+
 processors * * *                                                        
 boundary p p p                                                      
 atom_style molecular
+
 read_data ./input_files/Si.data            
 timestep $(25*0.02418884326) 
 
-variable potential_path equal "input_files/PARM_Si.lammps"
-print "Setting up potential from ${potential_path}"
-include ${potential_path}                                                 
+include "input_files/Si_potential.in"                                               
 
 thermo 0                                                       
 thermo_style custom step pe ke epair ebond etotal vol temp              

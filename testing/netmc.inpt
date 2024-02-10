@@ -4,8 +4,8 @@ I/O
 ./output_files  Output Folder prefix
 test            	Output File prefix
 ./input_files       Input Folder prefix
-testA            	Input File prefix
-true               Create Network from scratch?
+gi_test            	Input File prefix
+false               Create Network from scratch?
 false              	Restart Network using lammps objects?
 --------------------------------------------------
 Network Properties

@@ -22,14 +22,14 @@ class Network:
         self.n = int(f.readline())
         self.geom = str(f.readline())
         f.readline()
-        self.pb = np.array([float(a) for a in f.readline().split()])
+        self.dimensions = np.array([float(a) for a in f.readline().split()])
         self.rpb = np.array([float(a) for a in f.readline().split()])
         f.close()
 
     def read_crd_file(self):
         self.crds = np.genfromtxt(self.prefix + "_crds.dat", dtype=float)
-        self.crds[:, 0] -= self.pb[0] * np.round(self.crds[:, 0] * self.rpb[0])
-        self.crds[:, 1] -= self.pb[1] * np.round(self.crds[:, 1] * self.rpb[1])
+        self.crds[:, 0] -= self.dimensions[0] * np.round(self.crds[:, 0] * self.rpb[0])
+        self.crds[:, 1] -= self.dimensions[1] * np.round(self.crds[:, 1] * self.rpb[1])
         if self.crds.shape[1] == 3:
             crds_3d = np.zeros_like(self.crds)
             crds_3dp = np.zeros_like(self.crds)
@@ -87,8 +87,8 @@ class Network:
     def generate_ring_crds(self, rings, av_ring_size):
         self.init_ring_colours2(av_ring_size)
         self.ring_crds = []
-        x_cut = 0.5 * self.pb[0]
-        y_cut = 0.5 * self.pb[1]
+        x_cut = 0.5 * self.dimensions[0]
+        y_cut = 0.5 * self.dimensions[1]
         for ring in rings:
             x = np.zeros(ring.size)
             y = np.zeros(ring.size)
@@ -99,10 +99,10 @@ class Network:
             origin_y = y[np.argmin(np.abs(y - y_cut))]  # +np.abs(y-y_cut))]
             x -= origin_x
             y -= origin_y
-            x[x > x_cut] -= self.pb[0]
-            y[y > y_cut] -= self.pb[1]
-            x[x < -x_cut] += self.pb[0]
-            y[y < -y_cut] += self.pb[1]
+            x[x > x_cut] -= self.dimensions[0]
+            y[y > y_cut] -= self.dimensions[1]
+            x[x < -x_cut] += self.dimensions[0]
+            y[y < -y_cut] += self.dimensions[1]
             x += origin_x
             y += origin_y
             self.ring_crds.append(np.array(list(zip(x, y))))
@@ -188,8 +188,8 @@ class Network:
 
         patches = []
         ring_colours = []
-        x_shift *= self.pb[0]
-        y_shift *= self.pb[1]
+        x_shift *= self.dimensions[0]
+        y_shift *= self.dimensions[1]
         order = np.argsort(np.array([np.max(np.abs(c)) for c in self.ring_crds]))[::-1]
         print(order)
         for i, ring in enumerate(self.ring_crds[order]):
@@ -211,16 +211,16 @@ class Network:
                 zorder=zorder,
             )
         )
-        ax.set_xlim(-self.pb[0] * 0.5, self.pb[0] * 1.5)
-        ax.set_ylim(-self.pb[0] * 0.5, self.pb[0] * 1.5)
+        ax.set_xlim(-self.dimensions[0] * 0.5, self.dimensions[0] * 1.5)
+        ax.set_ylim(-self.dimensions[0] * 0.5, self.dimensions[0] * 1.5)
         return ax
 
     def plot_connections(self, ax, lw=1, alpha=1, x_shift=0, y_shift=0):
 
-        x_shift *= self.pb[0]
-        y_shift *= self.pb[1]
-        x_cut = 0.5 * self.pb[0]
-        y_cut = 0.5 * self.pb[1]
+        x_shift *= self.dimensions[0]
+        y_shift *= self.dimensions[1]
+        x_cut = 0.5 * self.dimensions[0]
+        y_cut = 0.5 * self.dimensions[1]
         self.crds[:, 0] += x_shift
         self.crds[:, 1] += y_shift
         # mask_3 = np.array([self.netCnxs[i].size==3 for i in range(self.netCnxs.size)])
@@ -236,13 +236,13 @@ class Network:
                 x = self.crds[j, 0] - self.crds[i, 0]
                 y = self.crds[j, 1] - self.crds[i, 1]
                 if x > x_cut:
-                    x -= self.pb[0]
+                    x -= self.dimensions[0]
                 elif x < -x_cut:
-                    x += self.pb[0]
+                    x += self.dimensions[0]
                 if y > y_cut:
-                    y -= self.pb[1]
+                    y -= self.dimensions[1]
                 elif y < -y_cut:
-                    y += self.pb[1]
+                    y += self.dimensions[1]
                 plt.plot(
                     (self.crds[i, 0], self.crds[i, 0] + x),
                     (self.crds[i, 1], self.crds[i, 1] + y),
@@ -265,8 +265,8 @@ class Network:
         ]
         cluster_colours.append("white")
         ring_colours = []
-        x_shift *= self.pb[0]
-        y_shift *= self.pb[1]
+        x_shift *= self.dimensions[0]
+        y_shift *= self.dimensions[1]
         order = np.argsort(np.array([np.max(np.abs(c)) for c in self.ring_crds]))[::-1]
         for i, ring in enumerate(self.ring_crds):
             ring[:, 0] += x_shift

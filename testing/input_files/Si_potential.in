@@ -1,0 +1,14 @@
+# Remember, all units are the electron style, so Energy is in Hatrees, distances in Bohr radii and angles in degrees
+
+# The potential is E = U(min) / (r0 -rC)^2 ((r-r0)^2 - (rC-r0)^2)
+# The numbers in the bond_coeff command correspond to: Minimum energy (U(min)), equilibrium bond length (r0) and the critical distance (rC), at which the potential = 0
+
+bond_style harmonic/shift/cut
+bond_coeff Si-Si -36.8 2.3 3.5 
+
+
+# The potential is E = K(theta - theta_0)^2
+# The numbers in the angle_coeff command correspond to: The force constant (K) and the equilibrium angle (theta_0)
+
+angle_style harmonic
+angle_coeff Si-Si-Si 100 120

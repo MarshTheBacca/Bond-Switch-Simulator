@@ -23,7 +23,7 @@ class Network:
         self.n = int(f.readline())
         self.geom = str(f.readline())
         f.readline()
-        self.pb = np.array([float(a) for a in f.readline().split()])
+        self.dimensions = np.array([float(a) for a in f.readline().split()])
         self.rpb = np.array([float(a) for a in f.readline().split()])
         f.close()
 
@@ -121,8 +121,8 @@ class Network:
                     c="k",
                     lw=lw,
                 )
-        #         ax.set_xlim(-self.pb[0]*0.2,self.pb[0]*1.2)
-        #         ax.set_ylim(-self.pb[0]*0.2,self.pb[0]*1.2)
+        #         ax.set_xlim(-self.dimensions[0]*0.2,self.dimensions[0]*1.2)
+        #         ax.set_ylim(-self.dimensions[0]*0.2,self.dimensions[0]*1.2)
         return ax
 
     def init_ring_colours2(self, av_ring_size):

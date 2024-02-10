@@ -2,6 +2,7 @@
     "sonarlint.pathToCompileCommands": "${workspaceFolder}/build/compile_commands.json",
     "C_Cpp.default.compileCommands": "${workspaceFolder}/build/compile_commands.json",
     "makefile.compileCommandsPath": "${workspaceFolder}/build/compile_commands.json",
+    "editor.tabSize": 4,
     "files.associations": {
         "iostream": "cpp",
         "array": "cpp",
