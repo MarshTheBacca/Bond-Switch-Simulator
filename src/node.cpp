@@ -10,33 +10,40 @@ Node::Node() {
 }
 
 // Construct with maximum number of connections, initialise with 0
-Node::Node(int nodeId, int maxNetCnxs, int maxDualCnxs, int maxAuxCnxs) {
-    id = nodeId;
-    netCnxs = VecR<int>(0, maxNetCnxs);
-    dualCnxs = VecR<int>(0, maxDualCnxs);
-    auxCnxs = VecR<int>(0, maxAuxCnxs);
+Node::Node(int nodeId, int maxNetCnxs, int maxDualCnxs, int maxAuxCnxs) : id(nodeId), netCnxs(0, maxNetCnxs),
+                                                                          dualCnxs(0, maxDualCnxs), auxCnxs(0, maxAuxCnxs) {
     oxyCnxs = VecR<int>(8);
 }
 
-// Copy constructor
-Node::Node(const Node &source) {
-    id = source.id;
-    crd = source.crd;
-    netCnxs = source.netCnxs;
-    dualCnxs = source.dualCnxs;
-    auxCnxs = source.auxCnxs;
-    oxyCnxs = source.oxyCnxs;
+std::ostream &operator<<(std::ostream &os, Node &node) {
+    // Replace this with your actual implementation
+    os << "Node " << node.id << "at " << node.crd[0] << ", " << node.crd[1] << " with neighbours: ";
+    for (int i = 0; i < node.netCnxs.n; ++i)
+        os << node.netCnxs[i] << " ";
+    os << " and ring neighbours: ";
+    for (int i = 0; i < node.dualCnxs.n; ++i)
+        os << node.dualCnxs[i] << " ";
+    return os;
 }
 
-// Assigment operator
-Node &Node::operator=(const Node &source) {
-    if (this != &source) {
-        id = source.id;
-        crd = source.crd;
-        netCnxs = source.netCnxs;
-        dualCnxs = source.dualCnxs;
-        auxCnxs = source.auxCnxs;
-        oxyCnxs = source.oxyCnxs;
-    }
-    return *this;
+std::ostream &operator<<(std::ostream &os, const Node &node) {
+    // Replace this with your actual implementation
+    os << "Node " << node.id << "at " << node.crd[0] << ", " << node.crd[1] << " with neighbours: ";
+    for (int i = 0; i < node.netCnxs.n; ++i)
+        os << node.netCnxs[i] << " ";
+    os << " and ring neighbours: ";
+    for (int i = 0; i < node.dualCnxs.n; ++i)
+        os << node.dualCnxs[i] << " ";
+    return os;
+}
+
+std::string Node::toString() {
+    std::string str = "Node " + std::to_string(id) + " at " + std::to_string(crd[0]) + ", " + std::to_string(crd[1]) +
+                      " with neighbours: ";
+    for (int i = 0; i < netCnxs.n; ++i)
+        str += std::to_string(netCnxs[i]) + " ";
+    str += " and ring neighbours: ";
+    for (int i = 0; i < dualCnxs.n; ++i)
+        str += std::to_string(dualCnxs[i]) + " ";
+    return str;
 }
