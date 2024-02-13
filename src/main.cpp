@@ -121,7 +121,6 @@ int main(int argc, char *argv[]) {
 
     std::string prefixOut = inputData.outputFolder + "/" + inputData.outputFilePrefix;
     OutputFile outEnergyStats(prefixOut + "_e_compare.out");
-    logger->debug("Energy file created");
     OutputFile outRingStats(prefixOut + "_ringstats.out");
     OutputFile outCorr(prefixOut + "_correlations.out");
     OutputFile outEnergy(prefixOut + "_energy.out");
@@ -190,6 +189,7 @@ int main(int argc, char *argv[]) {
                          TriangleRaftEnergy, BilayerEnergy, BNEnergy);
             moveStatus = network.monteCarloSwitchMoveLAMMPS(SimpleGrapheneEnergy, TersoffGrapheneEnergy, TriangleRaftEnergy,
                                                             BilayerEnergy, BNEnergy, logger);
+            logger->debug("After move");
             if (moveStatus[0])
                 numAcceptedMoves++;
             optCodes[moveStatus[1]] += 1;
@@ -242,8 +242,7 @@ int main(int argc, char *argv[]) {
             if (i % inputData.structureWriteFrequency == 0 &&
                 inputData.isWriteSamplingStructuresEnabled == 1) {
                 network.syncCoordinates();
-                std::string structureFilePath =
-                    prefixOut + "_therm_" + std::to_string(i);
+                std::string structureFilePath = prefixOut + "_therm_" + std::to_string(i);
                 logger->info("Writing structure: {} to file {}", i, structureFilePath);
                 network.writeXYZ(structureFilePath);
             }
@@ -286,8 +285,7 @@ int main(int argc, char *argv[]) {
                     corr[3] = aw[1];
                     corr[4] = aw[2];
                     corr[5] = rr;
-                    VecF<double> geomStats = network.getOptimisationGeometry(
-                        network.networkA, lenHist, angHist);
+                    VecF<double> geomStats = network.getOptimisationGeometry(network.networkA, lenHist, angHist);
                     VecF<VecF<int>> edgeDist = network.getEdgeDistribution("B");
                     VecF<double> cndStats = network.getNodeDistribution("A");
                     VecF<double> eCompare(6);
@@ -314,8 +312,7 @@ int main(int argc, char *argv[]) {
                 if (i % inputData.structureWriteFrequency == 0 &&
                     inputData.isWriteSamplingStructuresEnabled == 1) {
                     network.syncCoordinates();
-                    network.writeXYZ(prefixOut + "_t" + std::to_string(temperature) + "_" +
-                                     std::to_string(i));
+                    network.writeXYZ(prefixOut + "_t" + std::to_string(temperature) + "_" + std::to_string(i));
                 }
             }
         }
@@ -358,16 +355,14 @@ int main(int argc, char *argv[]) {
     bool convex = network.checkConvexity();
     logger->debug("Network consistent: {}", consistent ? "true" : "false");
     logger->debug("Rings convex: {}", convex ? "true" : "false");
-    logger->debug("Monte Carlo acceptance: {}",
-                  (double)numAcceptedMoves / inputData.stepsPerTemperature);
+    logger->debug("Monte Carlo acceptance: {}", (double)numAcceptedMoves / inputData.stepsPerTemperature);
     logger->debug("Geometry optimisation codes: {}");
     logger->debug("Converged: {}", optCodes[0]);
     logger->debug("Converged (zero force): {}", optCodes[1]);
     logger->debug("Unconverged: {}", optCodes[2]);
     logger->debug("Failed (overlapping): {}", optCodes[3]);
     logger->debug("Failed (initially non-convex): {}", optCodes[4]);
-    logger->debug("Geometry optimisation average iterations: {}",
-                  optIterations / vSum(optCodes));
+    logger->debug("Geometry optimisation average iterations: {}", optIterations / vSum(optCodes));
 
     // Write files
     logger->info("Writing files...");
@@ -380,9 +375,7 @@ int main(int argc, char *argv[]) {
 
     // Log time taken
     auto end = std::chrono::high_resolution_clock::now();
-    auto duration =
-        std::chrono::duration_cast<std::chrono::milliseconds>(end - start) /
-        1000.0;
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start) / 1000.0;
     logger->info("Total run time: {} s", duration.count());
     spdlog::shutdown();
 
