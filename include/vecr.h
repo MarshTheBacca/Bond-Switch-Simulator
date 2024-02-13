@@ -30,17 +30,20 @@ class VecR {
     ~VecR();
 
     // Member functions
-    bool equals(const T &a, const T &b) const;                // check for equality
-    void setSize(int size);                                   // set current size
-    void resetMaxSize(int maxSize);                           // reset maximum size
-    void addValue(T value);                                   // add value to end
-    void delValue(T value);                                   // remove first instance of value from vector
-    void swapValue(T vDel, T vAdd, bool swapAll = true);      // swap a value in place of another
-    void swapValue(T vDel, T vAdd, T vBetween0, T vBetween1); // swap value in place of another at specific point
-    void insertValue(T vInsert, T vBetween0, T vBetween1);    // insert a value between two others
+    bool equals(const T &a, const T &b) const;                                      // check for equality
+    void setSize(int size);                                                         // set current size
+    void resetMaxSize(int maxSize);                                                 // reset maximum size
+    void addValue(T value);                                                         // add value to end
+    void delValue(T value);                                                         // remove first instance of value from vector
+    void replaceValue(T vDel, T vAdd, bool swapAll = true);                         // swap a value in place of another
+    bool tryReplace(int i, int j, int k, T vDel, T vAdd, T vBetween0, T vBetween1); // Helper function for replaceValue
+    void replaceValue(T vDel, T vAdd, T vBetween0, T vBetween1);                    // swap value in place of another at specific point
+    void insertValue(T vInsert, T vBetween0, T vBetween1);                          // insert a value between two others
 
     // Subscript operator
     T &operator[](int i);
+    T &operator[](int i) const;
+
     // Binary operators with constant
     void operator=(const T &k);
     void operator+=(const T &k);
@@ -67,18 +70,20 @@ class VecR {
     VecR operator/(const VecR &source);
     // Unary operators
     VecR operator-();
+
     T *begin() { return v; }
+    const T *begin() const { return v; } // const version
+
     T *end() { return v + n; }
+    const T *end() const { return v + n; } // const version
 
-    // Stream
-    friend std::ostream &operator<<(std::ostream &output, const VecR &source) {
-        for (int i = 0; i < source.n; ++i)
-            output << source.v[i] << std::endl;
-        return output;
-    };
-
-    void toLog(LoggerPtr logger);
     bool contains(T value);
+    std::string toString();
+
+    template <typename U>
+    friend std::ostream &operator<<(std::ostream &os, VecR<U> &vec);
+    template <typename U>
+    friend std::ostream &operator<<(std::ostream &os, const VecR<U> &vec);
 };
 
 #include "vecr.tpp"

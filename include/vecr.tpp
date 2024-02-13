@@ -138,81 +138,77 @@ void VecR<T>::delValue(T value) {
     --this->n;
 }
 
-// Swaps value from vector
+/**
+ * @brief Replace a value in the vector with another
+ * @param removeValue The value to remove
+ * @param addValue The value to add
+ * @param replaceAll Whether to replace all instances of the value
+ * @typedef T The type of the vector
+ * @throws std::runtime_error If the value to replace is not present in the vector
+ */
 template <typename T>
-void VecR<T>::swapValue(T vDel, T vAdd, bool swapAll) {
-    bool swap = false;
-    if (swapAll) {
-        for (int i = 0; i < this->n; ++i) {
-            if (equals(this->v[i], vDel)) {
-                this->v[i] = vAdd;
-                swap = true;
-            }
-        }
-    } else {
-        for (int i = 0; i < this->n; ++i) {
-            if (equals(this->v[i], vDel)) {
-                this->v[i] = vAdd;
-                swap = true;
-                break;
-            }
+void VecR<T>::replaceValue(T removeValue, T addValue, bool replaceAll) {
+    // Use std::find_if to find the first occurrence of removeValue in the vector
+    auto it = std::find_if(this->v, this->v + this->n, [&](const T &value) {
+        return equals(value, removeValue);
+    });
+
+    // If removeValue is not found in the vector, throw an exception
+    if (it == this->v + this->n) {
+        std::ostringstream oss;
+        oss << "Cannot replace value " << removeValue << " with " << addValue << " as not present in vector: " << *this;
+        throw std::runtime_error(oss.str());
+    }
+
+    // Replace the found value with addValue
+    *it = addValue;
+
+    // If replaceAll is true, continue to find and replace all subsequent occurrences of removeValue
+    if (replaceAll) {
+        while ((it = std::find_if(it + 1, this->v + this->n, [&](const T &value) {
+                    return equals(value, removeValue);
+                })) != this->v + this->n) {
+            *it = addValue;
         }
     }
-    if (!swap)
-        throw std::runtime_error("Cannot swap value as not present in vector");
 }
 
 template <typename T>
-void VecR<T>::swapValue(T vDel, T vAdd, T vBetween0, T vBetween1) {
-    bool swap = false;
-    int i;
-    int j;
-    int k;
-    i = 0;
-    j = this->n - 1;
-    k = 1;
-    if (equals(this->v[i], vDel)) {
-        if (equals(this->v[j], vBetween0) && equals(this->v[k], vBetween1)) {
-            this->v[i] = vAdd;
-            swap = true;
-        } else if (equals(this->v[j], vBetween1) && equals(this->v[k], vBetween0)) {
-            this->v[i] = vAdd;
-            swap = true;
+bool VecR<T>::tryReplace(int i, int j, int k, T removeValue, T addValue, T betweenValue1, T betweenValue2) {
+    if (equals(v[i], removeValue)) {
+        if ((equals(v[j], betweenValue1) && equals(v[k], betweenValue2)) ||
+            (equals(v[j], betweenValue2) && equals(v[k], betweenValue1))) {
+            v[i] = addValue;
+            return true;
         }
     }
-    if (swap)
+    return false;
+}
+
+/**
+ * @brief Replace a value in place of another at a specific point
+ * @param removeValue The value to delete
+ * @param addValue The value to add
+ * @param betweenValue1 The first value between which to swap
+ * @param betweenValue2 The second value between which to swap
+ * @typedef T The type of the vector
+ * @throws std::runtime_error If the sequence is not present in the vector
+ */
+template <typename T>
+void VecR<T>::replaceValue(T removeValue, T addValue, T betweenValue1, T betweenValue2) {
+    if (tryReplace(0, n - 1, 1, removeValue, addValue, betweenValue1, betweenValue2) ||
+        tryReplace(n - 1, n - 2, 0, removeValue, addValue, betweenValue1, betweenValue2)) {
         return;
-    for (int i = 1, j = 0, k = 2; i < this->n - 1; ++i, ++j, ++k) {
-        if (equals(this->v[i], vDel)) {
-            if (equals(this->v[j], vBetween0) && equals(this->v[k], vBetween1)) {
-                this->v[i] = vAdd;
-                swap = true;
-                break;
-            } else if (equals(this->v[j], vBetween1) && equals(this->v[k], vBetween0)) {
-                this->v[i] = vAdd;
-                swap = true;
-                break;
-            }
+    }
+
+    for (int i = 1, j = 0, k = 2; i < n - 1; ++i, ++j, ++k) {
+        if (tryReplace(i, j, k, removeValue, addValue, betweenValue1, betweenValue2)) {
+            return;
         }
     }
-    if (swap)
-        return;
-    i = this->n - 1;
-    j = this->n - 2;
-    k = 0;
-    if (equals(this->v[i], vDel)) {
-        if (equals(this->v[j], vBetween0) && equals(this->v[k], vBetween1)) {
-            this->v[i] = vAdd;
-            swap = true;
-        } else if (equals(this->v[j], vBetween1) && equals(this->v[k], vBetween0)) {
-            this->v[i] = vAdd;
-            swap = true;
-        }
-    }
-    if (swap)
-        return;
-    std::cout << "Sequence not present in vector" << std::endl;
-    throw std::runtime_error("Cannot swap value between values as sequence not present in vector");
+    std::ostringstream oss;
+    oss << "Cannot replace value " << removeValue << " with value " << addValue << " between " << betweenValue1 << " and " << betweenValue2 << " as sequence not present in vector: " << *this;
+    throw std::runtime_error(oss.str());
 }
 
 // Insert value in vector between two others
@@ -233,22 +229,13 @@ void VecR<T>::insertValue(T vInsert, T vBetween0, T vBetween1) {
     }
     if (!insert) {
         std::ostringstream oss;
-        oss << "Cannot insert " << vInsert << " between " << vBetween0 << " and " << vBetween1 << " in vector: ";
-        for (int i = 0; i < n; ++i)
-            oss << v[i] << " ";
+        oss << "Cannot insert " << vInsert << " between " << vBetween0 << " and " << vBetween1 << " in vector: " << *this;
         throw std::runtime_error(oss.str());
     }
     for (int i = n; i > insertPos; --i)
         v[i] = v[i - 1];
     v[insertPos] = vInsert;
     ++n;
-}
-// Subscript operator
-template <typename T>
-T &VecR<T>::operator[](int i) {
-    if (this->n <= i)
-        throw std::runtime_error("Vector subscript out of bounds");
-    return this->v[i];
 }
 
 // Binary Operators with constant
@@ -454,23 +441,6 @@ VecR<T> VecR<T>::operator-() {
 }
 
 /**
- * @brief Log the vector to the console
- * @param logger The logger to use
- */
-template <typename T>
-void VecR<T>::toLog(LoggerPtr logger) {
-    std::stringstream ss;
-    ss << "[";
-    for (int i = 0; i < this->n; ++i) {
-        ss << this->v[i];
-        if (i < this->n - 1)
-            ss << ", ";
-    }
-    ss << "]";
-    logger->info(ss.str());
-}
-
-/**
  * @brief Check if value is in vector
  * @param value The value to check
  * @return True if value is in vector
@@ -482,4 +452,70 @@ bool VecR<T>::contains(T value) {
             return true;
     }
     return false;
+}
+
+template <typename T>
+std::string VecR<T>::toString() {
+    std::ostringstream os;
+    os << "VecR<" << typeid(T).name() << "> of size " << this->n << ": [";
+    for (const T &value : *this) {
+        os << value << ' ';
+    }
+    os << "]";
+    return os.str();
+}
+// Subscript operator
+template <typename T>
+T &VecR<T>::operator[](int i) {
+    if (n <= i) {
+        std::ostringstream oss;
+        oss << "Vector subscript out of bounds: " << i << " >= " << n << " for vector: " << *this;
+        throw std::runtime_error(oss.str());
+    }
+    return v[i];
+}
+
+// Subscript operator
+template <typename T>
+T &VecR<T>::operator[](int i) const {
+    if (n <= i) {
+        std::ostringstream oss;
+        oss << "Vector subscript out of bounds: " << i << " >= " << n << " for vector: " << *this;
+        throw std::runtime_error(oss.str());
+    }
+    return v[i];
+}
+
+/**
+ * @brief Stream operator for VecR
+ * @param os Output stream
+ * @param vec Vector to output
+ * @typedef U Type of vector
+ * @return Output stream
+ */
+template <typename U>
+std::ostream &operator<<(std::ostream &os, VecR<U> &vec) {
+    os << "VecR<" << typeid(U).name() << "> of size " << vec.n << " and max size " << vec.nMax << ": [";
+    for (const U &value : vec) {
+        os << value << ' ';
+    }
+    os << "]";
+    return os;
+}
+
+/**
+ * @brief Const version of stream operator for VecR
+ * @param os Output stream
+ * @param vec Vector to output
+ * @typedef U Type of vector
+ * @return Output stream
+ */
+template <typename U>
+std::ostream &operator<<(std::ostream &os, const VecR<U> &vec) {
+    os << "VecR<" << typeid(U).name() << "> of size " << vec.n << "and max size " << vec.nMax << ": [";
+    for (const U &value : vec) {
+        os << value << ' ';
+    }
+    os << "]";
+    return os;
 }
