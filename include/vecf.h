@@ -2,35 +2,40 @@
 #ifndef NL_VECF_H
 #define NL_VECF_H
 
+#include <cmath>
 #include <iostream>
 #include <limits>
-#include <cmath>
-#include <sstream>
 #include <spdlog/spdlog.h>
+#include <sstream>
 
 using LoggerPtr = std::shared_ptr<spdlog::logger>;
 
 // Vector class
 template <typename T>
-class VecF
-{
+class VecF {
 
-public:
+  public:
     // Data members
     int n; // number of values
     T *v;  // values
 
     // Constructors, copy constructor, destructor
     VecF();
-    VecF(int size);
+    explicit VecF(int size);
     VecF(const VecF &source);
     ~VecF();
 
+    T *begin() { return &v[0]; }
+    T *end() { return &v[n]; }
+    const T *begin() const { return &v[0]; }
+    const T *end() const { return &v[n]; }
+
     // Member functions
-    inline bool equals(const T &a, const T &b); // check for equality
+    bool equals(const T &a, const T &b) const; // check for equality
 
     // Subscript operator
     T &operator[](int i);
+    T &operator[](int i) const;
     // Binary operators with constant
     void operator=(const T &k);
     void operator+=(const T &k);
@@ -58,17 +63,15 @@ public:
     // Unary operators
     VecF operator-();
 
-    // Stream
-    friend std::ostream &operator<<(std::ostream &output, const VecF &source)
-    {
-        for (int i = 0; i < source.n; ++i)
-            output << source.v[i] << std::endl;
-        return output;
-    };
+    bool contains(T value);
+    std::string toString();
 
-    void toLog(LoggerPtr logger);
+    template <typename U>
+    friend std::ostream &operator<<(std::ostream &os, VecF<U> &vec);
+
+    template <typename U>
+    friend std::ostream &operator<<(std::ostream &os, const VecF<U> &vec);
 };
 
 #include "vecf.tpp"
-
 #endif // NL_VECF_H
