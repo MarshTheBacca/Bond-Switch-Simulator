@@ -24,7 +24,7 @@
         {
             "label": "run",
             "type": "shell",
-            "command": "./netmc.x",
+            "command": "./netmc.x -d",
             "options": {
                 "cwd": "${workspaceFolder}/testing"
             },
