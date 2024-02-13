@@ -67,17 +67,17 @@ class LammpsObject {
     void breakAndFormAngles(int atom3, int atom1, int atom5, int atom4, int e1, int e11, int d1, int d11);
     std::pair<int, int> identifyAtoms(int atomA, int atomB, Network networkAArg, LoggerPtr logger);
 
-    void switchGraphene(VecF<int> switchIdsA, LoggerPtr logger);
-    void revertGraphene(VecF<int> switchIdsA, LoggerPtr logger);
+    void switchGraphene(VecF<int> switchIDsA, LoggerPtr logger);
+    void revertGraphene(VecF<int> switchIDsA, LoggerPtr logger);
 
-    void switchTriangleRaft(VecF<int> switchIdsA, VecF<int> switchIdsT, LoggerPtr logger);
-    void revertTriangleRaft(VecF<int> switchIdsA, VecF<int> switchIdsT, LoggerPtr logger);
+    void switchTriangleRaft(VecF<int> switchIDsA, VecF<int> switchIDsT, LoggerPtr logger);
+    void revertTriangleRaft(VecF<int> switchIDsA, VecF<int> switchIDsT, LoggerPtr logger);
 
-    void switchBilayer(VecF<int> switchIdsA, VecF<int> switchIdsT, LoggerPtr logger);
-    void revertBilayer(VecF<int> switchIdsA, VecF<int> switchIdsT, LoggerPtr logger);
+    void switchBilayer(VecF<int> switchIDsA, VecF<int> switchIDsT, LoggerPtr logger);
+    void revertBilayer(VecF<int> switchIDsA, VecF<int> switchIDsT, LoggerPtr logger);
 
-    void switchBonds(VecF<int> switchIdsA, VecF<int> switchIdsT);
-    void revertBonds(VecF<int> switchIdsA, VecF<int> switchIdsT);
+    void switchBonds(VecF<int> switchIDsA, VecF<int> switchIDsT);
+    void revertBonds(VecF<int> switchIDsA, VecF<int> switchIDsT);
 
     VecF<int> globalPotentialMinimisation();
     double globalPotentialEnergy();
