@@ -68,7 +68,7 @@ void Network::initialiseDescriptors(int maxCnxs) {
  */
 Network::Network(const std::string &prefix, int maxBaseCoordinationArg,
                  int maxDualCoordinationArg, LoggerPtr logger) {
-    logger->info("Reading aux file {} ...", prefix + "_aux.dat");
+    logger->debug("Reading aux file {} ...", prefix + "_aux.dat");
 
     // Initialise variables with aux file information
     std::string line;
@@ -82,7 +82,7 @@ Network::Network(const std::string &prefix, int maxBaseCoordinationArg,
     int nNodes;
     getline(auxFile, line);
     std::istringstream(line) >> nNodes;
-    logger->info("Number of nodes: {}", nNodes);
+    logger->debug("Number of nodes: {}", nNodes);
     getline(auxFile, line);
     ss.str(line);
     ss >> maxNetCnxs;
@@ -97,7 +97,7 @@ Network::Network(const std::string &prefix, int maxBaseCoordinationArg,
         maxNetCnxs += 20;
         maxDualCnxs += 20;
     }
-    logger->info("Max Net/Dual Connections: {} {}", maxNetCnxs, maxDualCnxs);
+    logger->debug("Max Net/Dual Connections: {} {}", maxNetCnxs, maxDualCnxs);
     getline(auxFile, line);
     std::istringstream(line) >> geometryCode;
     nodes = VecR<Node>(0, nNodes);
@@ -117,7 +117,7 @@ Network::Network(const std::string &prefix, int maxBaseCoordinationArg,
     }
     auxFile.close();
 
-    logger->info("Reading crds file {} ...", prefix + "_crds.dat");
+    logger->debug("Reading crds file {} ...", prefix + "_crds.dat");
     std::ifstream crdFile(prefix + "_crds.dat", std::ios::in);
     if (!crdFile.is_open()) {
         logger->critical("crds.dat file not found!");
@@ -134,7 +134,7 @@ Network::Network(const std::string &prefix, int maxBaseCoordinationArg,
     crdFile.close();
 
     // Read network connections
-    logger->info("Reading net file {} ...", prefix + "_net.dat");
+    logger->debug("Reading net file {} ...", prefix + "_net.dat");
     std::ifstream netFile(prefix + "_net.dat", std::ios::in);
     if (!netFile.is_open()) {
         logger->critical("net.dat file not found!");
@@ -151,7 +151,7 @@ Network::Network(const std::string &prefix, int maxBaseCoordinationArg,
     netFile.close();
 
     // Read dual connections
-    logger->info("Reading dual file {} ...", prefix + "_dual.dat");
+    logger->debug("Reading dual file {} ...", prefix + "_dual.dat");
     std::ifstream dualFile(prefix + "_dual.dat", std::ios::in);
     if (!dualFile.is_open()) {
         logger->critical("dual.dat file not found!");
@@ -166,8 +166,8 @@ Network::Network(const std::string &prefix, int maxBaseCoordinationArg,
     dualFile.close();
 
     // Set up descriptors
-    logger->info("Max net connections: {}", maxNetCnxs);
-    logger->info("Number of nodes: {}", nodes.n);
+    logger->debug("Max net connections: {}", maxNetCnxs);
+    logger->debug("Number of nodes: {}", nodes.n);
     initialiseDescriptors(maxNetCnxs);
 }
 
@@ -1546,8 +1546,8 @@ Network::Network(VecR<Node> nodesA, VecF<double> pbA, VecF<double> rpbA,
                 nodes.addValue(node);
 
                 nodes[OxygenAtom].crd = crds;
-                nodes[atom0].netCnxs.swapValue(atom1, OxygenAtom, true);
-                nodes[atom1].netCnxs.swapValue(atom0, OxygenAtom, true);
+                nodes[atom0].netCnxs.replaceValue(atom1, OxygenAtom, true);
+                nodes[atom1].netCnxs.replaceValue(atom0, OxygenAtom, true);
                 nodes[OxygenAtom].netCnxs.addValue(atom0);
                 nodes[OxygenAtom].netCnxs.addValue(atom1);
                 OxygenAtom += 1;
