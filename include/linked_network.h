@@ -100,29 +100,17 @@ class LinkedNetwork {
                               int seed = 0);                                         // set up monte carlo
     void initialiseCostFunction(double temperature, int seed, double pk, double rk); // set up cost function
     void rescale(double scaleFactor);                                                // rescale lattice dimensions
-                                                                                     // geometry with optimal parameters
-    void assignValues(int &a, int &b, int &cnxType, int randNode, int randNodeConnection,
-                      int randNodeCoordination, int randNodeConnectionCoordination);
+    std::tuple<int, int, int, int, int> pickRandomConnection(std::mt19937 &mtGen, SelectionType selectionType);
+    int assignValues(int randNodeCoordination, int randNodeConnectionCoordination) const;
 
-    int pickRandomConnection(int &baseNode1, int &baseNode2, int &ringNode1, int &ringNode2,
-                             std::mt19937 &gen, SelectionType selectionType, LoggerPtr logger);
-    bool generateSwitchIDs(int cnxType, VecF<int> &switchIdsA, VecF<int> &switchIdsB,
-                           VecF<int> &switchIdsT, int a, int b, int u, int v, LoggerPtr logger);          // get all ids of nodes in lattice A and B needed for switch move
-    bool generateMixIds(int cnxType, VecF<int> &mixIdsA, VecF<int> &mixIdsB, int a, int b, int u, int v); // get all ids of nodes in lattice A and B needed for mix move
-    int findCommonConnection(int idA, int idB, int idDel);                                                //
-    int findAssociatedNodeAA(int idA, int idB, int idDel);                                                //
-    void switchCnx33(VecF<int> switchIdsA, VecF<int> switchIdsB, VecF<int> switchIdsT);                   // switch connectivities in lattice
+    bool generateSwitchIDs(VecF<int> &switchIDsA, VecF<int> &switchIDsB, VecF<int> &switchIDsT,
+                           int a, int b, int u, int v, LoggerPtr logger);                                 // get all ids of nodes in lattice A and B needed for switch move
+    int findCommonConnection(int idA, int idB, int idDel, LoggerPtr logger);                              //
+    int findCommonRing(int idA, int idB, int idDel, LoggerPtr logger);                                    //
+    void switchCnx33(VecF<int> switchIDsA, VecF<int> switchIDsB, VecF<int> switchIDsT, LoggerPtr logger); // switch connectivities in lattice
                                                                                                           // between 2x3 coordinate nodes
-    void switchCnx44(VecF<int> switchIdsA, VecF<int> switchIdsB);                                         // switch connectivities in lattice
-                                                                                                          // between 2x4 coordinate nodes
-    void switchCnx43(VecF<int> switchIdsA, VecF<int> switchIdsB);                                         // switch connectivities in lattice
-                                                                                                          // between 4 and 3 coordinate nodes
-    void mixCnx34(VecF<int> mixIdsA, VecF<int> mixIdsB);                                                  // mix connectivities in lattice between 4
-                                                                                                          // and 3 coordinate nodes
-    void mixCnx(VecF<int> mixIdsA, VecF<int> mixIdsB);                                                    // mix connectivities in lattice between 4 and
-                                                                                                          // 3 coordinate nodes
     bool checkThreeRingEdges(int id);                                                                     // prevent edges being part of three rings
-    bool convexRearrangement(int cnxType, VecF<int> switchIdsA, VecF<int> switchIdsB);                    // rearrange nodes after switch to
+    bool convexRearrangement(VecF<int> switchIDsA, LoggerPtr logger);                                     // rearrange nodes after switch to
                                                                                                           // maintain convexity
     VecF<int> monteCarloSwitchMove(Network network, double &energy, LoggerPtr logger);                    // monte carlo switching move
     VecF<int> monteCarloSwitchMoveLAMMPS(double &SimpleGrapheneEnergy,
