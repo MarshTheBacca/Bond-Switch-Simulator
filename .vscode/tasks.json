@@ -22,13 +22,22 @@
             "problemMatcher": []
         },
         {
+            "label": "clean",
+            "type": "shell",
+            "command": "rm -rf output_files",
+            "options": {
+                "cwd": "${workspaceFolder}/testing"
+            },
+            "problemMatcher": []
+        },
+        {
             "label": "run",
             "type": "shell",
             "command": "./netmc.x -d",
             "options": {
                 "cwd": "${workspaceFolder}/testing"
             },
-            "dependsOn": "build",
+            "dependsOn": ["build", "clean"],
             "problemMatcher": []
         }
     ]
