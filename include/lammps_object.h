@@ -31,14 +31,12 @@ class LammpsObject {
   public:
     Network networkA;
     Network networkB;
-    Network networkT;
 
     void *handle;
     int version;
     int natoms = 0;
     int nbonds = 0;
     int nangles = 0;
-    double *coords = nullptr;
     double *bonds = nullptr;
     double *angles = nullptr;
 
@@ -53,12 +51,9 @@ class LammpsObject {
     void write_restart(const std::string &structureName);
     void finaliseLAMMPSObject(const std::string &structureName);
 
-    double pbx();
-    double pby();
-    double pbz();
-
-    double *fetchCrds(int dim);
-    void pushCrds(int dim, double *old_coords);
+    std::vector<double> getCoords(int dim);
+    void getCoords(std::vector<double> &coords, int dim);
+    void setCoords(std::vector<double> &newCoords, int dim);
 
     void breakBond(int atom1, int atom2, int type, LoggerPtr logger);
     void formBond(int atom1, int atom2, int type, LoggerPtr logger);
@@ -70,19 +65,8 @@ class LammpsObject {
     void switchGraphene(VecF<int> switchIDsA, LoggerPtr logger);
     void revertGraphene(VecF<int> switchIDsA, LoggerPtr logger);
 
-    void switchTriangleRaft(VecF<int> switchIDsA, VecF<int> switchIDsT, LoggerPtr logger);
-    void revertTriangleRaft(VecF<int> switchIDsA, VecF<int> switchIDsT, LoggerPtr logger);
-
-    void switchBilayer(VecF<int> switchIDsA, VecF<int> switchIDsT, LoggerPtr logger);
-    void revertBilayer(VecF<int> switchIDsA, VecF<int> switchIDsT, LoggerPtr logger);
-
-    void switchBonds(VecF<int> switchIDsA, VecF<int> switchIDsT);
-    void revertBonds(VecF<int> switchIDsA, VecF<int> switchIDsT);
-
-    VecF<int> globalPotentialMinimisation();
-    double globalPotentialEnergy();
-
-    double probeE();
+    void minimiseNetwork();
+    double getPotentialEnergy();
 };
 
 #endif // LAMMPS_OBJECT_H
