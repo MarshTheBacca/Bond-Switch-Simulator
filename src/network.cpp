@@ -1589,3 +1589,32 @@ int Network::getMinCnxs() {
     }
     return minNetCnxs;
 }
+
+/**
+ * @brief Get the coordinates of the network
+ * @return 1D vector of node coordinates
+ */
+std::vector<double> Network::getCoords() {
+    std::vector<double> returnCoords;
+    for (int i = 0; i < nodes.n; i++) {
+        returnCoords[i] = nodes[i].crd[0];
+        returnCoords[i + 1] = nodes[i].crd[1];
+    }
+    return returnCoords;
+}
+
+/**
+ * @brief Populate a given vector with the coordinates of the network
+ */
+void Network::getCoords(std::vector<double> &coords) {
+    if (coords.size() != nodes.n * 2) {
+        std::ostringstream oss;
+        oss << "The input vector must have the same size as the number of node. Got "
+            << coords.size() << " instead of " << nodes.n * 2;
+        throw std::invalid_argument(oss.str());
+    }
+    for (int i = 0; i < nodes.n; i++) {
+        coords[i * 2] = nodes[i].crd[0];
+        coords[i * 2 + 1] = nodes[i].crd[1];
+    }
+}

@@ -56,6 +56,8 @@ class Network {
     bool r_ij(int i, int j, float cutoff);
     int getMaxCnxs();
     int getMinCnxs();
+    std::vector<double> getCoords();
+    void getCoords(std::vector<double> &coords);
 
   private:
     // Refactored the initialiseTriangleLattice function
