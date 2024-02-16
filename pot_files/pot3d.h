@@ -37,8 +37,13 @@ class HLJ3DP : public BasePotentialModel3D {
     HLJ3DP(double periodicX, double periodicY, double periodicZ);
 
     // Periodic Boundary
-    double pbx, pby, pbz, pbrx, pbry, pbrz; // cell lengths and reciprocals
-    void wrap(VecF<double> &x);             // wrap coordinates inside periodic cell
+    double pbx;
+    double pby;
+    double pbz;
+    double pbrx;
+    double pbry;
+    double pbrz;                // cell lengths and reciprocals
+    void wrap(VecF<double> &x); // wrap coordinates inside periodic cell
 
     // Virtual to define
     double bndPotential(double &x0, double &y0, double &z0, double &x1, double &y1, double &z1, int &p) override;
