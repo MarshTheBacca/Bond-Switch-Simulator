@@ -6,17 +6,16 @@
 #include <random>
 
 // Metropolis-Hastings algorithm
-class Metropolis
-{
+class Metropolis {
 
-private:
+  private:
     // Data members
-    std::mt19937 mtGen;                            // mersenne twister generator
-    std::uniform_real_distribution<double> rand01; // uniform distribution
-    double rTemperature;                           // reciprocal temperature
-    double energyPrev;                             // previous energy
+    std::mt19937 mtGen;                              // mersenne twister generator
+    std::uniform_real_distribution<double> coinFlip; // uniform distribution
+    double rTemperature = 1.0;                       // reciprocal temperature
+    double energyPrev = 0.0;                         // previous energy
 
-public:
+  public:
     // Constructors
     Metropolis();
     Metropolis(int seed, double temperature, double energy = 0.0);
@@ -24,7 +23,7 @@ public:
     // Member functions
     void setEnergy(double energy);
     void setTemperature(double temperature);
-    bool acceptanceCriterion(double Ef, double Ei, double T_factor);
+    bool acceptanceCriterion(double Ef, double Ei, double temperatureFactor);
     double getEnergy();
 };
 
