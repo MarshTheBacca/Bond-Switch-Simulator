@@ -15,10 +15,6 @@ target_sources(netmc.x PRIVATE
     monte_carlo.cpp
     network.cpp
     node.cpp
-    pot.cpp
-    pot1d.cpp
-    pot2d.cpp
-    pot3d.cpp
     input_data.cpp
     output_file.cpp
 )
