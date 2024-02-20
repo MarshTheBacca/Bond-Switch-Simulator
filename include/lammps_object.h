@@ -62,10 +62,10 @@ class LammpsObject {
     void breakAndFormAngles(int atom3, int atom1, int atom5, int atom4, int e1, int e11, int d1, int d11);
     std::pair<int, int> identifyAtoms(int atomA, int atomB, Network networkAArg, LoggerPtr logger);
 
-    void switchGraphene(std::vector<int> &bondBreaks, std::vector<int> &bondMakes,
-                        std::vector<int> &angleBreaks, std::vector<int> &angleMakes, LoggerPtr logger);
-    void revertGraphene(std::vector<int> bondBreaks, std::vector<int> bondMakes,
-                        std::vector<int> angleBreaks, std::vector<int> angleMakes, LoggerPtr logger);
+    void switchGraphene(const std::vector<int> &bondBreaks, const std::vector<int> &bondMakes,
+                        const std::vector<int> &angleBreaks, const std::vector<int> &angleMakes, LoggerPtr logger);
+    void revertGraphene(const std::vector<int> &bondBreaks, const std::vector<int> &bondMakes,
+                        const std::vector<int> &angleBreaks, const std::vector<int> &angleMakes, LoggerPtr logger);
     std::vector<int> getAngles();
     void showAngles(const int &numLines, LoggerPtr logger);
     bool checkAngleUnique(const int &atom1, const int &atom2, const int &atom3);

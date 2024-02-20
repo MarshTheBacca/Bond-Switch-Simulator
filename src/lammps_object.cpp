@@ -270,8 +270,8 @@ void LammpsObject::formAngle(int atom1, int atom2, int atom3, LoggerPtr logger) 
  * @param angleMakes The IDs of the angles to be made (1D vector of triples)
  * @param logger The logger object
  */
-void LammpsObject::switchGraphene(std::vector<int> &bondBreaks, std::vector<int> &bondMakes,
-                                  std::vector<int> &angleBreaks, std::vector<int> &angleMakes, LoggerPtr logger) {
+void LammpsObject::switchGraphene(const std::vector<int> &bondBreaks, const std::vector<int> &bondMakes,
+                                  const std::vector<int> &angleBreaks, const std::vector<int> &angleMakes, LoggerPtr logger) {
     for (int i = 0; i < bondBreaks.size(); i += 2) {
         breakBond(bondBreaks[i] + 1, bondBreaks[i + 1] + 1, 1, logger);
     }
@@ -293,8 +293,8 @@ void LammpsObject::switchGraphene(std::vector<int> &bondBreaks, std::vector<int>
  * @param angleMakes The IDs of the angles that have been made (1D vector of triples)
  * @param logger The logger object
  */
-void LammpsObject::revertGraphene(std::vector<int> bondBreaks, std::vector<int> bondMakes,
-                                  std::vector<int> angleBreaks, std::vector<int> angleMakes, LoggerPtr logger) {
+void LammpsObject::revertGraphene(const std::vector<int> &bondBreaks, const std::vector<int> &bondMakes,
+                                  const std::vector<int> &angleBreaks, const std::vector<int> &angleMakes, LoggerPtr logger) {
     for (int i = 0; i < bondMakes.size(); i += 2) {
         breakBond(bondMakes[i] + 1, bondMakes[i + 1] + 1, 1, logger);
     }
@@ -316,7 +316,6 @@ void LammpsObject::minimiseNetwork() {
     // Numbers are stopping tolerance for energy, stopping tolerance for force,
     // maximum number of iterations and maximum number of energy/force evaluations
     lammps_command(handle, "minimize 1.0e-6 0.0 1000000 10000000");
-    VecF<int> optstatus(2);
 }
 
 /**
