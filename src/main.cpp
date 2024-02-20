@@ -171,13 +171,13 @@ int main(int argc, char *argv[]) {
         logger->info("Running Monte Carlo simulation");
 
         int numTemperatureSteps = std::floor((inputData.endTemperature - inputData.startTemperature) / inputData.temperatureIncrement);
-        for (int temperature = 0; temperature <= numTemperatureSteps; ++temperature) {
-            expTemperature = pow(10, inputData.startTemperature + temperature * inputData.temperatureIncrement);
+        for (int i = 0; i < numTemperatureSteps; ++i) {
+            expTemperature = pow(10, inputData.startTemperature + i * inputData.temperatureIncrement);
             network.mc.setTemperature(expTemperature);
             logger->info("Temperature: {}", expTemperature);
-            for (int i = 1; i <= inputData.stepsPerTemperature; ++i) {
+            for (int k = 1; k <= inputData.stepsPerTemperature; ++k) {
                 network.monteCarloSwitchMoveLAMMPS(logger);
-                if (i % inputData.analysisWriteFrequency == 0) {
+                if (k % inputData.analysisWriteFrequency == 0) {
 
                     VecF<double> ringStats = network.getNodeDistribution("B");
                     double r = network.getAssortativity("B");
@@ -210,9 +210,9 @@ int main(int argc, char *argv[]) {
                         outEmatrix.writeRowVector(edgeDist[j]);
                     outCndStats.writeRowVector(cndStats);
                 }
-                if (i % inputData.structureWriteFrequency == 0 &&
+                if (k % inputData.structureWriteFrequency == 0 &&
                     inputData.isWriteSamplingStructuresEnabled == 1) {
-                    network.writeXYZ(prefixOut + "_t" + std::to_string(temperature) + "_" + std::to_string(i));
+                    network.writeXYZ(prefixOut + "_t" + std::to_string(i) + "_" + std::to_string(i));
                 }
             }
         }
@@ -238,20 +238,22 @@ int main(int argc, char *argv[]) {
 
     // Check network
     logger->debug("Diagnosing simulation...");
-    logger->debug("Checking consistency and convexity");
     bool consistent = network.checkConsistency();
-    bool convex = network.checkConvexity();
     logger->debug("Network consistent: {}", consistent ? "true" : "false");
-    logger->debug("Rings convex: {}", convex ? "true" : "false");
 
     // Write files
     logger->info("Writing files...");
     network.write(prefixOut);
     network.writeXYZ(prefixOut);
-    logger->info(prefixOut);
     logger->debug("Files written");
+    logger->info("Number of accepted switches: {}", network.numAcceptedSwitches);
 
     logger->info("Monte Carlo acceptance: {}", (double)network.numAcceptedSwitches / network.numSwitches);
+    if (network.checkAllClockwiseNeighbours(logger)) {
+        logger->info("All rings have clockwise neighbours");
+    } else {
+        logger->info("Not all rings have clockwise neighbours");
+    }
 
     // Log time taken
     auto end = std::chrono::high_resolution_clock::now();
