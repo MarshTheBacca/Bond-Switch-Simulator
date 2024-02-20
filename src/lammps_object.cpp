@@ -60,6 +60,7 @@ LammpsObject::LammpsObject(const std::string &structureName, const std::string &
         logger->error("Failed to extract number of angles");
     }
     logger->info("LAMMPS #nodes: {} #bonds: {} #angles: {}", natoms, nbonds, nangles);
+    std::vector<int> angleHelper(6);
 }
 
 void LammpsObject::write_data(const std::string &structureName) {
@@ -126,13 +127,11 @@ void LammpsObject::breakBond(int atom1, int atom2, int type, LoggerPtr logger) {
 
     lammps_command(handle, "group switch delete");
 
-    command = "uncompute myBonds";
-    lammps_command(handle, command.c_str());
-
     double finalBondCount = lammps_get_thermo(handle, "bonds");
     if (finalBondCount != initialBondCount - 1) {
         std::ostringstream oss;
-        oss << "Error in Bond Counts while breaking bond between " << atom1 << " and " << atom2 << ", initial: " << finalBondCount << " final: " << initialBondCount;
+        oss << "Error in Bond Counts while breaking bond between " << atom1 << " and " << atom2
+            << ", initial: " << finalBondCount << " final: " << initialBondCount;
         throw std::runtime_error(oss.str());
     }
 }
@@ -146,7 +145,8 @@ void LammpsObject::formBond(int atom1, int atom2, int type, LoggerPtr logger) {
     double finalBondCount = lammps_get_thermo(handle, "bonds");
     if (finalBondCount != initialBondCount + 1) {
         std::ostringstream oss;
-        oss << "Error in Bond Counts while forming bond, initial: " << finalBondCount << " final: " << initialBondCount;
+        oss << "Error in Bond Counts while forming bond between " << atom1 << " and " << atom2
+            << ", initial: " << finalBondCount << " final: " << initialBondCount;
         throw std::runtime_error(oss.str());
     }
 }
@@ -162,7 +162,7 @@ void LammpsObject::formBond(int atom1, int atom2, int type, LoggerPtr logger) {
 void LammpsObject::breakAngle(int atom1, int atom2, int atom3, LoggerPtr logger) {
     // logger->debug("Breaking angle between {}, {}, {}", atom1, atom2, atom3);
     double initialAngleCount = lammps_get_thermo(handle, "angles");
-
+    double finalAngleCount;
     // Try to break the angle in both directions
     for (int attempt = 0; attempt < 2; ++attempt) {
         std::string command;
@@ -178,15 +178,55 @@ void LammpsObject::breakAngle(int atom1, int atom2, int atom3, LoggerPtr logger)
         lammps_command(handle, "group switch delete");
 
         // Check if the number of angles has decreased
-        double finalAngleCount = lammps_get_thermo(handle, "angles");
+        finalAngleCount = lammps_get_thermo(handle, "angles");
         if (finalAngleCount == initialAngleCount - 1)
             return; // The angle was successfully broken
+        else if (finalAngleCount == initialAngleCount - 3) {
+            // In LAMMPS, when you define a group of atoms and delete their angles, it deletes ALL the angles involving those atoms
+            // This means that when you have a triangle of atoms and delete one angle, it deletes all three angles
+            // So we have to add the other two angles back in
+            logger->warn("Triangle angle broken, adding the other two angles back in");
+            formAngle(atom1, atom3, atom2, logger);
+            formAngle(atom2, atom1, atom3, logger);
+            // Store the other two angles in a helper vector for later use
+            angleHelper = {atom1, atom3, atom2, atom2, atom1, atom3};
+            return;
+        }
+
+        else if (finalAngleCount == initialAngleCount - 2) {
+            // This is an error prone idea, but when you delete a second angle in a triangle, it deletes both of the angles
+            // added in the previous if statement, so the angle count decreases by two.
+            // That's why we have to add back in the final angle, by using a helper vector that stores the other two angles
+            // when the first angle was broken.
+            logger->warn("Second triangle angle broken, adding the final one back in");
+            if ((atom1 == angleHelper[0] && atom2 == angleHelper[1] && atom3 == angleHelper[2]) ||
+                (atom1 == angleHelper[2] && atom2 == angleHelper[1] && atom3 == angleHelper[0])) {
+                // If the current angle is the first angle in the angleHelper vector, then add the second angle in the angleHelper vector
+                formAngle(angleHelper[3], angleHelper[4], angleHelper[5], logger);
+                return;
+            } else if ((atom1 == angleHelper[3] && atom2 == angleHelper[4] && atom3 == angleHelper[5]) ||
+                       (atom1 == angleHelper[5] && atom2 == angleHelper[4] && atom3 == angleHelper[3])) {
+                // If the current angle is the second angle in the angleHelper vector, then add the first angle in the angleHelper vector
+                formAngle(angleHelper[0], angleHelper[1], angleHelper[2], logger);
+                return;
+            } else {
+                std::ostringstream oss;
+                oss << "Second triangle angle broken, but angle is not in the angleHelper vector " << atom1 << " " << atom2
+                    << " " << atom3 << "not in: " << angleHelper[0] << " " << angleHelper[1] << " " << angleHelper[2] << " "
+                    << angleHelper[3] << " " << angleHelper[4] << " " << angleHelper[5];
+                throw std::runtime_error(oss.str());
+            }
+        }
+
+        else {
+            break;
+        }
     }
 
     // If the function hasn't returned by now, the angle couldn't be broken in either direction
     std::stringstream error;
-    error << "Error in Angle Counts, initial: " << initialAngleCount;
-    logger->critical(error.str());
+    error << "Error in Angle Counts while trying to break angle " << atom1 << " " << atom2 << " "
+          << atom3 << ", initial: " << initialAngleCount << " final: " << finalAngleCount;
     throw std::runtime_error(error.str());
 }
 
@@ -199,6 +239,16 @@ void LammpsObject::breakAngle(int atom1, int atom2, int atom3, LoggerPtr logger)
  */
 void LammpsObject::formAngle(int atom1, int atom2, int atom3, LoggerPtr logger) {
     // logger->debug("Forming angle between {}, {}, {}", atom1, atom2, atom3);
+    if (atom1 == atom2 || atom1 == atom3 || atom2 == atom3) {
+        std::ostringstream oss;
+        oss << "Angle has one or more members that are the same ID: " << atom1 << " " << atom2 << " " << atom3;
+        throw std::runtime_error(oss.str());
+    }
+    // if (!checkAngleUnique(atom1, atom2, atom3)) {
+    //     std::ostringstream oss;
+    //     oss << "Angle already exists between " << atom1 << " and " << atom2 << " and " << atom3;
+    //     throw std::runtime_error(oss.str());
+    // }
     double initialAngleCount = lammps_get_thermo(handle, "angles");
     std::string command;
     command = "create_bonds single/angle 1 " + std::to_string(atom1) + " " + std::to_string(atom2) + " " + std::to_string(atom3);
@@ -206,135 +256,59 @@ void LammpsObject::formAngle(int atom1, int atom2, int atom3, LoggerPtr logger) 
     double finalAngleCount = lammps_get_thermo(handle, "angles");
     if (finalAngleCount != initialAngleCount + 1) {
         std::ostringstream oss;
-        oss << "Error in Angle Counts, initial: " << finalAngleCount << " final: " << initialAngleCount;
+        oss << "Error in Angle Counts, initial while forming angle between " << atom1 << " and " << atom2 << " and " << atom3
+            << ", initial: " << finalAngleCount << " final: " << initialAngleCount;
         throw std::runtime_error(oss.str());
     }
 }
 
 /**
  * @brief perform bond switch in the lattice using NetMC node IDs, ie, zero indexed
- * @param switchIDsA The node IDs of the atoms to be switched
+ * @param bondBreaks Ths IDs of the bonds to be broken (1D vector of pairs)
+ * @param bondMakes The IDs of the bonds to be made (1D vector of pairs)
+ * @param angleBreaks The IDs of the angles to be broken (1D vector of triples)
+ * @param angleMakes The IDs of the angles to be made (1D vector of triples)
  * @param logger The logger object
  */
-void LammpsObject::switchGraphene(VecF<int> switchIDsA, LoggerPtr logger) {
-    /*
-     *                7-----8                               7-----8
-     *               /       \                              |     |
-     *              /         \                      11-----3  2  4-----12
-     *      11-----3     2     4-----12                      \   /
-     *              \         /                               \ /
-     *               \       /                                 1
-     *          3     1-----2     4         --->         3     |      4
-     *               /       \                                 2
-     *              /         \                               /  \
-     *      13-----5     1     6-----14                      /    \
-     *              \         /                      13-----5  1   6-----14
-     *               \       /                              |      |
-     *                9-----10                              9------10
-     *
-     *      Bonds to break       Bonds to Make
-     *      1-5, 2-4             1-4, 2-5
-     *
-     *      Angles to break      Angles to Make
-     *      1-5-9, 1-5-13        1-4-8, 1-4-12
-     *      2-4-8, 2-4-12        2-5-9, 2-5-13
-     *      4-2-1, 4-2-6         4-1-2, 4-1-3
-     *      5-1-2, 5-1-3         6-2-1, 6-2-5
-     */
-
-    int atom1 = switchIDsA[0] + 1;
-    int atom2 = switchIDsA[1] + 1;
-    int atom5 = switchIDsA[2] + 1;
-    int atom6 = switchIDsA[3] + 1;
-    int atom3 = switchIDsA[4] + 1;
-    int atom4 = switchIDsA[5] + 1;
-    int atom7 = switchIDsA[6] + 1;
-    int atom8 = switchIDsA[7] + 1;
-    int atom9 = switchIDsA[8] + 1;
-    int atom10 = switchIDsA[9] + 1;
-    int atom11 = switchIDsA[10] + 1;
-    int atom12 = switchIDsA[11] + 1;
-    int atom13 = switchIDsA[12] + 1;
-    int atom14 = switchIDsA[13] + 1;
-    logger->debug("");
-    logger->debug("           {}----{}                                {}------{}", atom7, atom8, atom7, atom8);
-    logger->debug("          /        \\                                |      |");
-    logger->debug("         /          \\                       {}-----{}     {}-----{}", atom11, atom3, atom4, atom12);
-    logger->debug(" {}-----{}          {}-----{}                        \\    /", atom11, atom3, atom4, atom12);
-    logger->debug("         \\          /                                 \\  /");
-    logger->debug("          \\        /                                   {}", atom1);
-    logger->debug("          {}-----{}                --->                |       ", atom1, atom2);
-    logger->debug("          /       \\                                    {}", atom2);
-    logger->debug("         /         \\                                  /  \\");
-    logger->debug(" {}-----{}         {}-----{}                         /    \\", atom13, atom5, atom6, atom14);
-    logger->debug("         \\         /                        {}-----{}     {}-----{}", atom13, atom5, atom6, atom14);
-    logger->debug("          \\       /                                 |      |");
-    logger->debug("           {}----{}                                {}------{}", atom9, atom10, atom9, atom10);
-    logger->debug("");
-
-    breakBond(atom1, atom5, 1, logger);
-    breakBond(atom2, atom4, 1, logger);
-    formBond(atom1, atom4, 1, logger);
-    formBond(atom2, atom5, 1, logger);
-
-    breakAngle(atom1, atom5, atom9, logger);
-    breakAngle(atom1, atom5, atom13, logger);
-    breakAngle(atom2, atom4, atom8, logger);
-    breakAngle(atom2, atom4, atom12, logger);
-    breakAngle(atom4, atom2, atom1, logger);
-    breakAngle(atom4, atom2, atom6, logger);
-    breakAngle(atom5, atom1, atom2, logger);
-    breakAngle(atom5, atom1, atom3, logger);
-
-    formAngle(atom1, atom4, atom8, logger);
-    formAngle(atom1, atom4, atom12, logger);
-    formAngle(atom2, atom5, atom9, logger);
-    formAngle(atom2, atom5, atom13, logger);
-    formAngle(atom4, atom1, atom2, logger);
-    formAngle(atom4, atom1, atom3, logger);
-    formAngle(atom5, atom2, atom1, logger);
-    formAngle(atom6, atom2, atom5, logger);
+void LammpsObject::switchGraphene(std::vector<int> &bondBreaks, std::vector<int> &bondMakes,
+                                  std::vector<int> &angleBreaks, std::vector<int> &angleMakes, LoggerPtr logger) {
+    for (int i = 0; i < bondBreaks.size(); i += 2) {
+        breakBond(bondBreaks[i] + 1, bondBreaks[i + 1] + 1, 1, logger);
+    }
+    for (int i = 0; i < bondMakes.size(); i += 2) {
+        formBond(bondMakes[i] + 1, bondMakes[i + 1] + 1, 1, logger);
+    }
+    for (int i = 0; i < angleBreaks.size(); i += 3) {
+        breakAngle(angleBreaks[i] + 1, angleBreaks[i + 1] + 1, angleBreaks[i + 2] + 1, logger);
+    }
+    for (int i = 0; i < angleMakes.size(); i += 3) {
+        formAngle(angleMakes[i] + 1, angleMakes[i + 1] + 1, angleMakes[i + 2] + 1, logger);
+    }
+}
+/**
+ * @brief perform the opposite of a bond switch in the lattice using NetMC node IDs, ie, zero indexed
+ * @param bondBreaks Ths IDs of the bonds that have been broken (1D vector of pairs)
+ * @param bondMakes The IDs of the bonds that have been made (1D vector of pairs)
+ * @param angleBreaks The IDs of the angles that have been broken (1D vector of triples)
+ * @param angleMakes The IDs of the angles that have been made (1D vector of triples)
+ * @param logger The logger object
+ */
+void LammpsObject::revertGraphene(std::vector<int> bondBreaks, std::vector<int> bondMakes,
+                                  std::vector<int> angleBreaks, std::vector<int> angleMakes, LoggerPtr logger) {
+    for (int i = 0; i < bondMakes.size(); i += 2) {
+        breakBond(bondMakes[i] + 1, bondMakes[i + 1] + 1, 1, logger);
+    }
+    for (int i = 0; i < bondBreaks.size(); i += 2) {
+        formBond(bondBreaks[i] + 1, bondBreaks[i + 1] + 1, 1, logger);
+    }
+    for (int i = 0; i < angleMakes.size(); i += 3) {
+        breakAngle(angleMakes[i] + 1, angleMakes[i + 1] + 1, angleMakes[i + 2] + 1, logger);
+    }
+    for (int i = 0; i < angleBreaks.size(); i += 3) {
+        formAngle(angleBreaks[i] + 1, angleBreaks[i + 1] + 1, angleBreaks[i + 2] + 1, logger);
+    }
 }
 
-void LammpsObject::revertGraphene(VecF<int> switchIDsA, LoggerPtr logger) {
-    int atom1 = switchIDsA[0] + 1;
-    int atom2 = switchIDsA[1] + 1;
-    int atom5 = switchIDsA[2] + 1;
-    int atom6 = switchIDsA[3] + 1;
-    int atom3 = switchIDsA[4] + 1;
-    int atom4 = switchIDsA[5] + 1;
-    int atom7 = switchIDsA[6] + 1;
-    int atom8 = switchIDsA[7] + 1;
-    int atom9 = switchIDsA[8] + 1;
-    int atom10 = switchIDsA[9] + 1;
-    int atom11 = switchIDsA[10] + 1;
-    int atom12 = switchIDsA[11] + 1;
-    int atom13 = switchIDsA[12] + 1;
-    int atom14 = switchIDsA[13] + 1;
-
-    breakBond(atom1, atom4, 1, logger);
-    breakBond(atom2, atom5, 1, logger);
-    formBond(atom1, atom5, 1, logger);
-    formBond(atom2, atom4, 1, logger);
-
-    breakAngle(atom1, atom4, atom8, logger);
-    breakAngle(atom1, atom4, atom12, logger);
-    breakAngle(atom2, atom5, atom9, logger);
-    breakAngle(atom2, atom5, atom13, logger);
-    breakAngle(atom4, atom1, atom2, logger);
-    breakAngle(atom4, atom1, atom3, logger);
-    breakAngle(atom5, atom2, atom1, logger);
-    breakAngle(atom6, atom2, atom5, logger);
-
-    formAngle(atom1, atom5, atom9, logger);
-    formAngle(atom1, atom5, atom13, logger);
-    formAngle(atom2, atom4, atom8, logger);
-    formAngle(atom2, atom4, atom12, logger);
-    formAngle(atom4, atom2, atom1, logger);
-    formAngle(atom4, atom2, atom6, logger);
-    formAngle(atom5, atom1, atom2, logger);
-    formAngle(atom5, atom1, atom3, logger);
-}
 /**
  * @brief Minimise the potential energy of the network by moving atoms
  */
@@ -362,6 +336,7 @@ std::vector<double> LammpsObject::getCoords(int dim) {
     if (dim != 2 && dim != 3) {
         throw std::runtime_error("Invalid dimension");
     }
+    // Get the coordinates of the atoms
     std::vector<double> coords(dim * natoms);
     lammps_gather_atoms(handle, "x", 1, dim, coords.data());
     return coords;
@@ -389,4 +364,47 @@ void LammpsObject::setCoords(std::vector<double> &newCoords, int dim) {
         throw std::runtime_error(oss.str());
     }
     lammps_scatter_atoms(handle, "x", 1, dim, newCoords.data());
+}
+/**
+ * @brief Gets all the angles in the system
+ * @return A 1D vector containing all the angles in the system in the form [a1atom1, a1atom2, a1atom3, a2atom1, a2atom2, a2atom3, ...]
+ */
+std::vector<int> LammpsObject::getAngles() {
+    const int *nangles_ptr = static_cast<int *>(lammps_extract_global(handle, "nangles"));
+    int numAngles = *nangles_ptr;
+    char *command_result = lammps_command(handle, "compute myAngles all property/local aatom1 aatom2 aatom3");
+    auto compute_output = (double **)lammps_extract_compute(handle, "myAngles", 2, 2);
+
+    std::vector<int> angles(numAngles * 3);
+    for (int i = 0; i < numAngles; ++i) {
+        for (int j = 0; j < 3; ++j) {
+            angles[i * 3 + j] = static_cast<int>(compute_output[i][j]);
+        }
+    }
+    lammps_command(handle, "uncompute myAngles");
+    return angles;
+}
+
+void LammpsObject::showAngles(const int &numLines, LoggerPtr logger) {
+    std::vector<int> angles = getAngles();
+    for (int i = 0; i < numLines; ++i) {
+        logger->info("Angle: {:03} {:03} {:03}", angles[i * 3], angles[i * 3 + 1], angles[i * 3 + 2]);
+    }
+}
+/**
+ * @brief Check if an angle is not already in the system
+ * @param atom1 The first atom in the angle
+ * @param atom2 The second atom in the angle
+ * @param atom3 The third atom in the angle
+ * @return True if the angle is unique, false otherwise
+ */
+bool LammpsObject::checkAngleUnique(const int &atom1, const int &atom2, const int &atom3) {
+    std::vector<int> angles = getAngles();
+    for (int i = 0; i < angles.size(); i += 3) {
+        if ((angles[i] == atom1 && angles[i + 1] == atom2 && angles[i + 2] == atom3) ||
+            (angles[i] == atom3 && angles[i + 1] == atom2 && angles[i + 2] == atom1)) {
+            return false;
+        }
+    }
+    return true;
 }
