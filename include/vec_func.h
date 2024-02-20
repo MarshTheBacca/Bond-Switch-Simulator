@@ -3,13 +3,13 @@
 #ifndef NL_VEC_FUNC_H
 #define NL_VEC_FUNC_H
 
-#include <iostream>
 #include <cmath>
-
+#include <iostream>
+#include <sstream>
+#include <vector>
 // Sum of all vector values
 template <typename T>
-double vSum(T vec)
-{
+double vSum(T vec) {
     double sum = 0.0;
     for (int i = 0; i < vec.n; ++i)
         sum += vec.v[i];
@@ -18,8 +18,7 @@ double vSum(T vec)
 
 // Absolute sum of all vector values
 template <typename T>
-double vAsum(T vec)
-{
+double vAsum(T vec) {
     double asum = 0.0;
     for (int i = 0; i < vec.n; ++i)
         asum += abs(vec.v[i]);
@@ -28,8 +27,7 @@ double vAsum(T vec)
 
 // Modulus of vector
 template <typename T>
-double vNorm(T vec)
-{
+double vNorm(T vec) {
     double norm;
     norm = sqrt(vSum(vec * vec));
     return norm;
@@ -37,8 +35,7 @@ double vNorm(T vec)
 
 // Square modulus of vector
 template <class T>
-double vNormSq(T vec)
-{
+double vNormSq(T vec) {
     double normSq;
     normSq = vSum(vec * vec);
     return normSq;
@@ -46,8 +43,7 @@ double vNormSq(T vec)
 
 // Angle between vectors
 template <class T>
-double vAngle(T vec0, T vec1, double &n0, double &n1)
-{
+double vAngle(T vec0, T vec1, double &n0, double &n1) {
     n0 = vNorm(vec0);
     n1 = vNorm(vec1);
     double dotProduct = vSum(vec0 * vec1) / (n0 * n1);
@@ -61,15 +57,13 @@ double vAngle(T vec0, T vec1, double &n0, double &n1)
 
 // Mean of vector
 template <typename T>
-double vMean(T vec)
-{
+double vMean(T vec) {
     return vSum(vec) / vec.n;
 }
 
 // Cyclic permutation of vector elements
 template <typename T>
-T vCyclicPermutation(T vec)
-{
+T vCyclicPermutation(T vec) {
     T pVec(vec.n);
     for (int i = 1; i < vec.n; ++i)
         pVec[i] = vec[i - 1];
@@ -79,8 +73,7 @@ T vCyclicPermutation(T vec)
 
 // Sort vector using heapsort algorithm (see numerical recipes)
 template <typename T>
-T vSort(T vec)
-{
+T vSort(T vec) {
     int n = vec.n;
     int i = n / 2, parent, child;
     auto v = vec[0];
@@ -88,15 +81,11 @@ T vSort(T vec)
     if (n < 2)
         return sVec;
 
-    for (;;)
-    {
-        if (i > 0)
-        {
+    for (;;) {
+        if (i > 0) {
             i--;
             v = sVec[i];
-        }
-        else
-        {
+        } else {
             n--;
             if (n == 0)
                 break;
@@ -106,17 +95,14 @@ T vSort(T vec)
 
         parent = i;
         child = i * 2 + 1;
-        while (child < n)
-        {
+        while (child < n) {
             if (child + 1 < n && sVec[child + 1] > sVec[child])
                 ++child;
-            if (sVec[child] > v)
-            {
+            if (sVec[child] > v) {
                 sVec[parent] = sVec[child];
                 parent = child;
                 child = parent * 2 + 1;
-            }
-            else
+            } else
                 break;
         }
         sVec[parent] = v;
@@ -127,16 +113,12 @@ T vSort(T vec)
 
 // Find common values between vectors
 template <typename T>
-T vCommonValues(T vecA, T vecB)
-{
+T vCommonValues(T vecA, T vecB) {
     T vecC(vecA.n);
     int nCommon = 0;
-    for (int i = 0; i < vecA.n; ++i)
-    {
-        for (int j = 0; j < vecB.n; ++j)
-        {
-            if (vecA[i] == vecB[j])
-            {
+    for (int i = 0; i < vecA.n; ++i) {
+        for (int j = 0; j < vecB.n; ++j) {
+            if (vecA[i] == vecB[j]) {
                 vecC[nCommon] = vecA[i];
                 ++nCommon;
             }
@@ -150,13 +132,10 @@ T vCommonValues(T vecA, T vecB)
 
 // Find if vector contains a value
 template <typename T, typename S>
-bool vContains(T vec, S val)
-{
+bool vContains(T vec, S val) {
     bool contains = false;
-    for (int i = 0; i < vec.n; ++i)
-    {
-        if (vec[i] == val)
-        {
+    for (int i = 0; i < vec.n; ++i) {
+        if (vec[i] == val) {
             contains = true;
             break;
         }
@@ -164,46 +143,50 @@ bool vContains(T vec, S val)
     return contains;
 };
 
-// Find unique values in vector
+/**
+ * @brief Finds and returns a vector of unique values from the input vector.
+ * @param inputVec The vector from which unique values are to be found.
+ * @return A vector of unique values.
+ */
 template <typename T>
-T vUnique(T vecA)
-{
-    if (vecA.n == 0)
-        return vecA;
-    T vecB = vSort(vecA);
-    int count = 0;
-    for (int i = 1; i < vecB.n; ++i)
-    {
-        if (vecB[i] == vecB[i - 1])
-        {
-            vecB[i - 1] = -1;
-            ++count;
+T getUniqueValues(T inputVec) {
+    if (inputVec.n == 0)
+        return inputVec;
+
+    T sortedVec = vSort(inputVec);
+    int duplicateCount = 0;
+
+    // Mark duplicates with -1
+    for (int i = 1; i < sortedVec.n; ++i) {
+        if (sortedVec[i] == sortedVec[i - 1]) {
+            sortedVec[i - 1] = -1;
+            ++duplicateCount;
         }
     }
-    T vecC(vecB.n - count);
-    count = 0;
-    for (int i = 0; i < vecB.n; ++i)
-    {
-        if (vecB[i] >= 0)
-        {
-            vecC[count] = vecB[i];
-            ++count;
+
+    // Create a new vector for unique values
+    T uniqueVec(sortedVec.n - duplicateCount);
+    int uniqueCount = 0;
+
+    // Copy unique values to the new vector
+    for (int i = 0; i < sortedVec.n; ++i) {
+        if (sortedVec[i] >= 0) {
+            uniqueVec[uniqueCount] = sortedVec[i];
+            ++uniqueCount;
         }
     }
-    return vecC;
+
+    return uniqueVec;
 }
 
 // Count number of times each value appears in vector
 template <typename T>
-T vValCount(T vec, T vals)
-{
+T vValCount(T vec, T vals) {
     if (vec.n == 0)
         return vec;
     T count(vals.n);
-    for (int i = 0; i < vals.n; ++i)
-    {
-        for (int j = 0; j < vec.n; ++j)
-        {
+    for (int i = 0; i < vals.n; ++i) {
+        for (int j = 0; j < vec.n; ++j) {
             if (vec[j] == vals[i])
                 ++count[i];
         }
@@ -213,15 +196,12 @@ T vValCount(T vec, T vals)
 
 // Count number of times two values are adjacent in a vector
 template <typename T, typename S>
-int vAdjCount(T vec, S valA, S valB)
-{
+int vAdjCount(T vec, S valA, S valB) {
     if (vec.n <= 1)
         return 0;
     int adjCount = 0;
-    for (int i = 0; i < vec.n; ++i)
-    {
-        if (vec[i] == valA)
-        {
+    for (int i = 0; i < vec.n; ++i) {
+        if (vec[i] == valA) {
             int j = (i + vec.n - 1) % vec.n;
             int k = (i + 1) % vec.n;
             if (vec[j] == valB)
@@ -235,14 +215,12 @@ int vAdjCount(T vec, S valA, S valB)
 
 // Simple linear regression
 template <typename T>
-T vLinearRegression(T x, T y)
-{
+T vLinearRegression(T x, T y) {
     if (x.n != y.n)
         throw std::runtime_error("Regression error - must be equal number of x and y values");
     T coefficients(3); // gradient, intercept and r-squared
     double sumX = 0.0, sumY = 0.0, sumXY = 0.0, sumXX = 0.0, sumYY = 0.0;
-    for (int i = 0; i < x.n; ++i)
-    {
+    for (int i = 0; i < x.n; ++i) {
         sumX += x[i];
         sumY += y[i];
         sumXY += x[i] * y[i];
