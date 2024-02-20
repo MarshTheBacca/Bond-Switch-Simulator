@@ -57,17 +57,7 @@ struct InputData {
     int initialThermalisationSteps;
 
     // Potential Model Data
-    double harmonicBondForceConstant;
-    double harmonicAngleForceConstant;
-    double harmonicGeometryConstraint;
     bool isMaintainConvexityEnabled;
-
-    // Geometry Optimisation Data
-    int monteCarloLocalMaxIterations;
-    int globalMinimisationMaxIterations;
-    double tauBacktrackingParameter;
-    double tolerance;
-    int localRegionSize;
 
     // Analysis Data
     int analysisWriteFrequency;
@@ -94,7 +84,6 @@ struct InputData {
     void readMonteCarloProcess(std::ifstream &inputFile, const LoggerPtr &logger);
     void readMonteCarloEnergySearch(std::ifstream &inputFile, const LoggerPtr &logger);
     void readPotentialModel(std::ifstream &inputFile, const LoggerPtr &logger);
-    void readGeometryOptimisation(std::ifstream &inputFile, const LoggerPtr &logger);
     void readAnalysis(std::ifstream &inputFile, const LoggerPtr &logger);
     void readOutput(std::ifstream &inputFile, const LoggerPtr &logger);
     void checkInSet(const std::string &value, const std::set<std::string, std::less<>> &validValues, const std::string &errorMessage) const;

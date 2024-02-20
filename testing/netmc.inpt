@@ -10,8 +10,8 @@ false              	Restart Network using lammps objects?
 --------------------------------------------------
 Network Properties
 1588        Number of rings
-4           min ring size
-12          max ring size
+3           min ring size
+30          max ring size
 3           min node coordination
 3           max node coordination
 false       Enable fix rings?
@@ -29,28 +29,18 @@ false           Enable BN?
 Monte Carlo Process
 switch      move type (switch/mix)
 0           random seed
-weighted    random/weighted MC
+random    random/weighted MC
 --------------------------------------------------
 Monte Carlo Energy Search
 -2.0        start temperature (10^x)
 -2.0        end temperature (10^x)
 0.1         temperature increment (10^x)
--2.0        thermalisation temperature
-800         steps per temperature
-200         initial themalisation steps
+1.5          thermalisation temperature
+0         steps per temperature
+52     initial themalisation steps
 --------------------------------------------------
 Potential Model
-0.8         harmonic bond force constant 
-0.2         harmonic angle force constant 
-10.0        harmonic geometry constraint
-true        maintain convexity
---------------------------------------------------
-Geometry Optimisation
-10000       monte carlo local max iterations
-1           global minimisation max iterations
-0.5         tau backtracking parameter
-1e-06       tolerance
-5           local region size
+false        maintain convexity
 --------------------------------------------------
 Analysis
 1           analysis write frequency

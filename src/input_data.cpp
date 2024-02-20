@@ -85,16 +85,7 @@ void InputData::readMonteCarloEnergySearch(std::ifstream &inputFile,
 
 void InputData::readPotentialModel(std::ifstream &inputFile,
                                    const LoggerPtr &logger) {
-    readSection(inputFile, "Potential Model", logger, harmonicBondForceConstant,
-                harmonicAngleForceConstant, harmonicGeometryConstraint,
-                isMaintainConvexityEnabled);
-}
-
-void InputData::readGeometryOptimisation(std::ifstream &inputFile,
-                                         const LoggerPtr &logger) {
-    readSection(inputFile, "Geometry Optimisation", logger,
-                monteCarloLocalMaxIterations, globalMinimisationMaxIterations,
-                tauBacktrackingParameter, tolerance, localRegionSize);
+    readSection(inputFile, "Potential Model", logger, isMaintainConvexityEnabled);
 }
 
 void InputData::readAnalysis(std::ifstream &inputFile,
@@ -123,7 +114,6 @@ void InputData::checkFileExists(const std::string &filename) const {
 }
 
 void InputData::validate() {
-    double maxDouble = std::numeric_limits<double>::max();
     // Network Properties
     checkInRange(numRings, 1, INT_MAX, "Number of rings must be at least 1");
     checkInRange(minRingSize, 3, INT_MAX, "Minimum ring size must be at least 3");
@@ -154,33 +144,15 @@ void InputData::validate() {
     }
 
     // Monte Carlo Process
-    checkInSet(moveType, {"switch", "mix"},
-               "Invalid move type: " + moveType + " must be either 'switch' or 'mix'");
+    checkInSet(moveType, {"switch", "mix"}, "Invalid move type: " + moveType + " must be either 'switch' or 'mix'");
     checkInRange(randomSeed, 0, INT_MAX, "Random seed must be at least 0");
-    checkInSet(randomOrWeighted, {"random", "weighted"},
-               "Invalid random or weighted: " + randomOrWeighted + " must be either 'random' or 'weighted'");
-
-    // Potential Model
-    checkInRange(harmonicBondForceConstant, 0.0, maxDouble,
-                 "Harmonic bond force constant must be at least 0");
-    checkInRange(harmonicAngleForceConstant, 0.0, maxDouble,
-                 "Harmonic angle force constant must be at least 0");
-    checkInRange(harmonicGeometryConstraint, 0.0, maxDouble,
-                 "Harmonic geometry constraint must be at least 0");
-
-    // Geometry Optimisation
-    checkInRange(monteCarloLocalMaxIterations, 0, INT_MAX,
-                 "Monte Carlo local max iterations must be at least 0");
-    checkInRange(globalMinimisationMaxIterations, 0, INT_MAX,
-                 "Global minimisation max iterations must be at least 0");
+    checkInSet(randomOrWeighted, {"random", "weighted"}, "Invalid random or weighted: " + randomOrWeighted + " must be either 'random' or 'weighted'");
 
     // Analysis
-    checkInRange(analysisWriteFrequency, 0, 1000,
-                 "Analysis write frequency must be between 0 and 1000");
+    checkInRange(analysisWriteFrequency, 0, 1000, "Analysis write frequency must be between 0 and 1000");
 
     // Output
-    checkInRange(ljPairsCalculationDistance, 0, INT_MAX,
-                 "LJ pairs calculation distance must be at least 0");
+    checkInRange(ljPairsCalculationDistance, 0, INT_MAX, "LJ pairs calculation distance must be at least 0");
 }
 
 /**
@@ -209,7 +181,6 @@ InputData::InputData(const std::string &filePath, const LoggerPtr &logger) {
     readMonteCarloProcess(inputFile, logger);
     readMonteCarloEnergySearch(inputFile, logger);
     readPotentialModel(inputFile, logger);
-    readGeometryOptimisation(inputFile, logger);
     readAnalysis(inputFile, logger);
     logger->info("Succeessfully read input file!");
 
