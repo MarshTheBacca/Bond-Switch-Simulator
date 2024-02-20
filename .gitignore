@@ -7,3 +7,6 @@
 /testing/Si.log
 /clean-all.cmake
 /netmc.log
+/testing/input_files (copy)/
+/testing/Si_dump.lammpstrj
+/testing/bond.dump
