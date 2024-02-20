@@ -435,7 +435,7 @@ void Network::findLocalRegion(int a, int b, int extent, VecR<int> &local,
             layer1.addValue(nodes[layer0[i]].netCnxs[j]);
         }
     }
-    layer1 = vUnique(layer1);
+    layer1 = getUniqueValues(layer1);
     for (int i = 0; i < layer0.n; ++i)
         layer1.delValue(layer0[i]);
     for (int i = 0; i < layer1.n; ++i)
@@ -450,7 +450,7 @@ void Network::findLocalRegion(int a, int b, int extent, VecR<int> &local,
         }
         if (layer2.n == 0)
             break;
-        layer2 = vUnique(layer2);
+        layer2 = getUniqueValues(layer2);
         common = vCommonValues(layer2, layer1);
         for (int j = 0; j < common.n; ++j)
             layer2.delValue(common[j]);
@@ -703,7 +703,7 @@ VecF<int> Network::maxClusters(int minCnd, int maxCnd, int minInnerCnxs,
                                 search2.addValue(id);
                         }
                     }
-                    search1 = vUnique(search1);
+                    search1 = getUniqueValues(search1);
                     VecR<int> delValues = vCommonValues(clst, search1);
                     for (int j = 0; j < delValues.n; ++j)
                         search1.delValue(delValues[j]);
@@ -767,7 +767,7 @@ double Network::maxCluster(int nodeCnd) {
                 }
                 if (search1.n == 0)
                     break;
-                search1 = vUnique(search1);
+                search1 = getUniqueValues(search1);
                 VecR<int> delValues = vCommonValues(clst, search1);
                 for (int j = 0; j < delValues.n; ++j)
                     search1.delValue(delValues[j]);
