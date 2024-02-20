@@ -47,6 +47,7 @@ struct InputData {
     std::string moveType;
     int randomSeed;
     std::string randomOrWeighted;
+    double weightedDecay;
 
     // Monte Carlo Energy Search Data
     double startTemperature;
@@ -57,7 +58,8 @@ struct InputData {
     int initialThermalisationSteps;
 
     // Potential Model Data
-    bool isMaintainConvexityEnabled;
+    double maximumBondLength;
+    double maximumAngle;
 
     // Analysis Data
     int analysisWriteFrequency;

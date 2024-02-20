@@ -29,18 +29,20 @@ false           Enable BN?
 Monte Carlo Process
 switch      move type (switch/mix)
 0           random seed
-random    random/weighted MC
+weighted      Process for choosing bonds to switch (random, weighted)
+0.1         weighted decay
 --------------------------------------------------
 Monte Carlo Energy Search
 -2.0        start temperature (10^x)
 -2.0        end temperature (10^x)
 0.1         temperature increment (10^x)
-1.5          thermalisation temperature
+10          thermalisation temperature
 0         steps per temperature
-52     initial themalisation steps
+3     initial themalisation steps
 --------------------------------------------------
 Potential Model
-false        maintain convexity
+3.5         Maximum bond length
+175         Maximum angle
 --------------------------------------------------
 Analysis
 1           analysis write frequency

@@ -73,7 +73,7 @@ void InputData::readNetworkMinimisationProtocols(std::ifstream &inputFile,
 
 void InputData::readMonteCarloProcess(std::ifstream &inputFile,
                                       const LoggerPtr &logger) {
-    readSection(inputFile, "Monte Carlo Process", logger, moveType, randomSeed, randomOrWeighted);
+    readSection(inputFile, "Monte Carlo Process", logger, moveType, randomSeed, randomOrWeighted, weightedDecay);
 }
 
 void InputData::readMonteCarloEnergySearch(std::ifstream &inputFile,
@@ -85,7 +85,7 @@ void InputData::readMonteCarloEnergySearch(std::ifstream &inputFile,
 
 void InputData::readPotentialModel(std::ifstream &inputFile,
                                    const LoggerPtr &logger) {
-    readSection(inputFile, "Potential Model", logger, isMaintainConvexityEnabled);
+    readSection(inputFile, "Potential Model", logger, maximumBondLength, maximumAngle);
 }
 
 void InputData::readAnalysis(std::ifstream &inputFile,
@@ -182,10 +182,8 @@ InputData::InputData(const std::string &filePath, const LoggerPtr &logger) {
     readMonteCarloEnergySearch(inputFile, logger);
     readPotentialModel(inputFile, logger);
     readAnalysis(inputFile, logger);
-    logger->info("Succeessfully read input file!");
 
     // Validate input data
     logger->info("Validating input data...");
     validate();
-    logger->info("Successfully validated input data!");
 }
