@@ -30,6 +30,7 @@ class Node {
     ~Node() = default;
 
     // Member functions
+
     std::string toString();
 };
 
