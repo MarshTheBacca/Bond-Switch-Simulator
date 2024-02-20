@@ -1,6 +1,5 @@
 # LAMMPS Network Monte Carlo
 
-This repository is currently work in progress and will not work out of the box in its current state.
 
 This is a fork of the Wilson Group's [2D Network Monte Carlo](https://github.com/WilsonGroupOxford/Network-Monte-Carlo) repository that integrates [LAMMPS](https://github.com/lammps/lammps) to allow for faster energy evaluation and other 2D structures:
 
