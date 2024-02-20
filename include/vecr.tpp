@@ -211,7 +211,14 @@ void VecR<T>::replaceValue(T removeValue, T addValue, T betweenValue1, T between
     throw std::runtime_error(oss.str());
 }
 
-// Insert value in vector between two others
+/**
+ * @brief Insert a value between two others in the vector
+ * @param vInsert The value to insert
+ * @param vBetween0 The first value between which to insert
+ * @param vBetween1 The second value between which to insert
+ * @typedef T The type of the vector
+ * @throws std::runtime_error If the value to insert between is not present in the vector or the vector is full
+ */
 template <typename T>
 void VecR<T>::insertValue(T vInsert, T vBetween0, T vBetween1) {
     if (n == nMax)

@@ -77,6 +77,22 @@ class VecR {
     T *end() { return v + n; }
     const T *end() const { return v + n; } // const version
 
+    T &back() {
+        if (n > 0) {
+            return v[n - 1];
+        } else {
+            throw std::out_of_range("VecR is empty.");
+        }
+    }
+
+    const T &back() const {
+        if (n > 0) {
+            return v[n - 1];
+        } else {
+            throw std::out_of_range("VecR is empty.");
+        }
+    }
+
     bool contains(T value);
     std::string toString();
 
@@ -84,6 +100,28 @@ class VecR {
     friend std::ostream &operator<<(std::ostream &os, VecR<U> &vec);
     template <typename U>
     friend std::ostream &operator<<(std::ostream &os, const VecR<U> &vec);
+
+    /**
+     * @brief Converts VecR to std::vector
+     * @return std::vector of type T
+     */
+    operator std::vector<T>() const {
+        std::vector<T> vec(this->n);
+        for (int i = 0; i < this->n; ++i)
+            vec[i] = this->v[i];
+        return vec;
+    }
+
+    /**
+     * @brief Converts VecR to std::vector
+     * @return std::vector of type T
+     */
+    operator std::vector<T>() {
+        std::vector<T> vec(this->n);
+        for (int i = 0; i < this->n; ++i)
+            vec[i] = this->v[i];
+        return vec;
+    }
 };
 
 #include "vecr.tpp"
