@@ -71,6 +71,17 @@ class VecF {
 
     template <typename U>
     friend std::ostream &operator<<(std::ostream &os, const VecF<U> &vec);
+
+    /**
+     * @brief Converts VecF to std::vector
+     * @return std::vector of type T
+     */
+    operator std::vector<T>() const {
+        std::vector<T> vec(this->n);
+        for (int i = 0; i < this->n; ++i)
+            vec[i] = this->v[i];
+        return vec;
+    }
 };
 
 #include "vecf.tpp"
