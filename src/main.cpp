@@ -81,7 +81,7 @@ int main(int argc, char *argv[]) {
     }
 
     logger->info("Network initialised!");
-    logger->info("Initial energy: {}", network.energy);
+    logger->info("Initial energy: {:.3f} Hartrees", network.energy);
 
     // Initialise output files
     logger->info("Initialising analysis output files...");
@@ -93,14 +93,12 @@ int main(int argc, char *argv[]) {
     OutputFile outEnergy(prefixOut + "_energy.out");
     OutputFile outEntropy(prefixOut + "_entropy.out");
     OutputFile outTemperature(prefixOut + "_temperature.out");
-    OutputFile outGeometry(prefixOut + "_geometry.out");
     OutputFile outEmatrix(prefixOut + "_ematrix.out");
     OutputFile outGeomHist(prefixOut + "_geomhist.out");
     OutputFile outAreas(prefixOut + "_areas.out");
     OutputFile outClusterA(prefixOut + "_cluster_a.out");
     OutputFile outClusterB(prefixOut + "_cluster_b.out");
     OutputFile outCndStats(prefixOut + "_cndstats.out");
-    outGeometry.initVariables(6, 4, 60, 20);
     outAreas.initVariables(6, 4, 60, 30);
     outEmatrix.initVariables(1, 4, 60, int(log10(inputData.numRings * 12)) + 2);
     outGeomHist.initVariables(6, 4, 60, 20);
@@ -142,7 +140,6 @@ int main(int argc, char *argv[]) {
 
                 VecF<double> emptyL;
                 VecF<double> emptyA; // dummy histograms
-                VecF<double> geomStats = network.getOptimisationGeometry(network.networkA, emptyL, emptyA);
                 VecF<VecF<int>> edgeDist = network.getEdgeDistribution("B");
                 VecF<double> cndStats = network.getNodeDistribution("A");
                 outRingStats.writeRowVector(ringStats);
@@ -150,7 +147,6 @@ int main(int argc, char *argv[]) {
                 outEnergy.write(network.energy);
                 outEntropy.writeRowVector(s);
                 outTemperature.write(expTemperature);
-                outGeometry.writeRowVector(geomStats);
                 outAreas.writeRowVector(a);
                 outAreas.writeRowVector(aSq);
 
@@ -174,7 +170,7 @@ int main(int argc, char *argv[]) {
         for (int i = 0; i < numTemperatureSteps; ++i) {
             expTemperature = pow(10, inputData.startTemperature + i * inputData.temperatureIncrement);
             network.mc.setTemperature(expTemperature);
-            logger->info("Temperature: {}", expTemperature);
+            logger->info("Temperature: {:.2f}", expTemperature);
             for (int k = 1; k <= inputData.stepsPerTemperature; ++k) {
                 network.monteCarloSwitchMoveLAMMPS(logger);
                 if (k % inputData.analysisWriteFrequency == 0) {
@@ -194,7 +190,6 @@ int main(int argc, char *argv[]) {
                     corr[3] = aw[1];
                     corr[4] = aw[2];
                     corr[5] = rr;
-                    VecF<double> geomStats = network.getOptimisationGeometry(network.networkA, lenHist, angHist);
                     VecF<VecF<int>> edgeDist = network.getEdgeDistribution("B");
                     VecF<double> cndStats = network.getNodeDistribution("A");
 
@@ -203,7 +198,6 @@ int main(int argc, char *argv[]) {
                     outEnergy.write(network.energy);
                     outEntropy.writeRowVector(s);
                     outTemperature.write(expTemperature);
-                    outGeometry.writeRowVector(geomStats);
                     outAreas.writeRowVector(a);
                     outAreas.writeRowVector(aSq);
                     for (int j = 0; j < edgeDist.n; ++j)
@@ -216,50 +210,55 @@ int main(int argc, char *argv[]) {
                 }
             }
         }
+
+        logger->info("Monte Carlo simulation complete");
+
+        // Write total analysis
+        for (int i = 0; i < 10000; ++i) {
+            VecF<double> hist(4);
+            hist[0] = i * 4.0 / 10000.0;
+            hist[1] = lenHist[i];
+            hist[2] = i * 2 * M_PI / 10000.0;
+            hist[3] = angHist[i];
+            outGeomHist.writeRowVector(hist);
+        }
+
+        logger->info("Writing LAMMPS Results");
+        network.lammpsNetwork.write_data("Si");
+        network.lammpsNetwork.write_restart("Si");
+
+        // Check network
+        logger->debug("Diagnosing simulation...");
+        bool consistent = network.checkConsistency();
+        logger->debug("Network consistent: {}", consistent ? "true" : "false");
+
+        // Write files
+        logger->info("Writing files...");
+        network.write(prefixOut);
+        network.writeXYZ(prefixOut);
+        logger->info("");
+        logger->info("Number of attempted switches: {}", network.numSwitches);
+        logger->info("Number of accepted switches: {}", network.numAcceptedSwitches);
+        logger->info("Number of failed switches due to angle: {}", network.failedAngleChecks);
+        logger->info("Number of failed switches due to bond length: {}", network.failedBondLengthChecks);
+        logger->info("Number of failed switches due to energy: {}", network.failedEnergyChecks);
+        logger->info("");
+        logger->info("Monte Carlo acceptance: {:.3f}", (double)network.numAcceptedSwitches / network.numSwitches);
+        if (network.checkAllClockwiseNeighbours(logger)) {
+            logger->info("All rings have clockwise neighbours");
+        } else {
+            logger->info("Not all rings have clockwise neighbours");
+        }
+
+        // Log time taken
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start) / 1000.0;
+        logger->info("Total run time: {} s", duration.count());
+        spdlog::shutdown();
     } catch (std::exception &e) {
         logger->error("Exception: {}", e.what());
+        logger->flush();
         return 1;
     }
-    logger->info("Monte Carlo simulation complete");
-
-    // Write total analysis
-    for (int i = 0; i < 10000; ++i) {
-        VecF<double> hist(4);
-        hist[0] = i * 4.0 / 10000.0;
-        hist[1] = lenHist[i];
-        hist[2] = i * 2 * M_PI / 10000.0;
-        hist[3] = angHist[i];
-        outGeomHist.writeRowVector(hist);
-    }
-
-    logger->info("Writing LAMMPS Results");
-    network.lammpsNetwork.write_data("Si");
-    network.lammpsNetwork.write_restart("Si");
-
-    // Check network
-    logger->debug("Diagnosing simulation...");
-    bool consistent = network.checkConsistency();
-    logger->debug("Network consistent: {}", consistent ? "true" : "false");
-
-    // Write files
-    logger->info("Writing files...");
-    network.write(prefixOut);
-    network.writeXYZ(prefixOut);
-    logger->debug("Files written");
-    logger->info("Number of accepted switches: {}", network.numAcceptedSwitches);
-
-    logger->info("Monte Carlo acceptance: {}", (double)network.numAcceptedSwitches / network.numSwitches);
-    if (network.checkAllClockwiseNeighbours(logger)) {
-        logger->info("All rings have clockwise neighbours");
-    } else {
-        logger->info("Not all rings have clockwise neighbours");
-    }
-
-    // Log time taken
-    auto end = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start) / 1000.0;
-    logger->info("Total run time: {} s", duration.count());
-    spdlog::shutdown();
-
     return 0;
 }
