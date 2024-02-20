@@ -94,8 +94,9 @@ LinkedNetwork::LinkedNetwork(InputData &inputData, LoggerPtr logger) : centreCoo
         findFixedRings(inputData.isFixRingsEnabled, prefix, logger);
         findFixedNodes();
     }
-
-    isMaintainConvexityEnabled = inputData.isMaintainConvexityEnabled;
+    weightedDecay = inputData.weightedDecay;
+    maximumBondLength = inputData.maximumBondLength;
+    maximumAngle = inputData.maximumAngle * M_PI / 180; // Convert to radians
     energy = lammpsNetwork.getPotentialEnergy();
     currentCoords.resize(2 * networkA.nodes.n);
 
@@ -114,16 +115,17 @@ LinkedNetwork::LinkedNetwork(InputData &inputData, LoggerPtr logger) : centreCoo
     mcRoutine = inputData.selectedMinimisationProtocol;
 }
 
+/**
+ * @brief Populate fixedNodes with all base nodes that are a member of all fixed rings
+ */
 void LinkedNetwork::findFixedNodes() {
-    fixedNodes.setSize(0);
-    for (int i = 0; i < fixedRings.n; ++i) {
-        for (int j = 0; j < networkB.nodes[fixedRings[i]].dualCnxs.n; ++j) {
-            if (fixedNodes.contains(networkB.nodes[fixedRings[i]].dualCnxs[j]) == false)
-                fixedNodes.addValue(networkB.nodes[fixedRings[i]].dualCnxs[j]);
+    std::for_each(fixedRings.begin(), fixedRings.end(), [this](int fixedRing) {
+        for (int j = 0; j < networkB.nodes[fixedRing].dualCnxs.n; ++j) {
+            if (std::find(fixedNodes.begin(), fixedNodes.end(), networkB.nodes[fixedRing].dualCnxs[j]) == fixedNodes.end())
+                fixedNodes.push_back(networkB.nodes[fixedRing].dualCnxs[j]);
         }
-    }
+    });
 }
-
 /**
  * @brief Calculates the difference between two vectors with periodic boundary conditions
  * @param vector1 First vector
@@ -154,13 +156,12 @@ std::vector<double> pbcVector(const std::vector<double> &vector1, const std::vec
 }
 
 /**
- * @brief read the fixed_rings.dat file and store the fixed ring IDs in a vector
+ * @brief read the fixed_rings.dat file and populate fixedRings with integers from each line
  * @param isFixedRingsEnabled boolean to enable or disable fixed rings
  * @param filename the name of the input file
  * @param logger the logger object
  */
-void LinkedNetwork::findFixedRings(bool isFixedRingsEnabled,
-                                   std::string filename, LoggerPtr logger) {
+void LinkedNetwork::findFixedRings(bool isFixedRingsEnabled, std::string filename, LoggerPtr logger) {
     // Format of the fixed_rings.dat file has changed to not include the number of
     // fixed rings on the first line, but simply the IDs of each fixed ring line
     // by line.
@@ -168,26 +169,23 @@ void LinkedNetwork::findFixedRings(bool isFixedRingsEnabled,
         // Open the file
         std::ifstream fixedRingsFile(filename + ".dat", std::ios::in);
         if (!fixedRingsFile.is_open()) {
-            logger->warn("Failed to open file: {}.dat, setting number of fixed rings to 0.", filename);
-            fixedRings.setSize(0);
+            logger->warn("Failed to open file: {}.dat, setting number of fixed rings to 0 and they will be ignored", filename);
             return;
         }
         std::string line;
         std::string ringList = "";
-        int numFixedRings = 0;
         // Read the file line by line
         while (getline(fixedRingsFile, line)) {
             // Convert the line to an integer and store it in the vector
-            std::istringstream(line) >> fixedRings[numFixedRings];
-            ringList += std::to_string(fixedRings[numFixedRings]) + " ";
-            numFixedRings++;
+            int num;
+            std::istringstream(line) >> num;
+            fixedRings.push_back(num);
+            ringList += std::to_string(num) + " ";
         }
-        fixedRings.setSize(numFixedRings);
-        logger->info("Number of fixed rings: {}", numFixedRings);
+        logger->info("Number of fixed rings: {}", fixedRings.size());
         logger->info("Fixed rings: {}", ringList);
     } else {
         logger->info("Fixed rings disabled, setting number of fixed rings to 0.");
-        fixedRings.setSize(0);
     }
 }
 
@@ -200,59 +198,65 @@ void LinkedNetwork::monteCarloSwitchMoveLAMMPS(LoggerPtr logger) {
      * 3) optimise and evaluate energy
      * 4) accept or reject */
     logger->debug("Finding move...");
-    VecF<int> switchIDsA;
-    VecF<int> switchIDsB;
 
     bool foundValidMove = false;
     int baseNode1;
     int baseNode2;
     int ringNode1;
     int ringNode2;
-    int cnxType;
 
     std::vector<int> bondBreaks;
     std::vector<int> bondMakes;
     std::vector<int> angleBreaks;
     std::vector<int> angleMakes;
     std::vector<int> ringBondBreakMake;
-    std::vector<int> convexCheckIDs;
+    std::vector<int> involvedNodes;
 
     for (int i = 0; i < networkA.nodes.n * networkA.nodes.n; ++i) {
-        std::tuple<int, int, int, int, int> result;
+        std::tuple<int, int, int, int> result;
         if (mcWeighting == "weighted")
             result = pickRandomConnection(mtGen, SelectionType::EXPONENTIAL_DECAY);
         else
             result = pickRandomConnection(mtGen, SelectionType::RANDOM);
 
-        std::tie(baseNode1, baseNode2, ringNode1, ringNode2, cnxType) = result;
+        std::tie(baseNode1, baseNode2, ringNode1, ringNode2) = result;
         logger->debug("Picked base nodes: {} {} and ring nodes: {} {}", baseNode1, baseNode2, ringNode1, ringNode2);
         foundValidMove = genSwitchOperations(baseNode1, baseNode2, ringNode1, ringNode2,
                                              bondBreaks, bondMakes,
                                              angleBreaks, angleMakes,
-                                             ringBondBreakMake, convexCheckIDs, logger);
+                                             ringBondBreakMake, involvedNodes, logger);
         if (foundValidMove)
             break;
     }
 
-    // Now baseNode1, baseNode2, ringNode1, ringNode2, and cnxType are available here
     if (!foundValidMove) {
         logger->error("Cannot find any valid switch moves");
         throw std::runtime_error("Cannot find any valid switch moves");
     }
     numSwitches++;
     logger->info("Switch number: {}", numSwitches);
+
     // Save current state
     double initialEnergy = energy;
-
-    std::vector<double> initialCoords = currentCoords;
 
     VecF<int> saveNodeDistA = networkA.nodeDistribution;
     VecF<int> saveNodeDistB = networkB.nodeDistribution;
 
     VecF<VecF<int>> saveEdgeDistA = networkA.edgeDistribution;
     VecF<VecF<int>> saveEdgeDistB = networkB.edgeDistribution;
+    std::vector<Node> initialInvolvedNodesA;
+    for (const auto &id : involvedNodes) {
+        initialInvolvedNodesA.push_back(networkA.nodes[id]);
+    }
+    std::vector<Node> initialInvolvedNodesB;
+    for (const auto &id : ringBondBreakMake) {
+        initialInvolvedNodesB.push_back(networkB.nodes[id]);
+    }
 
     // Switch and geometry optimise
+    logger->debug("Switching NetMC Network...");
+    switchNetMCGraphene(bondBreaks, ringBondBreakMake);
+
     logger->debug("Switching LAMMPS Network...");
 
     if (isSimpleGrapheneEnabled) {
@@ -262,31 +266,42 @@ void LinkedNetwork::monteCarloSwitchMoveLAMMPS(LoggerPtr logger) {
     double finalEnergy;
     // Geometry optimisation of local region
     logger->debug("Minimising network...");
-
     lammpsNetwork.minimiseNetwork();
     std::vector<double> lammpsCoords = lammpsNetwork.getCoords(2);
-    if (checkConvexAngles(convexCheckIDs, lammpsCoords, logger)) {
-        finalEnergy = lammpsNetwork.getPotentialEnergy();
-    } else {
-        logger->warn("Angles are not all convex, setting final energy to inf");
-        finalEnergy = std::numeric_limits<double>::infinity();
-    }
 
     logger->info("Accepting or rejecting...");
-    bool isAccepted = mc.acceptanceCriterion(finalEnergy, initialEnergy, 1.0);
-    if (isAccepted) {
-        logger->info("Accepted Move, Ei = {} Ef = {}", initialEnergy, finalEnergy);
-        logger->debug("Switching NetMC Network...");
-        switchNetMCGraphene(bondBreaks, ringBondBreakMake);
-        logger->info("Syncing coordinates...");
-        currentCoords = lammpsCoords;
-        pushCoords(lammpsCoords);
-        energy = finalEnergy;
-        numAcceptedSwitches++;
+    bool isAccepted = false;
+    if (checkAnglesWithinRange(std::vector<int>{bondBreaks[0], bondBreaks[2]}, lammpsCoords, logger)) {
+        if (checkBondLengths(involvedNodes, lammpsCoords, logger)) {
+            finalEnergy = lammpsNetwork.getPotentialEnergy();
+            if (mc.acceptanceCriterion(finalEnergy, initialEnergy, 1.0)) {
+                logger->info("Accepted Move: Ei = {:.3f} Eh, Ef = {:.3f} Eh", initialEnergy, finalEnergy);
+                isAccepted = true;
+                numAcceptedSwitches++;
+                logger->info("Syncing LAMMPS coordinates to NetMC coordinates...");
+                currentCoords = lammpsCoords;
+                pushCoords(lammpsCoords);
+                energy = finalEnergy;
+            } else {
+                logger->warn("Rejected move: failed Metropolis criterion: Ei = {:.3f} Eh, Ef = {:.3f} Eh", initialEnergy, finalEnergy);
+                failedEnergyChecks++;
+            }
+        } else {
+            logger->warn("Rejected move: bond lengths are not within range");
+            failedBondLengthChecks++;
+        }
     } else {
-        logger->info("Rejected Move, Ei = {} Ef = {}", initialEnergy, finalEnergy);
+        logger->warn("Rejected move: angles are not within range");
+        failedAngleChecks++;
+    }
+
+    if (!isAccepted) {
+        logger->debug("Reverting NetMC Network...");
+        revertNetMCGraphene(initialInvolvedNodesA, initialInvolvedNodesB);
+
+        logger->debug("Reverting LAMMPS Network...");
         lammpsNetwork.revertGraphene(bondBreaks, bondMakes, angleBreaks, angleMakes, logger);
-        lammpsNetwork.setCoords(initialCoords, 2);
+        lammpsNetwork.setCoords(currentCoords, 2);
 
         networkA.nodeDistribution = saveNodeDistA;
         networkA.edgeDistribution = saveEdgeDistA;
@@ -306,33 +321,6 @@ void LinkedNetwork::rescale(double scaleFactor) {
     networkB.rescale(scaleFactor);
 }
 
-// Constants for connection types
-const int CNX_TYPE_33 = 33;
-const int CNX_TYPE_44 = 44;
-const int CNX_TYPE_43 = 43;
-/**
- * @brief Gets the connection type of two connected nodes
- * @param node1Coordination Coordination of the first node
- * @param node2Coordination Coordination of the second node
- * @return The type of the selected connection. 33, 34 or 44.
- * @throw std::runtime_error if the nodes in the random connection have coordinations other than 3 or 4.
- */
-int LinkedNetwork::assignValues(int node1Coordination, int node2Coordination) const {
-    if (node1Coordination == 3 && node2Coordination == 3) {
-        return CNX_TYPE_33;
-    } else if (node1Coordination == 4 && node2Coordination == 4) {
-        return CNX_TYPE_44;
-    } else if ((node1Coordination == 3 && node2Coordination == 4) ||
-               (node1Coordination == 4 && node2Coordination == 3)) {
-        return CNX_TYPE_43;
-    } else {
-        std::ostringstream oss;
-        oss << "Two nodes have unsupported cooordinations: " << node1Coordination
-            << " and " << node2Coordination;
-        throw std::runtime_error(oss.str());
-    }
-}
-
 /**
  * @brief Chooses a random bond in the network and returns the IDs in the bond, the two rings either side and the connection type
  * @param generator Reference to a Mersenne Twister pseudo-random generator of 32-bit numbers with a state size of 19937 bits.
@@ -341,24 +329,14 @@ int LinkedNetwork::assignValues(int node1Coordination, int node2Coordination) co
  * @return A tuple containing the IDs of the two nodes in the bond, the two rings either side and the connection type
  * @throw std::runtime_error if the nodes in the random connection have coordinations other than 3 or 4.
  */
-std::tuple<int, int, int, int, int> LinkedNetwork::pickRandomConnection(std::mt19937 &generator, SelectionType selectionType) {
-    /*
-     * 3-3 coordination connection
-     * a,b,c,d,atom4,atom4 are nodes in lattice A
-     * ringNode1,ringNode2,ringNode3,ringNode4 are nodes in lattice B
-     * E       F            r1
-     *  \     /           / | \
-     *   b1--b2          W  |  X
-     *  /     \           \ | /
-     * C       D            r2
-     */
+std::tuple<int, int, int, int> LinkedNetwork::pickRandomConnection(std::mt19937 &generator, const SelectionType &selectionType) {
 
     std::vector<double> weights(networkA.nodes.n);
     if (selectionType == SelectionType::EXPONENTIAL_DECAY) {
-        double scale = 1.0; // Adjust this value based on your needs
+        double boxLength = dimensions[0];
         for (int i = 0; i < networkA.nodes.n; ++i) {
-            double distance = networkA.nodes[i].distanceFrom(centreCoords);
-            weights[i] = std::exp(-distance * scale);
+            double distance = networkA.nodes[i].distanceFrom(centreCoords) / boxLength;
+            weights[i] = std::exp(-distance * weightedDecay);
         }
 
         // Normalize weights
@@ -372,7 +350,6 @@ std::tuple<int, int, int, int, int> LinkedNetwork::pickRandomConnection(std::mt1
 
     // Create a discrete distribution based on the weights
     std::discrete_distribution<> distribution(weights.begin(), weights.end());
-    int cnxType;
     int randNode;
     int randNodeConnection;
     int sharedRingNode1;
@@ -386,7 +363,6 @@ std::tuple<int, int, int, int, int> LinkedNetwork::pickRandomConnection(std::mt1
         int randNodeConnectionCoordination = networkA.nodes[randNodeConnection].netCnxs.n;
 
         // Use helper function to assign a, b, and cnxType
-        cnxType = assignValues(randNodeCoordination, randNodeConnectionCoordination);
         // Two connected nodes should always share two ring nodes.
         if (VecR<int> commonRings = vCommonValues(networkA.nodes[randNode].dualCnxs, networkA.nodes[randNodeConnection].dualCnxs);
             commonRings.n == 2) {
@@ -399,12 +375,13 @@ std::tuple<int, int, int, int, int> LinkedNetwork::pickRandomConnection(std::mt1
             throw std::runtime_error("Selected random connection does not share two ring nodes");
         }
         // Check that the base nodes are not a member of a fixed ring.
-        if (!fixedNodes.contains(randNode) && !fixedNodes.contains(randNodeConnection)) {
+        if (std::find(fixedNodes.begin(), fixedNodes.end(), randNode) == fixedNodes.end() &&
+            std::find(fixedNodes.begin(), fixedNodes.end(), randNodeConnection) == fixedNodes.end()) {
             // If so, break and return the connection type
             pickingAcceptableRing = false;
         }
     }
-    return std::make_tuple(randNode, randNodeConnection, sharedRingNode1, sharedRingNode2, cnxType);
+    return std::make_tuple(randNode, randNodeConnection, sharedRingNode1, sharedRingNode2);
 }
 
 /**
@@ -454,11 +431,11 @@ bool LinkedNetwork::genSwitchOperations(int baseNode1, int baseNode2, int ringNo
      *      4-2-1, 4-2-6         4-1-2, 4-1-3
      *      5-1-2, 5-1-3         1-2-5, 6-2-5
      */
-
     int baseNode5 = findCommonConnection(baseNode1, ringNode1, baseNode2, logger);
     int baseNode6 = findCommonConnection(baseNode2, ringNode1, baseNode1, logger);
     int baseNode3 = findCommonConnection(baseNode1, ringNode2, baseNode2, logger);
     int baseNode4 = findCommonConnection(baseNode2, ringNode2, baseNode1, logger);
+
     int ringNode3 = findCommonRing(baseNode1, baseNode5, ringNode1, logger);
     int ringNode4 = findCommonRing(baseNode2, baseNode6, ringNode1, logger);
 
@@ -477,11 +454,7 @@ bool LinkedNetwork::genSwitchOperations(int baseNode1, int baseNode2, int ringNo
         return false;
     }
     // Prevent rings having only two or fewer neighbours
-    if (getUniqueValues(networkB.nodes[ringNode2].netCnxs).n <= 3) {
-        logger->debug("No valid move: Switch would result in a ring size less than 3");
-        return false;
-    }
-    if (getUniqueValues(networkB.nodes[ringNode1].netCnxs).n <= 3) {
+    if (getUniqueValues(networkB.nodes[ringNode1].netCnxs).n <= 3 || getUniqueValues(networkB.nodes[ringNode2].netCnxs).n <= 3) {
         logger->debug("No valid move: Switch would result in a ring size less than 3");
         return false;
     }
@@ -515,8 +488,8 @@ bool LinkedNetwork::genSwitchOperations(int baseNode1, int baseNode2, int ringNo
                       baseNode3, baseNode1, baseNode4,
                       baseNode2, baseNode1, baseNode4};
         logger->debug(" {:03}------{:03}------{:03}------{:03}             {:03}-----{:03}-----{:03}-----{:03} ", baseNode11, baseNode3, baseNode4, baseNode12, baseNode11, baseNode3, baseNode4, baseNode12);
-        logger->debug("            |  {:03}  |                                \\ {:03}  / ", ringNode2, ringNode2);
-        logger->debug("            |       |                                  \\    /");
+        logger->debug("            |       |                                \\ {:03}  / ", ringNode2, ringNode2);
+        logger->debug("            |   {:03}  |                             \\    /");
         logger->debug("            |       |                                  {:03}", baseNode1);
 
     } else if (baseNode7 == baseNode8) {
@@ -624,57 +597,16 @@ const int NUM_MIX_IDS_B = 7;
  * @throw std::runtime_error if the associated node cannot be found
  */
 int LinkedNetwork::findCommonConnection(int baseNode, int ringNode, int excludeNode, LoggerPtr logger) {
-
     // Find node that shares baseNode and ringNode but is not excludeNode
-    int commonConnection = -1;
     VecR<int> commonConnections = vCommonValues(networkA.nodes[baseNode].netCnxs, networkB.nodes[ringNode].dualCnxs);
     commonConnections.delValue(excludeNode);
     if (commonConnections.n == 1)
-        commonConnection = commonConnections[0];
-    else { // rare high temperature occurrence as a result of 2-cnd nodes giving
-           // ring inside ring
-        VecR<int> common1(0, commonConnections.n);
-        int nCnxs = networkA.nodes[baseNode].netCnxs.n;
-        for (int i = 0; i < nCnxs; ++i) {
-            if (networkA.nodes[baseNode].netCnxs[i] == excludeNode) {
-                int l = networkA.nodes[baseNode].netCnxs[(i + 1) % nCnxs];
-                int r = networkA.nodes[baseNode].netCnxs[(i - 1 + nCnxs) % nCnxs];
-                for (int j = 0; j < commonConnections.n; ++j) {
-                    if (commonConnections[j] == l)
-                        common1.addValue(commonConnections[j]);
-                    else if (commonConnections[j] == r)
-                        common1.addValue(commonConnections[j]);
-                }
-                break;
-            }
-        }
-        if (common1.n == 1)
-            commonConnection = common1[0];
-        else { // even rarer case
-            int nCnxs = networkB.nodes[ringNode].dualCnxs.n;
-            for (int i = 0; i < nCnxs; ++i) {
-                if (networkB.nodes[ringNode].dualCnxs[i] == excludeNode) {
-                    int j;
-                    if (networkB.nodes[ringNode].dualCnxs[(i + 1) % nCnxs] == baseNode)
-                        j = (i + 2) % nCnxs;
-                    else if (networkB.nodes[ringNode].dualCnxs[(i + nCnxs - 1) % nCnxs] == baseNode)
-                        j = (i + nCnxs - 2) % nCnxs;
-                    if (vContains(common1, networkB.nodes[ringNode].dualCnxs[j])) {
-                        commonConnection = networkB.nodes[ringNode].dualCnxs[j];
-                        break;
-                    }
-                }
-            }
-        }
-    }
+        return commonConnections[0];
 
-    if (commonConnection == -1) {
-        std::ostringstream oss;
-        oss << "Could not find common base node for base node " << baseNode << " and ring node " << ringNode
-            << " excluding base node " << excludeNode;
-        throw std::runtime_error(oss.str());
-    }
-    return commonConnection;
+    std::ostringstream oss;
+    oss << "Could not find common base node for base node " << baseNode << " and ring node " << ringNode
+        << " excluding base node " << excludeNode << " common connections: " << commonConnections;
+    throw std::runtime_error(oss.str());
 }
 /**
  * @brief Find a common ring connection between two base nodes that exlcudes a given node
@@ -728,7 +660,7 @@ int LinkedNetwork::findCommonRing(int baseNode1, int baseNode2, int excludeNode,
 }
 
 // Switch connectivities in lattice between 2x3 coordinate nodes
-void LinkedNetwork::switchNetMCGraphene(std::vector<int> &bondBreaks, std::vector<int> &ringBondBreakMake) {
+void LinkedNetwork::switchNetMCGraphene(const std::vector<int> &bondBreaks, const std::vector<int> &ringBondBreakMake) {
     if (bondBreaks.size() != 4 || ringBondBreakMake.size() != 4) {
         throw std::invalid_argument("Invalid input sizes for switchNetMCGraphene");
     }
@@ -747,69 +679,6 @@ void LinkedNetwork::switchNetMCGraphene(std::vector<int> &bondBreaks, std::vecto
     // For network A node distribution and edge distribution will remain unchanged
 
     // logger->debug("Switching A-A connections");
-    // A-A connectivities
-    // For network B node and edge distribution will change
-    int nu = networkB.nodes[ringNode1].netCnxs.n;
-    int nv = networkB.nodes[ringNode2].netCnxs.n;
-    int nw = networkB.nodes[ringNode3].netCnxs.n;
-    int nx = networkB.nodes[ringNode4].netCnxs.n;
-    --networkB.nodeDistribution[nu];
-    --networkB.nodeDistribution[nv];
-    --networkB.nodeDistribution[nw];
-    --networkB.nodeDistribution[nx];
-    for (int i = 0; i < nu; ++i) {
-        int id = networkB.nodes[ringNode1].netCnxs[i];
-        int nCnx = networkB.nodes[id].netCnxs.n;
-        --networkB.edgeDistribution[nu][nCnx];
-        if (id != ringNode2 && id != ringNode3 && id != ringNode4)
-            --networkB.edgeDistribution[nCnx][nu]; // prevent double counting
-    }
-    for (int i = 0; i < nv; ++i) {
-        int id = networkB.nodes[ringNode2].netCnxs[i];
-        int nCnx = networkB.nodes[id].netCnxs.n;
-        --networkB.edgeDistribution[nv][nCnx];
-        if (id != ringNode1 && id != ringNode3 && id != ringNode4)
-            --networkB.edgeDistribution[nCnx][nv]; // prevent double counting
-    }
-    for (int i = 0; i < nw; ++i) {
-        int id = networkB.nodes[ringNode3].netCnxs[i];
-        int nCnx = networkB.nodes[id].netCnxs.n;
-        --networkB.edgeDistribution[nw][nCnx];
-        if (id != ringNode1 && id != ringNode2 && id != ringNode4)
-            --networkB.edgeDistribution[nCnx][nw]; // prevent double counting
-    }
-    for (int i = 0; i < nx; ++i) {
-        int id = networkB.nodes[ringNode4].netCnxs[i];
-        int nCnx = networkB.nodes[id].netCnxs.n;
-        --networkB.edgeDistribution[nx][nCnx];
-        if (id != ringNode1 && id != ringNode2 && id != ringNode3)
-            --networkB.edgeDistribution[nCnx][nx]; // prevent double counting
-    }
-    /*
-     *                7-----8                               7-----8
-     *               /       \                              |     |
-     *              /         \                      11-----3  2  4-----12
-     *      11-----3     2     4-----12                      \   /
-     *              \         /                               \ /
-     *               \       /                                 1
-     *          3     1-----2     4         --->         3     |      4
-     *               /       \                                 2
-     *              /         \                               /  \
-     *      13-----5     1     6-----14                      /    \
-     *              \         /                      13-----5  1   6-----14
-     *               \       /        (6 membered case)     |      |
-     *                9-----10                              9------10
-     *
-     *      Bonds to break       Bonds to Make
-     *      1-5, 2-4             1-4, 2-5
-     *
-     *      Angles to break      Angles to Make
-     *      1-5-9, 1-5-13        1-4-8, 1-4-12
-     *      2-4-8, 2-4-12        2-5-9, 2-5-13
-     *      4-2-1, 4-2-6         4-1-2, 4-1-3
-     *      5-1-2, 5-1-3         1-2-5, 6-2-5
-     */
-
     networkA.nodes[atom1].netCnxs.replaceValue(atom5, atom4);
     networkA.nodes[atom2].netCnxs.replaceValue(atom4, atom5);
     networkA.nodes[atom4].netCnxs.replaceValue(atom2, atom1);
@@ -824,53 +693,24 @@ void LinkedNetwork::switchNetMCGraphene(std::vector<int> &bondBreaks, std::vecto
     // B-B connectivities
     networkB.nodes[ringNode1].netCnxs.delValue(ringNode2);
     networkB.nodes[ringNode2].netCnxs.delValue(ringNode1);
-    networkB.nodes[ringNode3].netCnxs.insertValue(ringNode4, ringNode1, ringNode2);
-    networkB.nodes[ringNode4].netCnxs.insertValue(ringNode3, ringNode1, ringNode2);
+    networkB.nodes[ringNode3].netCnxs.addValue(ringNode4);
+    networkB.nodes[ringNode4].netCnxs.addValue(ringNode3);
 
     // logger->debug("Switching B-A connections");
     // B-A connectivities
     networkB.nodes[ringNode1].dualCnxs.delValue(atom1);
     networkB.nodes[ringNode2].dualCnxs.delValue(atom2);
-    networkB.nodes[ringNode3].dualCnxs.insertValue(atom2, atom1, atom5);
-    networkB.nodes[ringNode4].dualCnxs.insertValue(atom1, atom2, atom4);
+    networkB.nodes[ringNode3].dualCnxs.addValue(atom2);
+    networkB.nodes[ringNode4].dualCnxs.addValue(atom1);
+}
 
-    // Apply changes to descriptors due to making connections
-    // Network B
-    nu = networkB.nodes[ringNode1].netCnxs.n;
-    nv = networkB.nodes[ringNode2].netCnxs.n;
-    nw = networkB.nodes[ringNode3].netCnxs.n;
-    nx = networkB.nodes[ringNode4].netCnxs.n;
-    ++networkB.nodeDistribution[nu];
-    ++networkB.nodeDistribution[nv];
-    ++networkB.nodeDistribution[nw];
-    ++networkB.nodeDistribution[nx];
-    for (int i = 0; i < nu; ++i) {
-        int id = networkB.nodes[ringNode1].netCnxs[i];
-        int nCnx = networkB.nodes[id].netCnxs.n;
-        ++networkB.edgeDistribution[nu][nCnx];
-        if (id != ringNode2 && id != ringNode3 && id != ringNode4)
-            ++networkB.edgeDistribution[nCnx][nu]; // prevent double counting
+void LinkedNetwork::revertNetMCGraphene(const std::vector<Node> &initialInvolvedNodesA, const std::vector<Node> &initialInvolvedNodesB) {
+    // Revert changes to descriptors due to breaking connections
+    for (const Node &node : initialInvolvedNodesA) {
+        networkA.nodes[node.id] = node;
     }
-    for (int i = 0; i < nv; ++i) {
-        int id = networkB.nodes[ringNode2].netCnxs[i];
-        int nCnx = networkB.nodes[id].netCnxs.n;
-        ++networkB.edgeDistribution[nv][nCnx];
-        if (id != ringNode1 && id != ringNode3 && id != ringNode4)
-            ++networkB.edgeDistribution[nCnx][nv]; // prevent double counting
-    }
-    for (int i = 0; i < nw; ++i) {
-        int id = networkB.nodes[ringNode3].netCnxs[i];
-        int nCnx = networkB.nodes[id].netCnxs.n;
-        ++networkB.edgeDistribution[nw][nCnx];
-        if (id != ringNode1 && id != ringNode2 && id != ringNode4)
-            ++networkB.edgeDistribution[nCnx][nw]; // prevent double counting
-    }
-    for (int i = 0; i < nx; ++i) {
-        int id = networkB.nodes[ringNode4].netCnxs[i];
-        int nCnx = networkB.nodes[id].netCnxs.n;
-        ++networkB.edgeDistribution[nx][nCnx];
-        if (id != ringNode1 && id != ringNode2 && id != ringNode3)
-            ++networkB.edgeDistribution[nCnx][nx]; // prevent double counting
+    for (const Node &node : initialInvolvedNodesB) {
+        networkB.nodes[node.id] = node;
     }
 }
 
@@ -991,7 +831,6 @@ VecF<double> LinkedNetwork::getEntropy(std::string_view lattice) {
 
 // Get cluster information
 double LinkedNetwork::getMaxCluster(std::string_view lattice, int nodeCnd) {
-
     if (lattice == "A")
         return networkA.maxCluster(nodeCnd);
     else
@@ -999,9 +838,7 @@ double LinkedNetwork::getMaxCluster(std::string_view lattice, int nodeCnd) {
 }
 
 // Get cluster information
-VecF<int> LinkedNetwork::getMaxClusters(std::string_view lattice, int minCnd,
-                                        int maxCnd) {
-
+VecF<int> LinkedNetwork::getMaxClusters(std::string_view lattice, int minCnd, int maxCnd) {
     if (lattice == "A")
         return networkA.maxClusters(minCnd, maxCnd, 3, 2);
     else
@@ -1010,12 +847,7 @@ VecF<int> LinkedNetwork::getMaxClusters(std::string_view lattice, int minCnd,
 
 // Check linked networks for consistency
 bool LinkedNetwork::checkConsistency() {
-
-    bool checkCnx = checkCnxConsistency();
-    bool checkDesc = checkDescriptorConsistency();
-    bool check = checkCnx * checkDesc;
-
-    return check;
+    return (checkCnxConsistency() && checkDescriptorConsistency());
 }
 
 // Check linked networks have mutual network and dual connections
@@ -1215,85 +1047,6 @@ bool LinkedNetwork::checkDescriptorConsistency() {
     return consistent;
 }
 
-// Calculate bond length and angle mean and standard deviation
-VecF<double> LinkedNetwork::getOptimisationGeometry(Network network,
-                                                    VecF<double> &lenHist,
-                                                    VecF<double> &angHist) {
-
-    // Calculate for current configuration
-    double ringNode4 = 0.0;
-    double xSq = 0.0;
-    double y = 0.0;
-    double ySq = 0.0; // len and angle
-    int xN = 0;
-    int yN = 0; // count
-    int cnd;
-    VecF<double> v0(2);
-    VecF<double> v1(2);
-    VecF<double> v2(2);
-    double pbx = network.dimensions[0];
-    double pby = network.dimensions[1];
-    double pbrx = network.rpb[0];
-    double pbry = network.rpb[1];
-    double lenBinWidth = 4.0 / 10000.0;
-    double angBinWidth = 2 * M_PI / 10000.0;
-    double bin;
-    for (int i = 0; i < network.nodes.n; ++i) {
-        cnd = network.nodes[i].netCnxs.n;
-        v0[0] = currentCoords[2 * i];
-        v0[1] = currentCoords[2 * i + 1];
-        for (int j = 0; j < cnd; ++j) {
-            int id1 = network.nodes[i].netCnxs[j];
-            int id2 = network.nodes[i].netCnxs[(j + 1) % cnd];
-            v1[0] = currentCoords[2 * id1];
-            v1[1] = currentCoords[2 * id1 + 1];
-            v2[0] = currentCoords[2 * id2];
-            v2[1] = currentCoords[2 * id2 + 1];
-            v1 -= v0;
-            v2 -= v0;
-            v1[0] -= pbx * nearbyint(v1[0] * pbrx);
-            v1[1] -= pby * nearbyint(v1[1] * pbry);
-            v2[0] -= pbx * nearbyint(v2[0] * pbrx);
-            v2[1] -= pby * nearbyint(v2[1] * pbry);
-            double n1;
-            double n2;
-            double theta = vAngle(v1, v2, n1, n2);
-            // Edge lengths avoiding double counting
-            if (i < id1) {
-                ringNode4 += n1;
-                xSq += n1 * n1;
-                xN += 1;
-                bin = floor(n1 / lenBinWidth);
-                if (bin < lenHist.n)
-                    lenHist[bin] += 1.0;
-            }
-            // Angles
-            y += theta;
-            ySq += theta * theta;
-            yN += 1;
-            bin = floor(theta / angBinWidth);
-            if (bin < angHist.n)
-                angHist[bin] += 1.0;
-        }
-    }
-
-    // Return current configuration
-    VecF<double> optGeom(8);
-    optGeom[0] = ringNode4;
-    optGeom[1] = xSq;
-    optGeom[2] = ringNode4 / xN;
-    optGeom[3] = sqrt(xSq / xN - optGeom[2] * optGeom[2]);
-    optGeom[4] = y;
-    optGeom[5] = ySq;
-    optGeom[6] = y / yN;
-    optGeom[7] = ySq / yN - optGeom[6] * optGeom[6];
-    if (optGeom[7] < 0.0)
-        optGeom[7] = 0.0;
-    else
-        optGeom[7] = sqrt(optGeom[7]);
-    return optGeom;
-}
-
 // Get sum of areas and squared areas for each ring size
 void LinkedNetwork::getRingAreas(VecF<double> &areaSum, VecF<double> &areaSqSum) {
 
@@ -1331,7 +1084,8 @@ void LinkedNetwork::getRingAreas(VecF<double> &areaSum, VecF<double> &areaSqSum)
     }
 }
 /**
- * @brief Wraps the coordinates out of bounds back into the periodic box
+ * @brief Wraps the coordinates out of bounds back into the periodic box, only for 2 dimensions
+ * @param coords Coordinates to be wrapped (1D vector of pairs)
  */
 void LinkedNetwork::wrapCoords(std::vector<double> &coords) {
     for (int i = 0, j = 1; i < coords.size(); i += 2, j += 2) {
@@ -1353,6 +1107,29 @@ void LinkedNetwork::write(const std::string &prefix) {
 }
 
 /**
+ * @brief Calculates angle between two vectors
+ * @param vector1 First vector
+ * @param vector2 Second vector
+ * @return Angle between the two vectors in radians
+ */
+double getClockwiseAngleBetweenVectors(const std::vector<double> &vector1, const std::vector<double> &vector2) {
+    double dotProduct = vector1[0] * vector2[0] + vector1[1] * vector2[1];
+    double magnitudeProduct = std::sqrt(vector1[0] * vector1[0] + vector1[1] * vector1[1]) *
+                              std::sqrt(vector2[0] * vector2[0] + vector2[1] * vector2[1]);
+    double angle = std::acos(dotProduct / magnitudeProduct);
+
+    // Calculate the cross product of the two vectors
+    double crossProduct = vector1[0] * vector2[1] - vector1[1] * vector2[0];
+
+    // If the cross product is positive, subtract the angle from 2π to get the angle in the range [π, 2π]
+    if (crossProduct > 0) {
+        angle = 2 * M_PI - angle;
+    }
+
+    return angle;
+}
+
+/**
  *
  * @brief Get the clockwise angle of the vector between two nodes relative to the x axis
  * @param coord1 Coordinates of the first node
@@ -1360,9 +1137,17 @@ void LinkedNetwork::write(const std::string &prefix) {
  * @param dimensions Dimensions of the periodic box
  * @return Angle of the vector between the two nodes relative to the x axis in radians
  */
-double getAngle(const std::vector<double> &coord1, const std::vector<double> &coord2, const std::vector<double> &dimensions) {
+double getClockwiseAngle(const std::vector<double> &coord1, const std::vector<double> &coord2, const std::vector<double> &dimensions) {
     std::vector<double> periodicVector = pbcVector(coord1, coord2, dimensions);
-    return -std::atan2(periodicVector[1], periodicVector[0]);
+
+    // Range of this function is -pi to pi
+    double angle = std::atan2(periodicVector[1], periodicVector[0]);
+
+    // So we have to convert it to 0 to 2pi
+    if (angle < 0) {
+        angle += 2 * M_PI;
+    }
+    return 2 * M_PI - angle;
 }
 
 /**
@@ -1372,15 +1157,40 @@ double getAngle(const std::vector<double> &coord1, const std::vector<double> &co
  */
 bool LinkedNetwork::checkClockwiseNeighbours(const int &nodeID) const {
     Node node = networkA.nodes[nodeID];
-    double prevAngle = getAngle(node.crd, networkA.nodes[node.netCnxs.back()].crd, dimensions);
+    double prevAngle = getClockwiseAngle(node.crd, networkA.nodes[node.netCnxs.back()].crd, dimensions);
+
+    // The angle a neighbour makes with the x axis should always increase, EXCEPT when the angle wraps around from 2π to 0
+    // This should only happen once if the neighbours are clockwise
+    int timesDecreased = 0;
     for (int id : node.netCnxs) {
-        double angle = getAngle(node.crd, networkA.nodes[id].crd, dimensions);
+        double angle = getClockwiseAngle(node.crd, networkA.nodes[id].crd, dimensions);
         if (angle < prevAngle) {
-            if (angle + 2 * M_PI - prevAngle > M_PI) {
+            timesDecreased++;
+            if (timesDecreased == 2) {
+                // So return false if it decreases twice
                 return false;
             }
-        } else {
-            if (prevAngle + 2 * M_PI - angle <= M_PI) {
+        }
+        prevAngle = angle;
+    }
+    return true;
+}
+/**
+ * @brief Checks if a given node in network A has clockwise neighbours with given coordinates
+ * @param nodeID ID of the node to check
+ * @return true if the node has clockwise neighbours, false otherwise
+ */
+bool LinkedNetwork::checkClockwiseNeighbours(const int &nodeID, const std::vector<double> &coords) const {
+    const std::vector<double> nodeCoord = {coords[2 * nodeID], coords[2 * nodeID + 1]};
+    const int lastNeighbourCoordsID = networkA.nodes[nodeID].netCnxs.back();
+    const std::vector<double> lastNeighbourCoord = {coords[2 * lastNeighbourCoordsID], coords[2 * lastNeighbourCoordsID + 1]};
+    double prevAngle = getClockwiseAngle(nodeCoord, lastNeighbourCoord, dimensions);
+    int timesDecreased = 0;
+    for (const auto &id : networkA.nodes[nodeID].netCnxs) {
+        double angle = getClockwiseAngle(nodeCoord, {coords[2 * id], coords[2 * id + 1]}, dimensions);
+        if (angle < prevAngle) {
+            timesDecreased++;
+            if (timesDecreased == 2) {
                 return false;
             }
         }
@@ -1410,27 +1220,41 @@ bool LinkedNetwork::checkAllClockwiseNeighbours(LoggerPtr logger) const {
     return check;
 }
 
-/**
- * @brief Calculates angle between two vectors
- * @param vector1 First vector
- * @param vector2 Second vector
- * @return Angle between the two vectors in radians
- */
-double getAngleBetweenVectors(const std::vector<double> &vector1, const std::vector<double> &vector2) {
-    double dotProduct = vector1[0] * vector2[0] + vector1[1] * vector2[1];
-    double magnitudeProduct = std::sqrt(vector1[0] * vector1[0] + vector1[1] * vector1[1]) *
-                              std::sqrt(vector2[0] * vector2[0] + vector2[1] * vector2[1]);
-    return std::acos(dotProduct / magnitudeProduct);
+void LinkedNetwork::arrangeNeighboursClockwise(const int &nodeID, const std::vector<double> &coords) {
+    // Get the coordinates of the center node
+    const std::vector<double> nodeCoord = {coords[2 * nodeID], coords[2 * nodeID + 1]};
+
+    // Get the neighbour IDs of the center node
+    VecR<int> &neighbours = networkA.nodes[nodeID].netCnxs;
+
+    // Create a vector of pairs, where each pair contains a neighbour ID and the angle between the center node and that neighbour
+    std::vector<std::pair<int, double>> neighbourAngles;
+    for (const auto &neighbourID : neighbours) {
+        std::vector<double> neighbourCoord = {coords[2 * neighbourID], coords[2 * neighbourID + 1]};
+        double angle = getClockwiseAngle(nodeCoord, neighbourCoord, dimensions);
+        neighbourAngles.push_back({neighbourID, angle});
+    }
+
+    // Sort the vector of pairs in ascending order of angle
+    std::sort(neighbourAngles.begin(), neighbourAngles.end(), [](const std::pair<int, double> &a, const std::pair<int, double> &b) {
+        return a.second < b.second;
+    });
+
+    // Replace the neighbour IDs in the center node with the sorted neighbour IDs
+    for (size_t i = 0; i < neighbours.n; ++i) {
+        neighbours[i] = neighbourAngles[i].first;
+    }
 }
 
 /**
- * @brief Checks if all angles around all nodes are convex, ie, less than or equal to 180 degrees
+ * @brief Checks if all angles around all nodes are less than or equal to maximum angle
  * @param coords Coordinates of all nodes as a 1D vector of coordinate pairs
  * @param logger Logger to log any non-convex angles
  * @return true if all angles are convex, false otherwise
  */
-bool LinkedNetwork::checkConvexAngles(const std::vector<double> &coords, LoggerPtr logger) {
+bool LinkedNetwork::checkAnglesWithinRange(const std::vector<double> &coords, LoggerPtr logger) {
     for (int nodeID = 0; nodeID < networkA.nodes.n; ++nodeID) {
+        arrangeNeighboursClockwise(nodeID, coords);
         for (int i = 0; i < networkA.nodes[nodeID].netCnxs.n; ++i) {
             int neighbourID = networkA.nodes[nodeID].netCnxs[i];
             int nextNeighbourID = networkA.nodes[nodeID].netCnxs[(i + 1) % networkA.nodes[nodeID].netCnxs.n];
@@ -1438,9 +1262,10 @@ bool LinkedNetwork::checkConvexAngles(const std::vector<double> &coords, LoggerP
                                                std::vector<double>{coords[nodeID * 2], coords[nodeID * 2 + 1]}, dimensions);
             std::vector<double> v2 = pbcVector(std::vector<double>{coords[nextNeighbourID * 2], coords[nextNeighbourID * 2 + 1]},
                                                std::vector<double>{coords[nodeID * 2], coords[nodeID * 2 + 1]}, dimensions);
-            double angle = getAngleBetweenVectors(v1, v2);
-            if (angle > M_PI) {
-                logger->warn("Node " + std::to_string(nodeID) + " has a non-convex angle");
+            double angle = getClockwiseAngleBetweenVectors(v1, v2);
+            if (angle > maximumAngle) {
+                logger->warn("Node {} has an out of bounds angle between neighbours {} and {}: {:.2f} degrees", nodeID, neighbourID, nextNeighbourID, angle * 180 / M_PI);
+
                 return false;
             }
         }
@@ -1449,15 +1274,16 @@ bool LinkedNetwork::checkConvexAngles(const std::vector<double> &coords, LoggerP
 }
 
 /**
- * @brief Checks if all angles around the given nodes are convex, ie, less than or equal to 180 degrees
+ * @brief Checks if all angles around the given nodes are less than or equal to maximum angle
  * @param nodeIDs IDs of the nodes to check
  * @param coords Coordinates of all nodes as a 1D vector of coordinate pairs
  * @param logger Logger to log any non-convex angles
  * @return true if all angles are convex, false otherwise
  */
-bool LinkedNetwork::checkConvexAngles(const std::vector<int> &nodeIDs, const std::vector<double> &coords, LoggerPtr logger) {
+bool LinkedNetwork::checkAnglesWithinRange(const std::vector<int> &nodeIDs, const std::vector<double> &coords, LoggerPtr logger) {
     for (int nodeID : nodeIDs) {
-        logger->debug("Checking node: {}", nodeID);
+        // if (std::find(fixedNodes.begin(), fixedNodes.end(), nodeID) != fixedNodes.end()) {
+        arrangeNeighboursClockwise(nodeID, coords);
         for (int i = 0; i < networkA.nodes[nodeID].netCnxs.n; ++i) {
             int neighbourID = networkA.nodes[nodeID].netCnxs[i];
             int nextNeighbourID = networkA.nodes[nodeID].netCnxs[(i + 1) % networkA.nodes[nodeID].netCnxs.n];
@@ -1465,13 +1291,58 @@ bool LinkedNetwork::checkConvexAngles(const std::vector<int> &nodeIDs, const std
                                                std::vector<double>{coords[nodeID * 2], coords[nodeID * 2 + 1]}, dimensions);
             std::vector<double> v2 = pbcVector(std::vector<double>{coords[nextNeighbourID * 2], coords[nextNeighbourID * 2 + 1]},
                                                std::vector<double>{coords[nodeID * 2], coords[nodeID * 2 + 1]}, dimensions);
-            double angle = getAngleBetweenVectors(v1, v2);
-            logger->debug("Neighbour1 {} Neighbour2 {} Angle {}", neighbourID, nextNeighbourID, angle);
-            if (angle > M_PI) {
-                logger->warn("Node " + std::to_string(nodeID) + " has a non-convex angle");
+            double angle = getClockwiseAngleBetweenVectors(v1, v2);
+            if (angle > maximumAngle) {
+                logger->warn("Node {} has an out of bounds angle between neighbours {} and {}: {:.2f} degrees", nodeID, neighbourID, nextNeighbourID, angle * 180 / M_PI);
                 return false;
             }
         }
     }
+    //}
     return true;
+}
+
+// Constants for connection types
+const int CNX_TYPE_33 = 33;
+const int CNX_TYPE_44 = 44;
+const int CNX_TYPE_43 = 43;
+/**
+ * @brief Gets the connection type of two connected nodes
+ * @param node1Coordination Coordination of the first node
+ * @param node2Coordination Coordination of the second node
+ * @return The type of the selected connection. 33, 34 or 44.
+ * @throw std::runtime_error if the nodes in the random connection have coordinations other than 3 or 4.
+ */
+int LinkedNetwork::assignValues(int node1Coordination, int node2Coordination) const {
+    if (node1Coordination == 3 && node2Coordination == 3) {
+        return CNX_TYPE_33;
+    } else if (node1Coordination == 4 && node2Coordination == 4) {
+        return CNX_TYPE_44;
+    } else if ((node1Coordination == 3 && node2Coordination == 4) ||
+               (node1Coordination == 4 && node2Coordination == 3)) {
+        return CNX_TYPE_43;
+    } else {
+        std::ostringstream oss;
+        oss << "Two nodes have unsupported cooordinations: " << node1Coordination
+            << " and " << node2Coordination;
+        throw std::runtime_error(oss.str());
+    }
+}
+
+bool LinkedNetwork::checkBondLengths(const int &nodeID, const std::vector<double> &coords, LoggerPtr logger) const {
+    for (const auto &neighbourID : networkA.nodes[nodeID].netCnxs) {
+        std::vector<double> pbcVec = pbcVector(std::vector<double>{coords[2 * nodeID], coords[2 * nodeID + 1]},
+                                               std::vector<double>{coords[2 * neighbourID], coords[2 * neighbourID + 1]}, dimensions);
+        if (std::sqrt(pbcVec[0] * pbcVec[0] + pbcVec[1] * pbcVec[1]) > maximumBondLength) {
+            logger->warn("Node {} has a bond length greater than the maximum bond length with neighbour {}: {:.2f}", nodeID, neighbourID, std::sqrt(pbcVec[0] * pbcVec[0] + pbcVec[1] * pbcVec[1]));
+            return false;
+        }
+    }
+    return true;
+}
+
+bool LinkedNetwork::checkBondLengths(const std::vector<int> &nodeIDs, const std::vector<double> &coords, LoggerPtr logger) const {
+    return std::all_of(nodeIDs.begin(), nodeIDs.end(), [this, &coords, &logger](int nodeID) {
+        return checkBondLengths(nodeID, coords, logger);
+    });
 }
