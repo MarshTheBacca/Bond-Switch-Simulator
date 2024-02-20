@@ -81,18 +81,14 @@ class LinkedNetwork {
     std::tuple<int, int, int, int, int> pickRandomConnection(std::mt19937 &mtGen, SelectionType selectionType);
     int assignValues(int randNodeCoordination, int randNodeConnectionCoordination) const;
 
-    bool generateSwitchIDs(VecF<int> &switchIDsA, VecF<int> &switchIDsB, int a, int b, int u, int v, LoggerPtr logger); // get all ids of nodes in lattice A and B needed for switch move
-    int findCommonConnection(int idA, int idB, int idDel, LoggerPtr logger);                                            //
-    int findCommonRing(int idA, int idB, int idDel, LoggerPtr logger);                                                  //
-    void switchCnx33(VecF<int> switchIDsA, VecF<int> switchIDsB, LoggerPtr logger);                                     // switch connectivities in lattice
-                                                                                                                        // between 2x3 coordinate nodes
-    bool checkThreeRingEdges(int id);                                                                                   // prevent edges being part of three rings
-    bool convexRearrangement(VecF<int> switchIDsA, LoggerPtr logger);                                                   // rearrange nodes after switch to
-                                                                                                                        // maintain convexity
+    int findCommonConnection(int idA, int idB, int idDel, LoggerPtr logger); //
+    int findCommonRing(int idA, int idB, int idDel, LoggerPtr logger);       //
+    void switchNetMCGraphene(VecF<int> switchIDsA, VecF<int> switchIDsB, LoggerPtr logger);
+    // between 2x3 coordinate nodes
+    bool checkThreeRingEdges(const int &rinNode) const;               // prevent edges being part of three rings
+    bool convexRearrangement(VecF<int> switchIDsA, LoggerPtr logger); // rearrange nodes after switch to
+                                                                      // maintain convexity
     void monteCarloSwitchMoveLAMMPS(LoggerPtr logger);
-    double getPotentialEnergy(bool useIntx, bool restrict, Network network, LoggerPtr logger);                                // calculate potential energy of entire system
-    VecF<int> globalGeometryOptimisation(bool useIntx, bool restrict, Network network, LoggerPtr logger);                     // geometry optimise entire system
-    VecF<int> localGeometryOptimisation(int centreA, int centreB, int extent, bool useIntx, bool restrict, LoggerPtr logger); // geometry optimise subsection of system
     void generateHarmonics(int id, VecR<int> &bonds, VecR<double> &bondParams,
                            VecR<int> &angles, VecR<double> &angleParams,
                            Network network,
@@ -122,8 +118,20 @@ class LinkedNetwork {
     void writeXYZ(const std::string &prefix);
     void write(const std::string &prefix);
 
-    void pushCoords(std::vector<double> coords);
-    void showCoords(std::vector<double> &coords, LoggerPtr logger);
+    void pushCoords(std::vector<double> &coords);
+    void showCoords(std::vector<double> &coords, LoggerPtr logger) const;
+
+    bool genSwitchOperations(int baseNode1, int baseNode2, int ringNode1, int ringNode2,
+                             std::vector<int> &bondBreaks, std::vector<int> &bondMakes,
+                             std::vector<int> &angleBreaks, std::vector<int> &angleMakes,
+                             std::vector<int> &ringBondBreakMake, std::vector<int> &convexCheckIDs, LoggerPtr logger);
+
+    void switchNetMCGraphene(std::vector<int> &bondBreaks, std::vector<int> &ringBondBreakMake);
+    bool checkClockwiseNeighbours(const int &nodeID) const;
+    bool checkAllClockwiseNeighbours(LoggerPtr logger) const;
+
+    bool checkConvexAngles(const std::vector<double> &coords, LoggerPtr logger);
+    bool checkConvexAngles(const std::vector<int> &nodeIDs, const std::vector<double> &coords, LoggerPtr logger);
 };
 
 #endif // NL_LINKED_NETWORK_H
