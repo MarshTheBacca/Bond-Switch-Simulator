@@ -63,7 +63,8 @@ class LammpsObject {
     std::pair<int, int> identifyAtoms(int atomA, int atomB, Network networkAArg, LoggerPtr logger);
 
     void switchGraphene(const std::vector<int> &bondBreaks, const std::vector<int> &bondMakes,
-                        const std::vector<int> &angleBreaks, const std::vector<int> &angleMakes, LoggerPtr logger);
+                        const std::vector<int> &angleBreaks, const std::vector<int> &angleMakes,
+                        const std::vector<double> &rotatedCoord1, const std::vector<double> &rotatedCoord2, LoggerPtr logger);
     void revertGraphene(const std::vector<int> &bondBreaks, const std::vector<int> &bondMakes,
                         const std::vector<int> &angleBreaks, const std::vector<int> &angleMakes, LoggerPtr logger);
     std::vector<int> getAngles();
@@ -72,6 +73,14 @@ class LammpsObject {
 
     void minimiseNetwork();
     double getPotentialEnergy();
+    void startMovie();
+
+    void writeMovie();
+    void stopMovie();
+
+    void saveState() const;
+    void recoverState();
+    void setAtomCoords(const int &atomID, const std::vector<double> &newCoords, const int &dim);
 };
 
 #endif // LAMMPS_OBJECT_H

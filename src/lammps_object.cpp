@@ -271,7 +271,8 @@ void LammpsObject::formAngle(int atom1, int atom2, int atom3, LoggerPtr logger) 
  * @param logger The logger object
  */
 void LammpsObject::switchGraphene(const std::vector<int> &bondBreaks, const std::vector<int> &bondMakes,
-                                  const std::vector<int> &angleBreaks, const std::vector<int> &angleMakes, LoggerPtr logger) {
+                                  const std::vector<int> &angleBreaks, const std::vector<int> &angleMakes,
+                                  const std::vector<double> &rotatedCoord1, const std::vector<double> &rotatedCoord2, LoggerPtr logger) {
     for (int i = 0; i < bondBreaks.size(); i += 2) {
         breakBond(bondBreaks[i] + 1, bondBreaks[i + 1] + 1, 1, logger);
     }
@@ -284,6 +285,10 @@ void LammpsObject::switchGraphene(const std::vector<int> &bondBreaks, const std:
     for (int i = 0; i < angleMakes.size(); i += 3) {
         formAngle(angleMakes[i] + 1, angleMakes[i + 1] + 1, angleMakes[i + 2] + 1, logger);
     }
+    int atom1ID = bondBreaks[0] + 1;
+    int atom2ID = bondBreaks[2] + 1;
+    setAtomCoords(atom1ID, rotatedCoord1, 2);
+    setAtomCoords(atom2ID, rotatedCoord2, 2);
 }
 /**
  * @brief perform the opposite of a bond switch in the lattice using NetMC node IDs, ie, zero indexed
@@ -307,6 +312,45 @@ void LammpsObject::revertGraphene(const std::vector<int> &bondBreaks, const std:
     for (int i = 0; i < angleBreaks.size(); i += 3) {
         formAngle(angleBreaks[i] + 1, angleBreaks[i + 1] + 1, angleBreaks[i + 2] + 1, logger);
     }
+}
+
+void LammpsObject::setCoords(std::vector<double> &newCoords, int dim) {
+    if (dim != 2 && dim != 3) {
+        throw std::runtime_error("Invalid dimension");
+    }
+    if (newCoords.size() != dim * natoms) {
+        std::ostringstream oss;
+        oss << "Invalid size of newCoords, expected " << dim * natoms << " got " << newCoords.size();
+        throw std::runtime_error(oss.str());
+    }
+    lammps_scatter_atoms(handle, "x", 1, dim, newCoords.data());
+}
+
+void LammpsObject::setAtomCoords(const int &atomID, const std::vector<double> &newCoords, const int &dim) {
+    if (dim != 2 && dim != 3) {
+        throw std::runtime_error("Invalid dimension");
+    }
+    if (newCoords.size() != dim) {
+        std::ostringstream oss;
+        oss << "Invalid size of newCoords, expected " << dim << " got " << newCoords.size();
+        throw std::runtime_error(oss.str());
+    }
+    auto x = (double **)lammps_extract_atom(handle, "x");
+    for (int i = 0; i < dim; i++) {
+        x[atomID - 1][i] = newCoords[i];
+    }
+}
+
+void LammpsObject::startMovie() {
+    lammps_command(handle, "dump myMovie all movie 1 dump.mpg type type");
+}
+
+void LammpsObject::writeMovie() {
+    lammps_command(handle, "run 0 post no");
+}
+
+void LammpsObject::stopMovie() {
+    lammps_command(handle, "undump myMovie");
 }
 
 /**
@@ -353,17 +397,6 @@ void LammpsObject::getCoords(std::vector<double> &coords, int dim) {
     lammps_gather_atoms(handle, "x", 1, dim, coords.data());
 }
 
-void LammpsObject::setCoords(std::vector<double> &newCoords, int dim) {
-    if (dim != 2 && dim != 3) {
-        throw std::runtime_error("Invalid dimension");
-    }
-    if (newCoords.size() != dim * natoms) {
-        std::ostringstream oss;
-        oss << "Invalid size of newCoords, expected " << dim * natoms << " got " << newCoords.size();
-        throw std::runtime_error(oss.str());
-    }
-    lammps_scatter_atoms(handle, "x", 1, dim, newCoords.data());
-}
 /**
  * @brief Gets all the angles in the system
  * @return A 1D vector containing all the angles in the system in the form [a1atom1, a1atom2, a1atom3, a2atom1, a2atom2, a2atom3, ...]
@@ -406,4 +439,11 @@ bool LammpsObject::checkAngleUnique(const int &atom1, const int &atom2, const in
         }
     }
     return true;
+}
+
+void LammpsObject::saveState() const {
+    lammps_command(handle, "write_restart restart.lammps");
+}
+void LammpsObject::recoverState() {
+    lammps_command(handle, "read_restart restart.lammps");
 }
