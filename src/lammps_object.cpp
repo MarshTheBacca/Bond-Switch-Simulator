@@ -1,9 +1,5 @@
 // Created by olwhi on 24/07/2023, edited by Marshall Hunt 28/01/2024.
 #include "lammps_object.h"
-#include <cstdint>
-#include <fstream>
-#include <stdio.h>
-#include <unistd.h>
 
 /**
  * @brief Default constructor for a blank Lammps Object
@@ -16,7 +12,7 @@ LammpsObject::LammpsObject() = default;
  * @param inputFolder The folder containing the input files
  * @param logger The logger object
  */
-LammpsObject::LammpsObject(const std::string &structureName, const std::string &inputFolder, const LoggerPtr logger) {
+LammpsObject::LammpsObject(const std::string &structureName, const std::string &inputFolder, LoggerPtr logger) {
     logger->info("Creating Lammps Object");
     const char *lmpargv[] = {"liblammps", "-screen", "none"};
     int lmpargc = sizeof(lmpargv) / sizeof(const char *);
@@ -98,23 +94,7 @@ void LammpsObject::write_restart(const std::string &structureName) {
     lammps_command(handle, command.c_str());
 }
 
-void LammpsObject::finaliseLAMMPSObject(const std::string &structureName) {
-    std::unordered_map<std::string, std::string> structureToFile = {
-        {"Si", "Si_restart.restart"},
-        {"Si2O3", "Si2O3_restart.restart"},
-        {"SiO2", "SiO2_restart.restart"},
-        {"C", "C_restart.restart"},
-        {"BN", "BN_restart.restart"}};
-    auto iterator = structureToFile.find(structureName);
-    if (iterator == structureToFile.end()) {
-        throw std::runtime_error("Invalid structure name");
-    }
-    std::string command = "write_data " + prefixFolderOut + "/" + iterator->second;
-    lammps_command(handle, command.c_str());
-    lammps_close(handle);
-}
-
-void LammpsObject::breakBond(int atom1, int atom2, int type, LoggerPtr logger) {
+void LammpsObject::breakBond(const int &atom1, const int &atom2, const int &type) {
     // logger->debug("Breaking bond between {} and {} of type {}", atom1, atom2, type);
     double initialBondCount = lammps_get_thermo(handle, "bonds");
 
@@ -136,7 +116,7 @@ void LammpsObject::breakBond(int atom1, int atom2, int type, LoggerPtr logger) {
     }
 }
 
-void LammpsObject::formBond(int atom1, int atom2, int type, LoggerPtr logger) {
+void LammpsObject::formBond(const int &atom1, const int &atom2, const int &type) {
     // logger->debug("Forming bond between {} and {} of type {}", atom1, atom2, type);
     double initialBondCount = lammps_get_thermo(handle, "bonds");
     std::string command;
@@ -159,7 +139,7 @@ void LammpsObject::formBond(int atom1, int atom2, int type, LoggerPtr logger) {
  * @param logger The logger object
  * @throws std::runtime_error if the angle count doesn't decrease
  */
-void LammpsObject::breakAngle(int atom1, int atom2, int atom3, LoggerPtr logger) {
+void LammpsObject::breakAngle(const int &atom1, const int &atom2, const int &atom3, LoggerPtr logger) {
     // logger->debug("Breaking angle between {}, {}, {}", atom1, atom2, atom3);
     double initialAngleCount = lammps_get_thermo(handle, "angles");
     double finalAngleCount;
@@ -237,7 +217,7 @@ void LammpsObject::breakAngle(int atom1, int atom2, int atom3, LoggerPtr logger)
  * @param atom3 The third atom in the angle
  * @param logger The logger object
  */
-void LammpsObject::formAngle(int atom1, int atom2, int atom3, LoggerPtr logger) {
+void LammpsObject::formAngle(const int &atom1, const int &atom2, const int &atom3, LoggerPtr logger) {
     // logger->debug("Forming angle between {}, {}, {}", atom1, atom2, atom3);
     if (atom1 == atom2 || atom1 == atom3 || atom2 == atom3) {
         std::ostringstream oss;
@@ -274,10 +254,10 @@ void LammpsObject::switchGraphene(const std::vector<int> &bondBreaks, const std:
                                   const std::vector<int> &angleBreaks, const std::vector<int> &angleMakes,
                                   const std::vector<double> &rotatedCoord1, const std::vector<double> &rotatedCoord2, LoggerPtr logger) {
     for (int i = 0; i < bondBreaks.size(); i += 2) {
-        breakBond(bondBreaks[i] + 1, bondBreaks[i + 1] + 1, 1, logger);
+        breakBond(bondBreaks[i] + 1, bondBreaks[i + 1] + 1, 1);
     }
     for (int i = 0; i < bondMakes.size(); i += 2) {
-        formBond(bondMakes[i] + 1, bondMakes[i + 1] + 1, 1, logger);
+        formBond(bondMakes[i] + 1, bondMakes[i + 1] + 1, 1);
     }
     for (int i = 0; i < angleBreaks.size(); i += 3) {
         breakAngle(angleBreaks[i] + 1, angleBreaks[i + 1] + 1, angleBreaks[i + 2] + 1, logger);
@@ -301,10 +281,10 @@ void LammpsObject::switchGraphene(const std::vector<int> &bondBreaks, const std:
 void LammpsObject::revertGraphene(const std::vector<int> &bondBreaks, const std::vector<int> &bondMakes,
                                   const std::vector<int> &angleBreaks, const std::vector<int> &angleMakes, LoggerPtr logger) {
     for (int i = 0; i < bondMakes.size(); i += 2) {
-        breakBond(bondMakes[i] + 1, bondMakes[i + 1] + 1, 1, logger);
+        breakBond(bondMakes[i] + 1, bondMakes[i + 1] + 1, 1);
     }
     for (int i = 0; i < bondBreaks.size(); i += 2) {
-        formBond(bondBreaks[i] + 1, bondBreaks[i + 1] + 1, 1, logger);
+        formBond(bondBreaks[i] + 1, bondBreaks[i + 1] + 1, 1);
     }
     for (int i = 0; i < angleMakes.size(); i += 3) {
         breakAngle(angleMakes[i] + 1, angleMakes[i + 1] + 1, angleMakes[i + 2] + 1, logger);
@@ -375,7 +355,7 @@ double LammpsObject::getPotentialEnergy() {
  * @param dim the number of dimensions you want to receieve, 2 or 3
  * @return A 1D vector containing the coordinates of the atoms
  */
-std::vector<double> LammpsObject::getCoords(int dim) {
+std::vector<double> LammpsObject::getCoords(const int &dim) const {
     if (dim != 2 && dim != 3) {
         throw std::runtime_error("Invalid dimension");
     }
@@ -389,7 +369,7 @@ std::vector<double> LammpsObject::getCoords(int dim) {
  * @brief Populates the coordinates of the atoms in the network into a given vector
  * @param dim the number of dimensions you want to receive, 2 or 3
  */
-void LammpsObject::getCoords(std::vector<double> &coords, int dim) {
+void LammpsObject::getCoords(std::vector<double> &coords, const int &dim) const {
     if (dim != 2 && dim != 3) {
         throw std::runtime_error("Invalid dimension");
     }
@@ -401,7 +381,7 @@ void LammpsObject::getCoords(std::vector<double> &coords, int dim) {
  * @brief Gets all the angles in the system
  * @return A 1D vector containing all the angles in the system in the form [a1atom1, a1atom2, a1atom3, a2atom1, a2atom2, a2atom3, ...]
  */
-std::vector<int> LammpsObject::getAngles() {
+std::vector<int> LammpsObject::getAngles() const {
     const int *nangles_ptr = static_cast<int *>(lammps_extract_global(handle, "nangles"));
     int numAngles = *nangles_ptr;
     char *command_result = lammps_command(handle, "compute myAngles all property/local aatom1 aatom2 aatom3");
@@ -417,7 +397,7 @@ std::vector<int> LammpsObject::getAngles() {
     return angles;
 }
 
-void LammpsObject::showAngles(const int &numLines, LoggerPtr logger) {
+void LammpsObject::showAngles(const int &numLines, LoggerPtr logger) const {
     std::vector<int> angles = getAngles();
     for (int i = 0; i < numLines; ++i) {
         logger->info("Angle: {:03} {:03} {:03}", angles[i * 3], angles[i * 3 + 1], angles[i * 3 + 2]);
@@ -430,7 +410,7 @@ void LammpsObject::showAngles(const int &numLines, LoggerPtr logger) {
  * @param atom3 The third atom in the angle
  * @return True if the angle is unique, false otherwise
  */
-bool LammpsObject::checkAngleUnique(const int &atom1, const int &atom2, const int &atom3) {
+bool LammpsObject::checkAngleUnique(const int &atom1, const int &atom2, const int &atom3) const {
     std::vector<int> angles = getAngles();
     for (int i = 0; i < angles.size(); i += 3) {
         if ((angles[i] == atom1 && angles[i + 1] == atom2 && angles[i + 2] == atom3) ||
