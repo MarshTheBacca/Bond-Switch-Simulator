@@ -37,7 +37,19 @@
             "options": {
                 "cwd": "${workspaceFolder}/testing"
             },
-            "dependsOn": ["build", "clean"],
+            "dependsOn": [
+                "build",
+                "clean"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "cleanBuildRun",
+            "dependsOn": [
+                "clean",
+                "build",
+                "run"
+            ],
             "problemMatcher": []
         }
     ]
