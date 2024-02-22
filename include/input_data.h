@@ -2,14 +2,19 @@
 #define INPUT_DATA_H
 
 #include "output_file.h"
+#include <climits>
 #include <fstream>
+#include <functional>
 #include <limits>
+#include <map>
+#include <numeric>
 #include <set>
 #include <spdlog/spdlog.h>
 #include <sstream>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
+#include <utility>
 
 using LoggerPtr = std::shared_ptr<spdlog::logger>;
 
@@ -27,12 +32,13 @@ enum class SelectionType {
 struct InputData {
     // Used for error messages
     int lineNumber = 0;
-
+    std::ifstream inputFile;
     // IO Data
     std::string outputFolder;
     std::string outputFilePrefix;
     std::string inputFolder;
     std::string inputFilePrefix;
+
     bool isFromScratchEnabled;
 
     // Network Properties Data
@@ -72,25 +78,24 @@ struct InputData {
     template <typename T>
     void readWord(const std::string &word, T &variable, const std::string &section) const;
     template <typename... Args>
-    void readSection(std::ifstream &inputFile, const std::string &section, Args &...args);
+    void readSection(const std::string &section, Args &...args);
     template <typename T>
-    void checkInRange(const T value, const T lower, const T upper, const std::string &errorMessage) const;
+    void checkInRange(const T &value, const T &lower, const T &upper, const std::string &errorMessage) const;
 
     // Declare non-template functions
     bool stringToBool(const std::string &str) const;
-    std::string getFirstWord(std::ifstream &inputFile, std::istringstream &iss);
+    std::string getFirstWord();
 
-    void readIO(std::ifstream &inputFile);
-    void readNetworkProperties(std::ifstream &inputFile);
-    void readNetworkMinimisationProtocols(std::ifstream &inputFile);
-    void readMonteCarloProcess(std::ifstream &inputFile);
-    void readMonteCarloEnergySearch(std::ifstream &inputFile);
-    void readPotentialModel(std::ifstream &inputFile);
-    void readAnalysis(std::ifstream &inputFile);
+    void readIO();
+    void readNetworkProperties();
+    void readNetworkMinimisationProtocols();
+    void readMonteCarloProcess();
+    void readMonteCarloEnergySearch();
+    void readPotentialModel();
+    void readAnalysis();
 
-    void checkInSet(const std::string &value, const std::set<std::string, std::less<>> &validValues, const std::string &errorMessage) const;
     void checkFileExists(const std::string &filename) const;
-    void validate();
+    void validate() const;
     InputData(const std::string &filePath, const LoggerPtr &logger);
 };
 

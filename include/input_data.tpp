@@ -6,14 +6,12 @@
 /**
  * @brief Reads a value from a string and converts it to the correct type
  * @param word The word to be converted
- * @param value The value to be assigned
+ * @param variable The variable to be assigned
  * @param section The section of the input file
  * @tparam T The type of the value to be assigned
  */
 template <typename T>
 void InputData::readWord(const std::string &word, T &variable, const std::string &section) const {
-    static_assert(std::is_same_v<T, int> || std::is_same_v<T, double> || std::is_same_v<T, bool> || std::is_same_v<T, StructureType> || std::is_same_v<T, SelectionType> || std::is_same_v<T, std::string>,
-                  "Invalid type for T. T must be int, double, bool, StructureType, SelectionType or std::string.");
 
     // Different conversions based on type of variable
     if constexpr (std::is_same_v<T, int>)
@@ -56,32 +54,32 @@ void InputData::readWord(const std::string &word, T &variable, const std::string
         } else {
             throw std::runtime_error("Invalid selection type: " + word + " in section: " + section + " on line: " + std::to_string(lineNumber));
         }
-    } else {
+    } else if constexpr (std::is_same_v<T, std::string>) {
         variable = word;
+    } else {
+        throw std::invalid_argument("Cannot read word for type T. T must be int, double, bool, StructureType, SelectionType or std::string.");
     }
 }
 
 /**
  * @brief Reads a section of the input file
  * @param inputFile The input file stream
- * @param args The values to be read
+ * @param args The variables to be assigned
  * @tparam Args The types of the values to be read
  */
 template <typename... Args>
-void InputData::readSection(std::ifstream &inputFile, const std::string &section, Args &...args) {
+void InputData::readSection(const std::string &section, Args &...args) {
     // Skip the '----' line and section title line
     inputFile.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
     lineNumber++;
     inputFile.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
     lineNumber++;
 
-    // Initialise string stream and first word
-    std::istringstream iss;
     std::string firstWord;
 
     // Fold expression to read data
     // For every argument in args, read a value from the input file and assign it to the argument
-    ((firstWord = getFirstWord(inputFile, iss),
+    ((firstWord = getFirstWord(inputFile),
       readWord(firstWord, args, section),
       lineNumber++),
      ...);
@@ -97,13 +95,13 @@ void InputData::readSection(std::ifstream &inputFile, const std::string &section
  * @throws std::runtime_error if the value is not in the range
  */
 template <typename T>
-void InputData::checkInRange(const T value, const T lower, const T upper, const std::string &errorMessage)
-    const {
-    static_assert(std::is_same_v<T, int> || std::is_same_v<T, double>,
-                  "Invalid type for T. T must be int or double.");
-    if (value < lower || value > upper) {
-        throw std::runtime_error(errorMessage);
+void InputData::checkInRange(const T &value, const T &lower, const T &upper, const std::string &errorMessage) const {
+    if constexpr (std::is_same_v<T, int> || std::is_same_v<T, double>) {
+        if (value < lower || value > upper) {
+            throw std::runtime_error(errorMessage);
+        }
     }
+    throw std::invalid_argument("Cannot check range for type T. T must be int or double.");
 }
 
 #endif // INPUT_DATA_TPP

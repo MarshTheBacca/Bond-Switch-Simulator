@@ -1,17 +1,4 @@
 #include "input_data.h"
-#include "output_file.h"
-#include <climits>
-#include <fstream>
-#include <functional>
-#include <limits>
-#include <map>
-#include <numeric>
-#include <set>
-#include <spdlog/spdlog.h>
-#include <sstream>
-#include <stdexcept>
-#include <type_traits>
-#include <utility>
 
 /**
  * @brief Converts a string to a boolean
@@ -28,18 +15,14 @@ bool InputData::stringToBool(const std::string &str) const {
 }
 
 /**
- * @brief Gets the first word from a line in the input file
- * @param inputFile The input file stream
- * @param iss The input string stream
- * @return The first word from the line
+ * @brief Gets the first word from a line in the input file and increment line number
+ * @return The first word from the line as a string
  */
-std::string InputData::getFirstWord(std::ifstream &inputFile,
-                                    std::istringstream &iss) {
+std::string InputData::getFirstWord() {
     std::string line;
     getline(inputFile, line);
     lineNumber++;
-    iss.str(line);
-    iss.clear();
+    std::istringstream iss(line);
     std::string firstWord;
     iss >> firstWord;
     return firstWord;
@@ -50,55 +33,56 @@ std::string InputData::getFirstWord(std::ifstream &inputFile,
  * @param inputFile The input file stream
  * @param logger The log file
  */
-void InputData::readIO(std::ifstream &inputFile) {
-    readSection(inputFile, "IO", outputFolder, outputFilePrefix,
+void InputData::readIO() {
+    readSection("IO", outputFolder, outputFilePrefix,
                 inputFolder, inputFilePrefix, isFromScratchEnabled);
 }
 
-void InputData::readNetworkProperties(std::ifstream &inputFile) {
-    readSection(inputFile, "Network Properties", numRings, minRingSize,
+void InputData::readNetworkProperties() {
+    readSection("Network Properties", numRings, minRingSize,
                 maxRingSize, minCoordination, maxCoordination, isFixRingsEnabled);
 }
 
-void InputData::readNetworkMinimisationProtocols(std::ifstream &inputFile) {
-    readSection(inputFile, "Network Minimisation Protocols",
+void InputData::readNetworkMinimisationProtocols() {
+    readSection("Network Minimisation Protocols",
                 isOpenMPIEnabled, structureType);
 }
 
-void InputData::readMonteCarloProcess(std::ifstream &inputFile) {
-    readSection(inputFile, "Monte Carlo Process", randomSeed, randomOrWeighted, weightedDecay);
+void InputData::readMonteCarloProcess() {
+    readSection("Monte Carlo Process", randomSeed, randomOrWeighted, weightedDecay);
 }
 
-void InputData::readMonteCarloEnergySearch(std::ifstream &inputFile) {
-    readSection(inputFile, "Monte Carlo Energy Search", startTemperature,
+void InputData::readMonteCarloEnergySearch() {
+    readSection("Monte Carlo Energy Search", startTemperature,
                 endTemperature, temperatureIncrement, thermalisationTemperature,
                 stepsPerTemperature, initialThermalisationSteps);
 }
 
-void InputData::readPotentialModel(std::ifstream &inputFile) {
-    readSection(inputFile, "Potential Model", maximumBondLength, maximumAngle);
+void InputData::readPotentialModel() {
+    readSection("Potential Model", maximumBondLength, maximumAngle);
 }
 
-void InputData::readAnalysis(std::ifstream &inputFile) {
-    readSection(inputFile, "Analysis", analysisWriteFrequency, writeMovie);
+void InputData::readAnalysis() {
+    readSection("Analysis", analysisWriteFrequency, writeMovie);
 }
 
-void InputData::checkInSet(const std::string &value,
-                           const std::set<std::string, std::less<>> &validValues,
-                           const std::string &errorMessage) const {
-    if (validValues.count(value) == 0) {
-        throw std::runtime_error(errorMessage);
-    }
-}
-
-void InputData::checkFileExists(const std::string &filename) const {
-    std::ifstream file(filename);
+/**
+ * @brief Checks if a file exists
+ * @param path The path of the file
+ * @throws std::runtime_error if the file does not exist
+ */
+void InputData::checkFileExists(const std::string &path) const {
+    std::ifstream file(path);
     if (!file) {
-        throw std::runtime_error("File does not exist: " + filename);
+        throw std::runtime_error("File does not exist: " + path);
     }
 }
 
-void InputData::validate() {
+/**
+ * @brief Validates the input data
+ * @throws std::runtime_error if the input data is invalid
+ */
+void InputData::validate() const {
     // Network Properties
     checkInRange(numRings, 1, INT_MAX, "Number of rings must be at least 1");
     checkInRange(minRingSize, 3, INT_MAX, "Minimum ring size must be at least 3");
@@ -127,9 +111,7 @@ void InputData::validate() {
  * @param filePath The path to the input file
  * @param logger The log file
  */
-InputData::InputData(const std::string &filePath, const LoggerPtr &logger) {
-    // Open the input file
-    std::ifstream inputFile(filePath);
+InputData::InputData(const std::string &filePath, const LoggerPtr &logger) : inputFile(filePath) {
 
     // Check if the file was opened successfully
     if (!inputFile.is_open()) {
@@ -142,13 +124,13 @@ InputData::InputData(const std::string &filePath, const LoggerPtr &logger) {
     lineNumber++;
 
     // Read sections
-    readIO(inputFile);
-    readNetworkProperties(inputFile);
-    readNetworkMinimisationProtocols(inputFile);
-    readMonteCarloProcess(inputFile);
-    readMonteCarloEnergySearch(inputFile);
-    readPotentialModel(inputFile);
-    readAnalysis(inputFile);
+    readIO();
+    readNetworkProperties();
+    readNetworkMinimisationProtocols();
+    readMonteCarloProcess();
+    readMonteCarloEnergySearch();
+    readPotentialModel();
+    readAnalysis();
 
     // Validate input data
     logger->info("Validating input data...");
