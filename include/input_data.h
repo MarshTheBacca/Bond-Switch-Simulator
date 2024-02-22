@@ -13,6 +13,17 @@
 
 using LoggerPtr = std::shared_ptr<spdlog::logger>;
 
+enum class StructureType { GRAPHENE,
+                           SILICENE,
+                           TRIANGLE_RAFT,
+                           BILAYER,
+                           BORON_NITRIDE };
+
+enum class SelectionType {
+    RANDOM,
+    EXPONENTIAL_DECAY
+};
+
 struct InputData {
     // Used for error messages
     int lineNumber = 0;
@@ -23,7 +34,6 @@ struct InputData {
     std::string inputFolder;
     std::string inputFilePrefix;
     bool isFromScratchEnabled;
-    bool isRestartUsingLAMMPSObjectsEnabled;
 
     // Network Properties Data
     int numRings;
@@ -32,21 +42,14 @@ struct InputData {
     int minCoordination;
     int maxCoordination;
     bool isFixRingsEnabled;
-    std::string fixedRingsFile;
 
     // Minimisation Protocols Data
     bool isOpenMPIEnabled;
-    bool isSimpleGrapheneEnabled;
-    bool isTriangleRaftEnabled;
-    bool isBilayerEnabled;
-    bool isTersoffGrapheneEnabled;
-    bool isBNEnabled;
-    int selectedMinimisationProtocol;
+    StructureType structureType;
 
     // Monte Carlo Process Data
-    std::string moveType;
     int randomSeed;
-    std::string randomOrWeighted;
+    SelectionType randomOrWeighted;
     double weightedDecay;
 
     // Monte Carlo Energy Search Data
@@ -63,31 +66,28 @@ struct InputData {
 
     // Analysis Data
     int analysisWriteFrequency;
-    bool isWriteSamplingStructuresEnabled;
-    int structureWriteFrequency;
-
-    // Output Data
-    int ljPairsCalculationDistance;
+    bool writeMovie;
 
     // Declare template functions
     template <typename T>
-    void readValue(const std::string &word, T &value, const std::string &section, const LoggerPtr &logger);
+    void readWord(const std::string &word, T &variable, const std::string &section) const;
     template <typename... Args>
-    void readSection(std::ifstream &inputFile, const std::string &section, const LoggerPtr &logger, Args &...args);
+    void readSection(std::ifstream &inputFile, const std::string &section, Args &...args);
     template <typename T>
     void checkInRange(const T value, const T lower, const T upper, const std::string &errorMessage) const;
 
     // Declare non-template functions
     bool stringToBool(const std::string &str) const;
     std::string getFirstWord(std::ifstream &inputFile, std::istringstream &iss);
-    void readIO(std::ifstream &inputFile, const LoggerPtr &logger);
-    void readNetworkProperties(std::ifstream &inputFile, const LoggerPtr &logger);
-    void readNetworkMinimisationProtocols(std::ifstream &inputFile, const LoggerPtr &logger);
-    void readMonteCarloProcess(std::ifstream &inputFile, const LoggerPtr &logger);
-    void readMonteCarloEnergySearch(std::ifstream &inputFile, const LoggerPtr &logger);
-    void readPotentialModel(std::ifstream &inputFile, const LoggerPtr &logger);
-    void readAnalysis(std::ifstream &inputFile, const LoggerPtr &logger);
-    void readOutput(std::ifstream &inputFile, const LoggerPtr &logger);
+
+    void readIO(std::ifstream &inputFile);
+    void readNetworkProperties(std::ifstream &inputFile);
+    void readNetworkMinimisationProtocols(std::ifstream &inputFile);
+    void readMonteCarloProcess(std::ifstream &inputFile);
+    void readMonteCarloEnergySearch(std::ifstream &inputFile);
+    void readPotentialModel(std::ifstream &inputFile);
+    void readAnalysis(std::ifstream &inputFile);
+
     void checkInSet(const std::string &value, const std::set<std::string, std::less<>> &validValues, const std::string &errorMessage) const;
     void checkFileExists(const std::string &filename) const;
     void validate();

@@ -6,39 +6,31 @@ test            	Output File prefix
 ./input_files       Input Folder prefix
 gi_test            	Input File prefix
 false               Create Network from scratch?
-false              	Restart Network using lammps objects?
 --------------------------------------------------
 Network Properties
 1588        Number of rings
-3           min ring size
+4           min ring size
 30          max ring size
 3           min node coordination
 3           max node coordination
 false       Enable fix rings?
-fixed_rings fix rings file
 --------------------------------------------------
 Minimisation Protocols
-true        Enable OpenMPI?
-true           Enable Simple Graphene? (Always leave on if using potentials where bonds not explicitly defined)
-false           Enable Triangle Raft?
-false           Enable Bilayer?
-false           Enable Tersoff Graphene?
-false           Enable BN?
-1           Selected Routine (1 - SimpleGraphene, 2 - TriangleRaft, 3 - Bilayer, 4 - Tersoff, 5 - BN)
+true            Enable OpenMPI?
+Silicene        Structure Type (Graphene, Silicene, TriangleRaft, Bilayer or BoronNitride)
 --------------------------------------------------
 Monte Carlo Process
-switch      move type (switch/mix)
 0           random seed
-weighted      Process for choosing bonds to switch (random, weighted)
-0.1         weighted decay
+Weighted      Process for choosing bonds to switch (Random, Weighted)
+25         weighted decay, if using weighted
 --------------------------------------------------
 Monte Carlo Energy Search
--2.0        start temperature (10^x)
+2        start temperature (10^x)
 -2.0        end temperature (10^x)
-0.1         temperature increment (10^x)
+-0.1         temperature increment (10^x)
 10          thermalisation temperature
-0         steps per temperature
-3     initial themalisation steps
+100         steps per temperature
+100    initial themalisation steps
 --------------------------------------------------
 Potential Model
 3.5         Maximum bond length
@@ -46,9 +38,5 @@ Potential Model
 --------------------------------------------------
 Analysis
 1           analysis write frequency
-false       write sampling structures
-1           structure write frequency
+true       Write a movie file? (takes MUCH longer)
 --------------------------------------------------
-Output
-8           lj_pairs calculation distance
-------------------------------------------------

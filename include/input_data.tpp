@@ -11,35 +11,53 @@
  * @tparam T The type of the value to be assigned
  */
 template <typename T>
-void InputData::readValue(const std::string &word, T &value, const std::string &section, const LoggerPtr &logger) {
-    // Check to see if T is of type int, double, bool, or std::string
-    static_assert(std::is_same_v<T, int> || std::is_same_v<T, double> || std::is_same_v<T, bool> || std::is_same_v<T, std::string>,
-                  "Invalid type for T. T must be int, double, bool, or std::string.");
+void InputData::readWord(const std::string &word, T &variable, const std::string &section) const {
+    static_assert(std::is_same_v<T, int> || std::is_same_v<T, double> || std::is_same_v<T, bool> || std::is_same_v<T, StructureType> || std::is_same_v<T, SelectionType> || std::is_same_v<T, std::string>,
+                  "Invalid type for T. T must be int, double, bool, StructureType, SelectionType or std::string.");
 
-    // Different conversions based on type of value
+    // Different conversions based on type of variable
     if constexpr (std::is_same_v<T, int>)
         try {
-            value = std::stoi(word);
+            variable = std::stoi(word);
         } catch (std::invalid_argument &) {
-            logger->critical("Invalid integer: {} in section: {} on line: {}", word, section, lineNumber);
             throw std::runtime_error("Invalid integer: " + word + " in section: " + section + " on line: " + std::to_string(lineNumber));
         }
     else if constexpr (std::is_same_v<T, double>) {
         try {
-            value = std::stod(word);
+            variable = std::stod(word);
         } catch (std::invalid_argument &) {
-            logger->critical("Invalid double: {} in section: {} on line: {}", word, section, lineNumber);
             throw std::runtime_error("Invalid double: " + word + " in section: " + section + " on line: " + std::to_string(lineNumber));
         }
     } else if constexpr (std::is_same_v<T, bool>) {
         try {
-            value = stringToBool(word);
+            variable = stringToBool(word);
         } catch (std::invalid_argument &) {
-            logger->critical("Invalid boolean: {} in section: {} on line: {}", word, section, lineNumber);
             throw std::runtime_error("Invalid boolean: " + word + " in section: " + section + " on line: " + std::to_string(lineNumber));
         }
+    } else if constexpr (std::is_same_v<T, StructureType>) {
+        if (word == "SimpleGraphene") {
+            variable = StructureType::GRAPHENE;
+        } else if (word == "Silicene") {
+            variable = StructureType::SILICENE;
+        } else if (word == "TriangleRaft") {
+            variable = StructureType::TRIANGLE_RAFT;
+        } else if (word == "Bilayer") {
+            variable = StructureType::BILAYER;
+        } else if (word == "BoronNitride") {
+            variable = StructureType::BORON_NITRIDE;
+        } else {
+            throw std::runtime_error("Invalid structure type: " + word + " in section: " + section + " on line: " + std::to_string(lineNumber));
+        }
+    } else if constexpr (std::is_same_v<T, SelectionType>) {
+        if (word == "Random") {
+            variable = SelectionType::RANDOM;
+        } else if (word == "Weighted") {
+            variable = SelectionType::EXPONENTIAL_DECAY;
+        } else {
+            throw std::runtime_error("Invalid selection type: " + word + " in section: " + section + " on line: " + std::to_string(lineNumber));
+        }
     } else {
-        value = word;
+        variable = word;
     }
 }
 
@@ -50,8 +68,7 @@ void InputData::readValue(const std::string &word, T &value, const std::string &
  * @tparam Args The types of the values to be read
  */
 template <typename... Args>
-void InputData::readSection(std::ifstream &inputFile, const std::string &section,
-                            const LoggerPtr &logger, Args &...args) {
+void InputData::readSection(std::ifstream &inputFile, const std::string &section, Args &...args) {
     // Skip the '----' line and section title line
     inputFile.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
     lineNumber++;
@@ -65,7 +82,7 @@ void InputData::readSection(std::ifstream &inputFile, const std::string &section
     // Fold expression to read data
     // For every argument in args, read a value from the input file and assign it to the argument
     ((firstWord = getFirstWord(inputFile, iss),
-      readValue(firstWord, args, section, logger),
+      readWord(firstWord, args, section),
       lineNumber++),
      ...);
 }
