@@ -59,7 +59,6 @@ int main(int argc, char *argv[]) {
     logger->debug("Max ring size: {}", inputData.maxRingSize);
     logger->debug("Min node coordination: {}", inputData.minCoordination);
     logger->debug("Max node coordination: {}", inputData.maxCoordination);
-    logger->debug("Monte Carlo move type: {}", inputData.moveType);
     logger->debug("Monte carlo initial log temperature: {}", inputData.startTemperature);
     logger->debug("Monte carlo final log temperature: {}", inputData.endTemperature);
     logger->debug("Monte carlo log temperature increment: {}", inputData.temperatureIncrement);
@@ -115,7 +114,7 @@ int main(int argc, char *argv[]) {
     VecF<int> moveStatus;
 
     // Run monte carlo thermalisation
-    logger->info("Running Monte Carlo thermalisation...");
+    logger->info("Running Thermalisation...");
     try {
         double expTemperature = pow(10, inputData.thermalisationTemperature);
         network.mc.setTemperature(expTemperature);
@@ -154,19 +153,14 @@ int main(int argc, char *argv[]) {
                     outEmatrix.writeRowVector(edgeDist[j]);
                 outCndStats.writeRowVector(cndStats);
             }
-            if (i % inputData.structureWriteFrequency == 0 &&
-                inputData.isWriteSamplingStructuresEnabled == 1) {
-                std::string structureFilePath = prefixOut + "_therm_" + std::to_string(i);
-                logger->info("Writing structure: {} to file {}", i, structureFilePath);
-                network.writeXYZ(structureFilePath);
-            }
         }
-        logger->info("Monte Carlo equilibration complete");
+        logger->info("Thermalisation complete");
 
         // Perform monte carlo simulation
-        logger->info("Running Monte Carlo simulation");
+        logger->info("Annealing...");
 
-        int numTemperatureSteps = std::floor((inputData.endTemperature - inputData.startTemperature) / inputData.temperatureIncrement);
+        int numTemperatureSteps = std::abs(std::floor((inputData.endTemperature - inputData.startTemperature) / inputData.temperatureIncrement));
+        logger->info("Number of temperature steps: {}", numTemperatureSteps);
         for (int i = 0; i < numTemperatureSteps; ++i) {
             expTemperature = pow(10, inputData.startTemperature + i * inputData.temperatureIncrement);
             network.mc.setTemperature(expTemperature);
@@ -204,14 +198,10 @@ int main(int argc, char *argv[]) {
                         outEmatrix.writeRowVector(edgeDist[j]);
                     outCndStats.writeRowVector(cndStats);
                 }
-                if (k % inputData.structureWriteFrequency == 0 &&
-                    inputData.isWriteSamplingStructuresEnabled == 1) {
-                    network.writeXYZ(prefixOut + "_t" + std::to_string(i) + "_" + std::to_string(i));
-                }
             }
         }
-
-        logger->info("Monte Carlo simulation complete");
+        network.lammpsNetwork.stopMovie();
+        logger->info("Annealing complete");
 
         // Write total analysis
         for (int i = 0; i < 10000; ++i) {
