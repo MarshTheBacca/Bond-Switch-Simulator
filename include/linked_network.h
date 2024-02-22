@@ -19,9 +19,9 @@
 
 using LoggerPtr = std::shared_ptr<spdlog::logger>;
 
-enum class SelectionType {
-    RANDOM,
-    EXPONENTIAL_DECAY
+enum class Direction {
+    CLOCKWISE,
+    ANTICLOCKWISE
 };
 
 class LinkedNetwork {
@@ -47,22 +47,15 @@ class LinkedNetwork {
 
     std::string prefixIn;
     std::string prefixOut;
-    bool isOpenMPIEnabled = false;
-    bool isSimpleGrapheneEnabled = false;
-    bool isTriangleRaftEnabled = false;
-    bool isTersoffGrapheneEnabled = false;
-    bool isBilayerEnabled = false;
-    bool isBNEnabled = false;
-    int mcRoutine;
-    double CScaling = 1.420;
-    double SiScaling = 1.609 * sqrt(32) / 3 / 0.52917721090380;
 
-    std::string mcWeighting;  // Either 'weighted' or 'random'
-    std::mt19937 mtGen;       // mersenne twister random number generator
-    Metropolis mc;            // monte carlo metropolis condition
-    double weightedDecay = 1; // decay factor for weighted monte carlo
-    double maximumBondLength; // Maximum bond length
-    double maximumAngle;      // Maximum angle between atoms
+    bool isOpenMPIEnabled;       // Whether to use MPI
+    SelectionType selectionType; // Either 'weighted' or 'random'
+    std::mt19937 mtGen;          // mersenne twister random number generator
+    Metropolis mc;               // monte carlo metropolis condition
+    double weightedDecay = 1;    // decay factor for weighted monte carlo
+    double maximumBondLength;    // Maximum bond length
+    double maximumAngle;         // Maximum angle between atoms
+    bool writeMovie;             // Write movie file
 
     std::vector<int> fixedRings; // IDs of the fixed rings
     std::vector<int> fixedNodes; // IDs of the fixed nodes
@@ -75,10 +68,10 @@ class LinkedNetwork {
 
     // Constructors
     LinkedNetwork();
-    LinkedNetwork(int numRing, LoggerPtr logger);          // Construct hexagonal linked network from scratch
-    LinkedNetwork(InputData &inputData, LoggerPtr logger); // Construct from files using an InputData object
+    LinkedNetwork(int numRing, LoggerPtr logger);                // Construct hexagonal linked network from scratch
+    LinkedNetwork(const InputData &inputData, LoggerPtr logger); // Construct from files using an InputData object
 
-    void findFixedRings(bool fixed_rings, std::string filename, LoggerPtr logger);
+    void findFixedRings(const std::string &filename, LoggerPtr logger);
     void findFixedNodes();
 
     // Member Functions
@@ -130,6 +123,10 @@ class LinkedNetwork {
 
     void switchNetMCGraphene(const std::vector<int> &bondBreaks, const std::vector<int> &ringBondBreakMake);
     void revertNetMCGraphene(const std::vector<Node> &initialInvolvedNodesA, const std::vector<Node> &initialInvolvedNodesB);
+
+    std::tuple<std::vector<double>, std::vector<double>> rotateBond(const int &atomID1, const int &atomID2,
+                                                                    const Direction &direct, LoggerPtr logger) const;
+    Direction getRingsDirection(const std::vector<int> &ringNodeIDs, LoggerPtr logger) const;
 
     bool checkClockwiseNeighbours(const int &nodeID) const;
     bool checkClockwiseNeighbours(const int &nodeID, const std::vector<double> &coords) const;

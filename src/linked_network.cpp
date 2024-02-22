@@ -34,85 +34,76 @@ LinkedNetwork::LinkedNetwork(int numRings, LoggerPtr logger)
  * @param inputData the input data object
  * @param logger the logger object
  */
-LinkedNetwork::LinkedNetwork(InputData &inputData, LoggerPtr logger) : centreCoords(2) {
+LinkedNetwork::LinkedNetwork(const InputData &inputData, LoggerPtr logger) : centreCoords(2) {
     std::string prefix = inputData.inputFolder + '/' + inputData.inputFilePrefix;
 
     networkA = Network(prefix + "_A", inputData.maxRingSize, inputData.maxRingSize, logger);
-    minACnxs = networkA.getMinCnxs();
-    maxACnxs = networkA.getMaxCnxs();
+    minACnxs = inputData.minCoordination;
+    int loadedMinACnxs = networkA.getMinCnxs();
+    maxACnxs = inputData.maxCoordination;
+    int loadedMaxACnxs = networkA.getMaxCnxs();
 
     networkB = Network(prefix + "_B", inputData.maxRingSize, inputData.maxRingSize, logger);
-    minBCnxs = networkB.getMinCnxs();
-    maxBCnxs = networkB.getMaxCnxs();
+    minBCnxs = inputData.minRingSize;
+    int loadedMinBCnxs = networkB.getMinCnxs();
+    maxBCnxs = inputData.maxRingSize;
+    int loadedMaxBCnxs = networkB.getMaxCnxs();
 
     dimensions = networkA.dimensions;
     centreCoords[0] = dimensions[0] / 2;
     centreCoords[1] = dimensions[1] / 2;
-
-    if (inputData.minCoordination <= minACnxs) {
-        minACnxs = inputData.minCoordination;
-    } else {
-        logger->warn("Initial base network does not fit within allowed min node "
-                     "coordination numbers, input file: {} vs NetMC files: {}",
-                     inputData.minCoordination, minACnxs);
+    if (loadedMinACnxs < minACnxs) {
+        logger->warn("Loaded network has a min coordination of {}, which is lower than {}", loadedMinACnxs, minACnxs);
     }
-    if (inputData.maxCoordination >= maxACnxs) {
-        maxACnxs = inputData.maxCoordination;
-    } else {
-        logger->warn("Initial base network does not fit within allowed max node "
-                     "coordination numbers, input file: {} vs NetMC files: {}",
-                     inputData.maxCoordination, maxACnxs);
+    if (loadedMaxACnxs > maxACnxs) {
+        logger->warn("Loaded network has a max coordination of {}, which is higher than {}", loadedMaxACnxs, maxACnxs);
     }
-    if (inputData.minRingSize <= minBCnxs) {
-        minBCnxs = inputData.minRingSize;
-    } else {
-        logger->warn("Initial ring network does not fit within allowed min ring "
-                     "coordination numbers, input file: {} vs NetMC files: {}",
-                     inputData.minRingSize, minBCnxs);
+    if (loadedMinBCnxs < minBCnxs) {
+        logger->warn("Loaded network has a min ring size of {}, which is lower than {}", loadedMinBCnxs, minBCnxs);
     }
-    if (inputData.maxRingSize >= maxBCnxs) {
-        maxBCnxs = inputData.maxRingSize;
-    } else {
-        logger->warn("Initial ring network does not fit within allowed max ring "
-                     "coordination numbers, input file: {} vs NetMC files: {}",
-                     inputData.maxRingSize, maxBCnxs);
+    if (loadedMaxBCnxs > maxBCnxs) {
+        logger->warn("Loaded network has a max ring size of {}, which is higher than {}", loadedMaxBCnxs, maxBCnxs);
     }
 
-    if (inputData.isSimpleGrapheneEnabled)
-        lammpsNetwork = LammpsObject("Si", inputData.inputFolder, logger);
-    else if (inputData.isTersoffGrapheneEnabled)
+    if (inputData.structureType == StructureType::GRAPHENE)
         lammpsNetwork = LammpsObject("C", inputData.inputFolder, logger);
-    else if (inputData.isTriangleRaftEnabled)
+    else if (inputData.structureType == StructureType::SILICENE)
+        lammpsNetwork = LammpsObject("Si", inputData.inputFolder, logger);
+    else if (inputData.structureType == StructureType::TRIANGLE_RAFT)
         lammpsNetwork = LammpsObject("Si2O3", inputData.inputFolder, logger);
-    else if (inputData.isBilayerEnabled)
+    else if (inputData.structureType == StructureType::BILAYER)
         lammpsNetwork = LammpsObject("SiO2", inputData.inputFolder, logger);
-    else if (inputData.isBNEnabled)
+    else if (inputData.structureType == StructureType::BORON_NITRIDE)
         lammpsNetwork = LammpsObject("BN", inputData.inputFolder, logger);
-    else
-        throw std::runtime_error("You must enable at least one network type");
+
     if (inputData.isFixRingsEnabled) {
-        findFixedRings(inputData.isFixRingsEnabled, prefix, logger);
+        findFixedRings(inputData.inputFolder + "/fixed_rings.dat", logger);
         findFixedNodes();
+    } else {
+        logger->info("Fixed rings disabled, setting number of fixed rings to 0.");
+    }
+    writeMovie = inputData.writeMovie;
+    if (writeMovie) {
+        lammpsNetwork.startMovie();
+        lammpsNetwork.writeMovie();
     }
     weightedDecay = inputData.weightedDecay;
     maximumBondLength = inputData.maximumBondLength;
     maximumAngle = inputData.maximumAngle * M_PI / 180; // Convert to radians
-    energy = lammpsNetwork.getPotentialEnergy();
-    currentCoords.resize(2 * networkA.nodes.n);
 
+    lammpsNetwork.minimiseNetwork();
+    std::vector<double> coords = lammpsNetwork.getCoords(2);
+    energy = lammpsNetwork.getPotentialEnergy();
+    pushCoords(coords);
+
+    currentCoords.resize(2 * networkA.nodes.n);
     networkA.getCoords(currentCoords);
 
     mc = Metropolis(inputData.randomSeed, pow(10, inputData.startTemperature), energy);
     mtGen.seed(inputData.randomSeed);
 
     isOpenMPIEnabled = inputData.isOpenMPIEnabled;
-    mcWeighting = inputData.randomOrWeighted;
-    isSimpleGrapheneEnabled = inputData.isSimpleGrapheneEnabled;
-    isTersoffGrapheneEnabled = inputData.isTersoffGrapheneEnabled;
-    isTriangleRaftEnabled = inputData.isTriangleRaftEnabled;
-    isBilayerEnabled = inputData.isBilayerEnabled;
-    isBNEnabled = inputData.isBNEnabled;
-    mcRoutine = inputData.selectedMinimisationProtocol;
+    selectionType = inputData.randomOrWeighted;
 }
 
 /**
@@ -161,32 +152,28 @@ std::vector<double> pbcVector(const std::vector<double> &vector1, const std::vec
  * @param filename the name of the input file
  * @param logger the logger object
  */
-void LinkedNetwork::findFixedRings(bool isFixedRingsEnabled, std::string filename, LoggerPtr logger) {
+void LinkedNetwork::findFixedRings(const std::string &filename, LoggerPtr logger) {
     // Format of the fixed_rings.dat file has changed to not include the number of
     // fixed rings on the first line, but simply the IDs of each fixed ring line
     // by line.
-    if (isFixedRingsEnabled) {
-        // Open the file
-        std::ifstream fixedRingsFile(filename + ".dat", std::ios::in);
-        if (!fixedRingsFile.is_open()) {
-            logger->warn("Failed to open file: {}.dat, setting number of fixed rings to 0 and they will be ignored", filename);
-            return;
-        }
-        std::string line;
-        std::string ringList = "";
-        // Read the file line by line
-        while (getline(fixedRingsFile, line)) {
-            // Convert the line to an integer and store it in the vector
-            int num;
-            std::istringstream(line) >> num;
-            fixedRings.push_back(num);
-            ringList += std::to_string(num) + " ";
-        }
-        logger->info("Number of fixed rings: {}", fixedRings.size());
-        logger->info("Fixed rings: {}", ringList);
-    } else {
-        logger->info("Fixed rings disabled, setting number of fixed rings to 0.");
+    // Open the file
+    std::ifstream fixedRingsFile(filename, std::ios::in);
+    if (!fixedRingsFile.is_open()) {
+        logger->warn("Failed to open file: {}.dat, setting number of fixed rings to 0 and they will be ignored", filename);
+        return;
     }
+    std::string line;
+    std::string ringList = "";
+    // Read the file line by line
+    while (getline(fixedRingsFile, line)) {
+        // Convert the line to an integer and store it in the vector
+        int num;
+        std::istringstream(line) >> num;
+        fixedRings.push_back(num);
+        ringList += std::to_string(num) + " ";
+    }
+    logger->info("Number of fixed rings: {}", fixedRings.size());
+    logger->info("Fixed rings: {}", ringList);
 }
 
 // Single monte carlo switching move
@@ -214,10 +201,7 @@ void LinkedNetwork::monteCarloSwitchMoveLAMMPS(LoggerPtr logger) {
 
     for (int i = 0; i < networkA.nodes.n * networkA.nodes.n; ++i) {
         std::tuple<int, int, int, int> result;
-        if (mcWeighting == "weighted")
-            result = pickRandomConnection(mtGen, SelectionType::EXPONENTIAL_DECAY);
-        else
-            result = pickRandomConnection(mtGen, SelectionType::RANDOM);
+        result = pickRandomConnection(mtGen, selectionType);
 
         std::tie(baseNode1, baseNode2, ringNode1, ringNode2) = result;
         logger->debug("Picked base nodes: {} {} and ring nodes: {} {}", baseNode1, baseNode2, ringNode1, ringNode2);
@@ -256,13 +240,15 @@ void LinkedNetwork::monteCarloSwitchMoveLAMMPS(LoggerPtr logger) {
     // Switch and geometry optimise
     logger->debug("Switching NetMC Network...");
     switchNetMCGraphene(bondBreaks, ringBondBreakMake);
+    std::vector<double> rotatedCoord1;
+    std::vector<double> rotatedCoord2;
+    std::vector<int> orderedRingNodes = {ringBondBreakMake[1], ringBondBreakMake[3], ringBondBreakMake[0], ringBondBreakMake[2]};
+    std::tie(rotatedCoord1, rotatedCoord2) = rotateBond(baseNode1, baseNode2, getRingsDirection(orderedRingNodes, logger), logger);
 
     logger->debug("Switching LAMMPS Network...");
 
-    if (isSimpleGrapheneEnabled) {
-        logger->debug("Switching Simple Graphene");
-        lammpsNetwork.switchGraphene(bondBreaks, bondMakes, angleBreaks, angleMakes, logger);
-    }
+    lammpsNetwork.switchGraphene(bondBreaks, bondMakes, angleBreaks, angleMakes, rotatedCoord1, rotatedCoord2, logger);
+
     double finalEnergy;
     // Geometry optimisation of local region
     logger->debug("Minimising network...");
@@ -282,6 +268,8 @@ void LinkedNetwork::monteCarloSwitchMoveLAMMPS(LoggerPtr logger) {
                 currentCoords = lammpsCoords;
                 pushCoords(lammpsCoords);
                 energy = finalEnergy;
+                if (writeMovie)
+                    lammpsNetwork.writeMovie();
             } else {
                 logger->warn("Rejected move: failed Metropolis criterion: Ei = {:.3f} Eh, Ef = {:.3f} Eh", initialEnergy, finalEnergy);
                 failedEnergyChecks++;
@@ -460,6 +448,9 @@ bool LinkedNetwork::genSwitchOperations(int baseNode1, int baseNode2, int ringNo
     }
 
     // check move will not violate dual connectivity limits
+    logger->debug("min ring size: {} max ring size: {}", minBCnxs, maxBCnxs);
+    logger->debug("Ring 1: {} Ring 2: {}", networkB.nodes[ringNode1].netCnxs.n, networkB.nodes[ringNode2].netCnxs.n);
+    logger->debug("Ring 3: {} Ring 4: {}", networkB.nodes[ringNode3].netCnxs.n, networkB.nodes[ringNode4].netCnxs.n);
     if (networkB.nodes[ringNode1].netCnxs.n == minBCnxs ||
         networkB.nodes[ringNode2].netCnxs.n == minBCnxs ||
         networkB.nodes[ringNode3].netCnxs.n == maxBCnxs ||
@@ -488,8 +479,8 @@ bool LinkedNetwork::genSwitchOperations(int baseNode1, int baseNode2, int ringNo
                       baseNode3, baseNode1, baseNode4,
                       baseNode2, baseNode1, baseNode4};
         logger->debug(" {:03}------{:03}------{:03}------{:03}             {:03}-----{:03}-----{:03}-----{:03} ", baseNode11, baseNode3, baseNode4, baseNode12, baseNode11, baseNode3, baseNode4, baseNode12);
-        logger->debug("            |       |                                \\ {:03}  / ", ringNode2, ringNode2);
-        logger->debug("            |   {:03}  |                             \\    /");
+        logger->debug("            |       |                                \\ {:03}  / ", ringNode2);
+        logger->debug("            |  {:03}  |                             \\    /", ringNode2);
         logger->debug("            |       |                                  {:03}", baseNode1);
 
     } else if (baseNode7 == baseNode8) {
@@ -540,8 +531,8 @@ bool LinkedNetwork::genSwitchOperations(int baseNode1, int baseNode2, int ringNo
                                              baseNode1, baseNode2, baseNode5,
                                              baseNode6, baseNode2, baseNode5});
         logger->debug("            |       |                                   {:03}", baseNode2);
-        logger->debug("            |       |                                  /   \\");
-        logger->debug("            |  {:03}  |                                 / {:03} \\ ", ringNode1, ringNode1);
+        logger->debug("            |  {:03}  |                                /   \\, ringNode1");
+        logger->debug("            |       |                                 / {:03} \\ ", ringNode1);
         logger->debug(" {:03}-------{:03}-----{:03}-------{:03}            {:03}-----{:03}-----{:03}-----{:03} ", baseNode13, baseNode5, baseNode6, baseNode14, baseNode13, baseNode5, baseNode6, baseNode14);
         logger->debug("");
     } else if (baseNode9 == baseNode10) {
@@ -1345,4 +1336,70 @@ bool LinkedNetwork::checkBondLengths(const std::vector<int> &nodeIDs, const std:
     return std::all_of(nodeIDs.begin(), nodeIDs.end(), [this, &coords, &logger](int nodeID) {
         return checkBondLengths(nodeID, coords, logger);
     });
+}
+
+Direction LinkedNetwork::getRingsDirection(const std::vector<int> &ringNodeIDs, LoggerPtr logger) const {
+    if (ringNodeIDs.size() != 4) {
+        throw std::invalid_argument("Error getting ring direction, ringNodeIDs size is not 4");
+    }
+    std::vector<double> midCoords(2, 0.0);
+    for (int id : ringNodeIDs) {
+        midCoords[0] += currentCoords[id * 2];
+        midCoords[1] += currentCoords[id * 2 + 1];
+    }
+    midCoords[0] /= 4;
+    midCoords[1] /= 4;
+    int timesDecreased = 0;
+    double prevAngle = getClockwiseAngle(midCoords,
+                                         {currentCoords[ringNodeIDs.back() * 2], currentCoords[ringNodeIDs.back() * 2 + 1]},
+                                         dimensions);
+    for (int id : ringNodeIDs) {
+        double angle = getClockwiseAngle(midCoords, {currentCoords[id * 2], currentCoords[id * 2 + 1]}, dimensions);
+        if (angle < prevAngle) {
+            timesDecreased++;
+            if (timesDecreased == 2) {
+                logger->debug("Anticlockwise");
+                return Direction::ANTICLOCKWISE;
+            }
+        }
+        prevAngle = angle;
+    }
+    logger->debug("Clockwise");
+    return Direction::CLOCKWISE;
+}
+
+std::tuple<std::vector<double>, std::vector<double>> LinkedNetwork::rotateBond(const int &atomID1, const int &atomID2,
+                                                                               const Direction &direct, LoggerPtr logger) const {
+    logger->debug("Rotating bond between atoms {} and {}", atomID1, atomID2);
+    std::vector<double> atom1Coord = {currentCoords[atomID1 * 2], currentCoords[atomID1 * 2 + 1]};
+    std::vector<double> atom2Coord = {currentCoords[atomID2 * 2], currentCoords[atomID2 * 2 + 1]};
+
+    // Calculate the center point
+    double centerX = (atom1Coord[0] + atom2Coord[0]) / 2.0;
+    double centerY = (atom1Coord[1] + atom2Coord[1]) / 2.0;
+
+    // Translate the points to the origin
+    atom1Coord[0] -= centerX;
+    atom1Coord[1] -= centerY;
+    atom2Coord[0] -= centerX;
+    atom2Coord[1] -= centerY;
+
+    std::vector<double> rotatedAtom1Coord;
+    std::vector<double> rotatedAtom2Coord;
+    // Rotate the points by 90 degrees
+    if (direct == Direction::CLOCKWISE) {
+        rotatedAtom1Coord = {atom1Coord[1], -atom1Coord[0]};
+        rotatedAtom2Coord = {atom2Coord[1], -atom2Coord[0]};
+    } else {
+        rotatedAtom1Coord = {-atom1Coord[1], atom1Coord[0]};
+        rotatedAtom2Coord = {-atom2Coord[1], atom2Coord[0]};
+    }
+
+    // Translate the points back
+    rotatedAtom1Coord[0] += centerX;
+    rotatedAtom1Coord[1] += centerY;
+    rotatedAtom2Coord[0] += centerX;
+    rotatedAtom2Coord[1] += centerY;
+
+    return {rotatedAtom1Coord, rotatedAtom2Coord};
 }

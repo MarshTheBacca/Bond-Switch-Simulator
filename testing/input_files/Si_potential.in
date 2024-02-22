@@ -4,7 +4,7 @@
 # The numbers in the bond_coeff command correspond to: Minimum energy (U(min)), equilibrium bond length (r0) and the critical distance (rC), at which the potential = 0
 
 bond_style harmonic/shift/cut
-bond_coeff Si-Si 20 2.3 3.5 
+bond_coeff Si-Si 40 2.3 3.5 
 
 
 # The potential is E = K(r - r0)^2
