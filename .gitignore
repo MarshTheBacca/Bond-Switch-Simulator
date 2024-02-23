@@ -8,5 +8,15 @@
 /clean-all.cmake
 /netmc.log
 /testing/input_files (copy)/
-/testing/Si_dump.lammpstrj
 /testing/bond.dump
+/3d_visualise_network.py
+/chech_marsh.py
+/lammps_to_netmc_marsh.py
+/visualise_network.py
+/establish_restart_marsh.py
+/plot_e_compare.py
+/testing/*.mpg
+/testing/Time stats
+/testing/Images/*
+/VecR_VecF_Opt/*
+
