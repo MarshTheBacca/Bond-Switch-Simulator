@@ -13,11 +13,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-int main(int argc, char *argv[]) {
-    // Set start time so we can calculate the total run time
-    auto start = std::chrono::high_resolution_clock::now();
-
-    // Create a file sink and a console sink with different names for clarity
+LoggerPtr initialiseLogger() {
     auto file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>("./netmc.log", true);
     auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
 
@@ -28,130 +24,115 @@ int main(int argc, char *argv[]) {
 
     // Set the default log level to info
     logger->set_level(spdlog::level::info);
+    return logger;
+}
 
-    // Check command line arguments for --debug flag
-    int opt;
-    while ((opt = getopt(argc, argv, "d")) != -1) {
-        if (opt == 'd') {
-            logger->set_level(spdlog::level::debug);
-            logger->debug("Debug messages enabled");
-            break;
-        }
-    }
-
-    logger->info("Network Monte Carlo");
-    logger->info("Written by David Ormrod Morley, Edited by Oliver Whitaker and "
-                 "Marshall Hunt, Wilson Group, 2024");
-
-    // Read input file
-    InputData inputData("./netmc.inpt", logger);
-
-    // Create output folder
-    if (!std::filesystem::create_directory(inputData.outputFolder)) {
-        logger->error("Error creating output folder {}", inputData.outputFolder);
+int main(int argc, char *argv[]) {
+    auto start = std::chrono::high_resolution_clock::now();
+    LoggerPtr logger;
+    try {
+        logger = initialiseLogger();
+    } catch (std::exception &e) {
+        std::cerr << "Exception while initialising logger: " << e.what() << std::endl;
         return 1;
     }
-
-    // Initialise network
-    logger->info("Initialising network...");
-    logger->debug("Number of rings: {}", inputData.numRings);
-    logger->debug("Min ring size: {}", inputData.minRingSize);
-    logger->debug("Max ring size: {}", inputData.maxRingSize);
-    logger->debug("Min node coordination: {}", inputData.minCoordination);
-    logger->debug("Max node coordination: {}", inputData.maxCoordination);
-    logger->debug("Monte carlo initial log temperature: {}", inputData.startTemperature);
-    logger->debug("Monte carlo final log temperature: {}", inputData.endTemperature);
-    logger->debug("Monte carlo log temperature increment: {}", inputData.temperatureIncrement);
-    logger->debug("Monte carlo steps per increment: {}", inputData.stepsPerTemperature);
-    logger->debug("Equilibrium steps: {}", inputData.initialThermalisationSteps);
-    LinkedNetwork network;
-    if (inputData.isFromScratchEnabled) {
-        logger->info("Creating network from scratch...");
-        logger->info("numRings: {}, minCoordination: {}, maxCoordination: {}, "
-                     "minRingSize: {}, maxRingSize: {}",
-                     inputData.numRings, inputData.minCoordination,
-                     inputData.maxCoordination, inputData.minRingSize,
-                     inputData.maxRingSize);
-        // Generate hexagonal network from scratch
-        network = LinkedNetwork(inputData.numRings, logger);
-    } else {
-        logger->info("Loading network from files...");
-        network = LinkedNetwork(inputData, logger);
-    }
-
-    logger->info("Network initialised!");
-    logger->info("Initial energy: {:.3f} Hartrees", network.energy);
-
-    // Initialise output files
-    logger->info("Initialising analysis output files...");
-
-    std::string prefixOut = inputData.outputFolder + "/" + inputData.outputFilePrefix;
-    OutputFile outEnergyStats(prefixOut + "_e_compare.out");
-    OutputFile outRingStats(prefixOut + "_ringstats.out");
-    OutputFile outCorr(prefixOut + "_correlations.out");
-    OutputFile outEnergy(prefixOut + "_energy.out");
-    OutputFile outEntropy(prefixOut + "_entropy.out");
-    OutputFile outTemperature(prefixOut + "_temperature.out");
-    OutputFile outEmatrix(prefixOut + "_ematrix.out");
-    OutputFile outGeomHist(prefixOut + "_geomhist.out");
-    OutputFile outAreas(prefixOut + "_areas.out");
-    OutputFile outClusterA(prefixOut + "_cluster_a.out");
-    OutputFile outClusterB(prefixOut + "_cluster_b.out");
-    OutputFile outCndStats(prefixOut + "_cndstats.out");
-    outAreas.initVariables(6, 4, 60, 30);
-    outEmatrix.initVariables(1, 4, 60, int(log10(inputData.numRings * 12)) + 2);
-    outGeomHist.initVariables(6, 4, 60, 20);
-    outClusterB.initVariables(1, 4, 60, 10);
-
-    // Initialise total analysis variables - only update in main simulation not
-    // equilibration
-    VecF<double> lenHist(10000);
-    VecF<double> angHist(10000);
-    lenHist = 0.0;
-    angHist = 0.0;
-
-    // Initialise Monte Carlo variables
-    VecF<int> moveStatus;
-
-    // Run monte carlo thermalisation
-    logger->info("Running Thermalisation...");
     try {
+        // Set start time so we can calculate the total run time
+
+        // Create a file sink and a console sink with different names for clarity
+
+        // Check command line arguments for --debug flag
+        int opt;
+        while ((opt = getopt(argc, argv, "d")) != -1) {
+            if (opt == 'd') {
+                logger->set_level(spdlog::level::debug);
+                logger->debug("Debug messages enabled");
+                break;
+            }
+        }
+
+        logger->info("Network Monte Carlo");
+        logger->info("Written by David Ormrod Morley, Edited by Oliver Whitaker and "
+                     "Marshall Hunt, Wilson Group, 2024");
+
+        // Read input file
+        InputData inputData("./netmc.inpt", logger);
+
+        // Create output folder
+        if (!std::filesystem::create_directory(inputData.outputFolder)) {
+            logger->error("Error creating output folder {}", inputData.outputFolder);
+            return 1;
+        }
+
+        // Initialise linkedNetwork
+        logger->info("Initialising linkedNetwork...");
+
+        LinkedNetwork linkedNetwork;
+        if (inputData.isFromScratchEnabled) {
+            logger->info("Creating linkedNetwork from scratch...");
+            logger->info("numRings: {}, minCoordination: {}, maxCoordination: {}, "
+                         "minRingSize: {}, maxRingSize: {}",
+                         inputData.numRings, inputData.minCoordination,
+                         inputData.maxCoordination, inputData.minRingSize,
+                         inputData.maxRingSize);
+            // Generate hexagonal linkedNetwork from scratch
+            linkedNetwork = LinkedNetwork(inputData.numRings, logger);
+        } else {
+            logger->info("Loading linkedNetwork from files...");
+            linkedNetwork = LinkedNetwork(inputData, logger);
+        }
+
+        logger->info("Network initialised!");
+        logger->info("Initial energy: {:.3f} Hartrees", linkedNetwork.energy);
+
+        // Initialise output files
+        logger->info("Initialising analysis output files...");
+
+        std::string prefixOut = inputData.outputFolder + "/" + inputData.outputFilePrefix;
+        OutputFile outRingStats(prefixOut + "_ringstats.out");
+        OutputFile outCorr(prefixOut + "_correlations.out");
+        OutputFile energyFile(prefixOut + "_energy.out");
+        OutputFile outEntropy(prefixOut + "_entropy.out");
+        OutputFile temperatureFile(prefixOut + "_temperature.out");
+        OutputFile outEmatrix(prefixOut + "_ematrix.out");
+        OutputFile outAreas(prefixOut + "_areas.out");
+        OutputFile outCndStats(prefixOut + "_cndstats.out");
+
+        // Run monte carlo thermalisation
+        logger->info("Running Thermalisation...");
         double expTemperature = pow(10, inputData.thermalisationTemperature);
-        network.mc.setTemperature(expTemperature);
+        linkedNetwork.mc.setTemperature(expTemperature);
         for (int i = 1; i <= inputData.initialThermalisationSteps; ++i) {
-            network.monteCarloSwitchMoveLAMMPS(logger);
-            if (i % inputData.analysisWriteFrequency == 0) {
-                VecF<double> ringStats = network.getNodeDistribution("B");
-                double r = network.getAssortativity("B");
-                double aEst = network.getAboavWeaireEstimate("B");
-                VecF<double> aw = network.getAboavWeaire("B");
-                VecF<double> s = network.getEntropy("B");
-                VecF<double> corr(6);
-                VecF<double> a(inputData.maxRingSize + 1);
-                VecF<double> aSq(inputData.maxRingSize + 1);
-                double rr = network.getAssortativity("A");
+            linkedNetwork.monteCarloSwitchMoveLAMMPS();
+            if (i % inputData.analysisWriteInterval == 0) {
+                std::vector<double> corr(6);
+                double aEst = linkedNetwork.networkB.getAboavWeaireEstimate();
+                std::vector<double> ringStats = linkedNetwork.networkB.getNodeDistribution();
+                double r = linkedNetwork.networkB.getAssortativity();
+                std::tie(corr[2], corr[3], corr[4]) = linkedNetwork.networkB.getAboavWeaireParams();
+                std::vector<double> s = linkedNetwork.networkB.getEntropy();
+                std::vector<double> a(inputData.maxRingSize + 1);
+                std::vector<double> aSq(inputData.maxRingSize + 1);
+                double rr = linkedNetwork.networkA.getAssortativity();
                 corr[0] = r;
                 corr[1] = aEst;
-                corr[2] = aw[0];
-                corr[3] = aw[1];
-                corr[4] = aw[2];
                 corr[5] = rr;
 
-                VecF<double> emptyL;
-                VecF<double> emptyA; // dummy histograms
-                VecF<VecF<int>> edgeDist = network.getEdgeDistribution("B");
-                VecF<double> cndStats = network.getNodeDistribution("A");
-                outRingStats.writeRowVector(ringStats);
-                outCorr.writeRowVector(corr);
-                outEnergy.write(network.energy);
-                outEntropy.writeRowVector(s);
-                outTemperature.write(expTemperature);
-                outAreas.writeRowVector(a);
-                outAreas.writeRowVector(aSq);
+                std::vector<double> emptyL;
+                std::vector<double> emptyA; // dummy histograms
+                std::vector<std::vector<int>> edgeDist = linkedNetwork.networkB.edgeDistribution;
+                std::vector<double> cndStats = linkedNetwork.networkA.getNodeDistribution();
+                outRingStats.writeVector(ringStats);
+                outCorr.writeVector(corr);
+                energyFile.writeValues(linkedNetwork.energy);
+                outEntropy.writeVector(s);
+                temperatureFile.writeValues(expTemperature);
+                outAreas.writeVector(a);
+                outAreas.writeVector(aSq);
 
-                for (int j = 0; j < edgeDist.n; ++j)
-                    outEmatrix.writeRowVector(edgeDist[j]);
-                outCndStats.writeRowVector(cndStats);
+                for (int j = 0; j < edgeDist.size(); ++j)
+                    outEmatrix.writeVector(edgeDist[j]);
+                outCndStats.writeVector(cndStats);
             }
         }
         logger->info("Thermalisation complete");
@@ -163,78 +144,65 @@ int main(int argc, char *argv[]) {
         logger->info("Number of temperature steps: {}", numTemperatureSteps);
         for (int i = 0; i < numTemperatureSteps; ++i) {
             expTemperature = pow(10, inputData.startTemperature + i * inputData.temperatureIncrement);
-            network.mc.setTemperature(expTemperature);
+            linkedNetwork.mc.setTemperature(expTemperature);
             logger->info("Temperature: {:.2f}", expTemperature);
             for (int k = 1; k <= inputData.stepsPerTemperature; ++k) {
-                network.monteCarloSwitchMoveLAMMPS(logger);
-                if (k % inputData.analysisWriteFrequency == 0) {
-
-                    VecF<double> ringStats = network.getNodeDistribution("B");
-                    double r = network.getAssortativity("B");
-                    double aEst = network.getAboavWeaireEstimate("B");
-                    VecF<double> aw = network.getAboavWeaire("B");
-                    VecF<double> s = network.getEntropy("B");
-                    VecF<double> corr(6);
-                    VecF<double> a(inputData.maxRingSize + 1);
-                    VecF<double> aSq(inputData.maxRingSize + 1);
-                    double rr = network.getAssortativity("A");
+                linkedNetwork.monteCarloSwitchMoveLAMMPS();
+                if (k % inputData.analysisWriteInterval == 0) {
+                    std::vector<double> corr(6);
+                    std::vector<double> ringStats = linkedNetwork.networkB.getNodeDistribution();
+                    double r = linkedNetwork.networkB.getAssortativity();
+                    double aEst = linkedNetwork.networkB.getAboavWeaireEstimate();
+                    std::tie(corr[2], corr[3], corr[4]) = linkedNetwork.networkB.getAboavWeaireParams();
+                    std::vector<double> s = linkedNetwork.networkB.getEntropy();
+                    std::vector<double> a(inputData.maxRingSize + 1);
+                    std::vector<double> aSq(inputData.maxRingSize + 1);
+                    double rr = linkedNetwork.networkA.getAssortativity();
                     corr[0] = r;
                     corr[1] = aEst;
-                    corr[2] = aw[0];
-                    corr[3] = aw[1];
-                    corr[4] = aw[2];
                     corr[5] = rr;
-                    VecF<VecF<int>> edgeDist = network.getEdgeDistribution("B");
-                    VecF<double> cndStats = network.getNodeDistribution("A");
+                    std::vector<std::vector<int>> edgeDist = linkedNetwork.networkB.edgeDistribution;
+                    std::vector<double> cndStats = linkedNetwork.networkA.getNodeDistribution();
 
-                    outRingStats.writeRowVector(ringStats);
-                    outCorr.writeRowVector(corr);
-                    outEnergy.write(network.energy);
-                    outEntropy.writeRowVector(s);
-                    outTemperature.write(expTemperature);
-                    outAreas.writeRowVector(a);
-                    outAreas.writeRowVector(aSq);
-                    for (int j = 0; j < edgeDist.n; ++j)
-                        outEmatrix.writeRowVector(edgeDist[j]);
-                    outCndStats.writeRowVector(cndStats);
+                    energyFile.writeValues(linkedNetwork.energy);
+                    temperatureFile.writeValues(expTemperature);
+
+                    outRingStats.writeVector(ringStats);
+                    outCorr.writeVector(corr);
+
+                    outEntropy.writeVector(s);
+                    outAreas.writeVector(a);
+                    outAreas.writeVector(aSq);
+                    for (int j = 0; j < edgeDist.size(); ++j)
+                        outEmatrix.writeVector(edgeDist[j]);
+                    outCndStats.writeVector(cndStats);
                 }
             }
         }
-        network.lammpsNetwork.stopMovie();
+        linkedNetwork.lammpsNetwork.stopMovie();
         logger->info("Annealing complete");
 
-        // Write total analysis
-        for (int i = 0; i < 10000; ++i) {
-            VecF<double> hist(4);
-            hist[0] = i * 4.0 / 10000.0;
-            hist[1] = lenHist[i];
-            hist[2] = i * 2 * M_PI / 10000.0;
-            hist[3] = angHist[i];
-            outGeomHist.writeRowVector(hist);
-        }
+        // logger->info("Writing LAMMPS Results");
+        // linkedNetwork.lammpsNetwork.write_data("Si");
+        // linkedNetwork.lammpsNetwork.write_restart("Si");
 
-        logger->info("Writing LAMMPS Results");
-        network.lammpsNetwork.write_data("Si");
-        network.lammpsNetwork.write_restart("Si");
-
-        // Check network
+        // Check linkedNetwork
         logger->debug("Diagnosing simulation...");
-        bool consistent = network.checkConsistency();
+        bool consistent = linkedNetwork.checkConsistency();
         logger->debug("Network consistent: {}", consistent ? "true" : "false");
 
         // Write files
         logger->info("Writing files...");
-        network.write(prefixOut);
-        network.writeXYZ(prefixOut);
+        linkedNetwork.write(prefixOut);
         logger->info("");
-        logger->info("Number of attempted switches: {}", network.numSwitches);
-        logger->info("Number of accepted switches: {}", network.numAcceptedSwitches);
-        logger->info("Number of failed switches due to angle: {}", network.failedAngleChecks);
-        logger->info("Number of failed switches due to bond length: {}", network.failedBondLengthChecks);
-        logger->info("Number of failed switches due to energy: {}", network.failedEnergyChecks);
+        logger->info("Number of attempted switches: {}", linkedNetwork.numSwitches);
+        logger->info("Number of accepted switches: {}", linkedNetwork.numAcceptedSwitches);
+        logger->info("Number of failed switches due to angle: {}", linkedNetwork.failedAngleChecks);
+        logger->info("Number of failed switches due to bond length: {}", linkedNetwork.failedBondLengthChecks);
+        logger->info("Number of failed switches due to energy: {}", linkedNetwork.failedEnergyChecks);
         logger->info("");
-        logger->info("Monte Carlo acceptance: {:.3f}", (double)network.numAcceptedSwitches / network.numSwitches);
-        if (network.checkAllClockwiseNeighbours(logger)) {
+        logger->info("Monte Carlo acceptance: {:.3f}", (double)linkedNetwork.numAcceptedSwitches / linkedNetwork.numSwitches);
+        if (linkedNetwork.checkAllClockwiseNeighbours()) {
             logger->info("All rings have clockwise neighbours");
         } else {
             logger->info("Not all rings have clockwise neighbours");
@@ -242,7 +210,7 @@ int main(int argc, char *argv[]) {
 
         // Log time taken
         auto end = std::chrono::high_resolution_clock::now();
-        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start) / 1000.0;
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start) / 1000;
         logger->info("Total run time: {} s", duration.count());
         spdlog::shutdown();
     } catch (std::exception &e) {
