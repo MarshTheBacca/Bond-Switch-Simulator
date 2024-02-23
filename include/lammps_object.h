@@ -10,8 +10,7 @@
 #include <stdio.h>
 #include <unistd.h>
 
-
-#include "vec_func.h"
+#include "vector_tools.h"
 
 #include "mpi.h"
 #include "stdio.h"
