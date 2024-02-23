@@ -17,6 +17,7 @@ target_sources(netmc.x PRIVATE
     node.cpp
     input_data.cpp
     output_file.cpp
+    vector_tools.cpp
 )
 target_include_directories(netmc.x PUBLIC ${LAMMPS_INCLUDE_DIRS}/lammps)
 target_include_directories(netmc.x BEFORE PRIVATE ${CMAKE_SOURCE_DIR}/include)
