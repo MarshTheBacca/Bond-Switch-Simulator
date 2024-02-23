@@ -1,45 +1,27 @@
 #ifndef OUTPUT_FILE_TPP
 #define OUTPUT_FILE_TPP
 
-#include <iomanip>
-#include <ctime>
-#include <sstream>
 #include "output_file.h"
 
-/**
- * @brief Writes a value to the output file with a new line
- * @param val The value to be written
- * @tparam T The type of the value to be written
- */
-template <typename T>
-void OutputFile::write(T val)
-{
-    file << std::string(currIndent, ' ') << val << '\n';
-}
 
 /**
  * @brief Writes two values to the output file with a new line
- * @param val0 The first value to be written
- * @param val1 The second value to be written
- * @tparam T The type of the first value to be written
- * @tparam U The type of the second value to be written
+ *
+ *
  */
-template <typename T, typename U>
-void OutputFile::write(T val0, U val1)
-{
-    file << std::string(currIndent, ' ') << val0 << " " << val1 << '\n';
+template <typename... Args>
+void OutputFile::writeValues(Args... args) {
+    (file << ... << args) << '\n';
 }
 
 /**
- * @brief Writes a row vector to the output file with a new line
+ * @brief Writes a vector to the output file with a new line
  * @param vec The vector to be written
  * @tparam T The type of the vector to be written
  */
 template <typename T>
-void OutputFile::writeRowVector(T vec)
-{
-    for (int i = 0; i < vec.n; ++i)
-    {
+void OutputFile::writeVector(const std::vector<T> &vec) {
+    for (int i = 0; i < vec.size(); ++i) {
         file << std::setw(spacing) << std::left << vec[i];
     }
     file << '\n';

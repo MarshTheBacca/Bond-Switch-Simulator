@@ -1,39 +1,64 @@
 #include "output_file.h"
-#include <iomanip>
-#include <ctime>
-#include <sstream>
 
-OutputFile::OutputFile(const std::string &name) : file(name, std::ios::out | std::ios::trunc)
-{
-    if (!file.is_open())
-    {
-        std::string error_message = "Unable to open file: " + name;
+
+/**
+ * @brief Constructor that wipes file if it exists and creates file if it doesn't exist
+ * @throw std::runtime_error if file cannot be opened
+ */
+OutputFile::OutputFile(const std::string &path) : file(path, std::ios::out | std::ios::trunc) {
+    if (!file.is_open()) {
+        std::string error_message = "Unable to open file: " + path;
         throw std::runtime_error(error_message);
     }
-    initVariables();
 }
 
-void OutputFile::initVariables(int precision, int indentSize, int sepSize, int spaceSize)
-{
-    file << std::fixed << std::showpoint << std::setprecision(precision);
-    indent = std::string(indentSize, ' ');
-    dashed = std::string(sepSize, '-');
-    spacing = spaceSize;
-    currIndent = 0;
+/**
+ * @brief Constructor that wipes file if it exists and creates file if it doesn't exist and sets the spacing
+ * @param spaceArg The spacing to be used when writing vectors
+ * @throw std::runtime_error if file cannot be opened
+ */
+OutputFile::OutputFile(const std::string &path, const int &spaceArg) : file(path, std::ios::out | std::ios::trunc), spacing(spaceArg) {
+    if (!file.is_open()) {
+        std::string error_message = "Unable to open file: " + path;
+        throw std::runtime_error(error_message);
+    }
 }
 
-void OutputFile::datetime(const std::string &message)
-{
-    std::time_t now = std::time(0);
-    struct tm timeinfo;
-    localtime_r(&now, &timeinfo);
-    char buffer[100];
-    std::strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", &timeinfo);
-    std::string time(buffer);
-    file << message << time << '\n';
+/**
+ * @brief Writes the current date and time with a new line
+ */
+void OutputFile::writeDatetime() {
+    auto now = std::chrono::system_clock::now();
+    auto now_time_t = std::chrono::system_clock::to_time_t(now);
+    std::tm localtime;
+    localtime_r(&now_time_t, &localtime);
+    file << std::put_time(&localtime, "%Y-%m-%d %H:%M:%S") << '\n';
 }
 
-void OutputFile::separator()
-{
-    file << dashed << '\n';
+/**
+ * @brief Writes a message followed by the current date and time with a new line
+ */
+void OutputFile::writeDatetime(const std::string &message) {
+    auto now = std::chrono::system_clock::now();
+    auto now_time_t = std::chrono::system_clock::to_time_t(now);
+    std::tm localtime;
+    localtime_r(&now_time_t, &localtime);
+    file << message;
+    file << std::put_time(&localtime, "%Y-%m-%d %H:%M:%S") << '\n';
+}
+
+/**
+ * @brief Writes a string to the output file with a new line
+ * @param string The string to be written
+ */
+void OutputFile::writeLine(const std::string &string) {
+    file << string << "\n";
+}
+
+/**
+ * @brief Writes a string to the output file
+ * @param string The string to be written
+ */
+void OutputFile::write(const std::string &string) {
+    file << string;
 }
