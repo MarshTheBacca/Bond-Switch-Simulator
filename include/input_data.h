@@ -71,8 +71,10 @@ struct InputData {
     double maximumAngle;
 
     // Analysis Data
-    int analysisWriteFrequency;
+    int analysisWriteInterval;
     bool writeMovie;
+
+    LoggerPtr logger;
 
     // Declare template functions
     template <typename T>

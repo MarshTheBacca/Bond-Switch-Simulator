@@ -30,8 +30,6 @@ std::string InputData::getFirstWord() {
 
 /**
  * @brief Reads the IO section of the input file
- * @param inputFile The input file stream
- * @param logger The log file
  */
 void InputData::readIO() {
     readSection("IO", outputFolder, outputFilePrefix,
@@ -63,7 +61,7 @@ void InputData::readPotentialModel() {
 }
 
 void InputData::readAnalysis() {
-    readSection("Analysis", analysisWriteFrequency, writeMovie);
+    readSection("Analysis", analysisWriteInterval, writeMovie);
 }
 
 /**
@@ -89,6 +87,7 @@ void InputData::validate() const {
     checkInRange(maxRingSize, minRingSize, INT_MAX, "Maximum ring size must be at least the minimum ring size");
     checkInRange(minCoordination, 1, INT_MAX, "Minimum coordination must be at least 1");
     checkInRange(maxCoordination, minCoordination, INT_MAX, "Maximum coordination must be at least the minimum coordination");
+
     if (isFixRingsEnabled) {
         checkFileExists(inputFolder + "/fixed_rings.dat");
     }
@@ -103,7 +102,7 @@ void InputData::validate() const {
     }
 
     // Analysis
-    checkInRange(analysisWriteFrequency, 0, 1000, "Analysis write frequency must be between 0 and 1000");
+    checkInRange(analysisWriteInterval, 0, 1000, "Analysis write frequency must be between 0 and 1000");
 }
 
 /**
@@ -111,7 +110,7 @@ void InputData::validate() const {
  * @param filePath The path to the input file
  * @param logger The log file
  */
-InputData::InputData(const std::string &filePath, const LoggerPtr &logger) : inputFile(filePath) {
+InputData::InputData(const std::string &filePath, const LoggerPtr &loggerArg) : inputFile(filePath), logger(loggerArg) {
 
     // Check if the file was opened successfully
     if (!inputFile.is_open()) {

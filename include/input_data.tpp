@@ -79,7 +79,7 @@ void InputData::readSection(const std::string &section, Args &...args) {
 
     // Fold expression to read data
     // For every argument in args, read a value from the input file and assign it to the argument
-    ((firstWord = getFirstWord(inputFile),
+    ((firstWord = getFirstWord(),
       readWord(firstWord, args, section),
       lineNumber++),
      ...);
@@ -100,6 +100,7 @@ void InputData::checkInRange(const T &value, const T &lower, const T &upper, con
         if (value < lower || value > upper) {
             throw std::runtime_error(errorMessage);
         }
+        return;
     }
     throw std::invalid_argument("Cannot check range for type T. T must be int or double.");
 }
