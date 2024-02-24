@@ -102,21 +102,25 @@ int main(int argc, char *argv[]) {
         logger->info("Running Thermalisation...");
         double expTemperature = pow(10, inputData.thermalisationTemperature);
         linkedNetwork.mc.setTemperature(expTemperature);
+        double timeSpentSwitching = 0;
         for (int i = 1; i <= inputData.initialThermalisationSteps; ++i) {
+            std::chrono::high_resolution_clock::time_point startSwitch = std::chrono::high_resolution_clock::now();
             linkedNetwork.monteCarloSwitchMoveLAMMPS();
+            std::chrono::high_resolution_clock::time_point endSwitch = std::chrono::high_resolution_clock::now();
+            timeSpentSwitching += std::chrono::duration_cast<std::chrono::milliseconds>(endSwitch - startSwitch).count();
             if (i % inputData.analysisWriteInterval == 0) {
                 std::vector<double> corr(6);
-                double aEst = linkedNetwork.networkB.getAboavWeaireEstimate();
+                double aboavWeaireEstimate = linkedNetwork.networkB.getAboavWeaireEstimate();
                 std::vector<double> ringStats = linkedNetwork.networkB.getNodeDistribution();
-                double r = linkedNetwork.networkB.getAssortativity();
+                double networkBAssortativity = linkedNetwork.networkB.getAssortativity();
                 std::tie(corr[2], corr[3], corr[4]) = linkedNetwork.networkB.getAboavWeaireParams();
-                std::vector<double> s = linkedNetwork.networkB.getEntropy();
+                std::vector<double> entropy = linkedNetwork.networkB.getEntropy();
                 std::vector<double> a(inputData.maxRingSize + 1);
                 std::vector<double> aSq(inputData.maxRingSize + 1);
-                double rr = linkedNetwork.networkA.getAssortativity();
-                corr[0] = r;
-                corr[1] = aEst;
-                corr[5] = rr;
+                double networkAAssortativity = linkedNetwork.networkA.getAssortativity();
+                corr[0] = networkBAssortativity;
+                corr[1] = aboavWeaireEstimate;
+                corr[5] = networkAAssortativity;
 
                 std::vector<double> emptyL;
                 std::vector<double> emptyA; // dummy histograms
@@ -125,7 +129,7 @@ int main(int argc, char *argv[]) {
                 outRingStats.writeVector(ringStats);
                 outCorr.writeVector(corr);
                 energyFile.writeValues(linkedNetwork.energy);
-                outEntropy.writeVector(s);
+                outEntropy.writeVector(entropy);
                 temperatureFile.writeValues(expTemperature);
                 outAreas.writeVector(a);
                 outAreas.writeVector(aSq);
@@ -147,20 +151,23 @@ int main(int argc, char *argv[]) {
             linkedNetwork.mc.setTemperature(expTemperature);
             logger->info("Temperature: {:.2f}", expTemperature);
             for (int k = 1; k <= inputData.stepsPerTemperature; ++k) {
+                std::chrono::high_resolution_clock::time_point startSwitch = std::chrono::high_resolution_clock::now();
                 linkedNetwork.monteCarloSwitchMoveLAMMPS();
+                std::chrono::high_resolution_clock::time_point endSwitch = std::chrono::high_resolution_clock::now();
+                timeSpentSwitching += std::chrono::duration_cast<std::chrono::milliseconds>(endSwitch - startSwitch).count();
                 if (k % inputData.analysisWriteInterval == 0) {
                     std::vector<double> corr(6);
                     std::vector<double> ringStats = linkedNetwork.networkB.getNodeDistribution();
-                    double r = linkedNetwork.networkB.getAssortativity();
-                    double aEst = linkedNetwork.networkB.getAboavWeaireEstimate();
+                    double networkBAssortativity = linkedNetwork.networkB.getAssortativity();
+                    double aboavWeaireEstimate = linkedNetwork.networkB.getAboavWeaireEstimate();
                     std::tie(corr[2], corr[3], corr[4]) = linkedNetwork.networkB.getAboavWeaireParams();
-                    std::vector<double> s = linkedNetwork.networkB.getEntropy();
+                    std::vector<double> entropy = linkedNetwork.networkB.getEntropy();
                     std::vector<double> a(inputData.maxRingSize + 1);
                     std::vector<double> aSq(inputData.maxRingSize + 1);
-                    double rr = linkedNetwork.networkA.getAssortativity();
-                    corr[0] = r;
-                    corr[1] = aEst;
-                    corr[5] = rr;
+                    double networkAAssortativity = linkedNetwork.networkA.getAssortativity();
+                    corr[0] = networkBAssortativity;
+                    corr[1] = aboavWeaireEstimate;
+                    corr[5] = networkAAssortativity;
                     std::vector<std::vector<int>> edgeDist = linkedNetwork.networkB.edgeDistribution;
                     std::vector<double> cndStats = linkedNetwork.networkA.getNodeDistribution();
 
@@ -170,7 +177,7 @@ int main(int argc, char *argv[]) {
                     outRingStats.writeVector(ringStats);
                     outCorr.writeVector(corr);
 
-                    outEntropy.writeVector(s);
+                    outEntropy.writeVector(entropy);
                     outAreas.writeVector(a);
                     outAreas.writeVector(aSq);
                     for (int j = 0; j < edgeDist.size(); ++j)
@@ -181,10 +188,6 @@ int main(int argc, char *argv[]) {
         }
         linkedNetwork.lammpsNetwork.stopMovie();
         logger->info("Annealing complete");
-
-        // logger->info("Writing LAMMPS Results");
-        // linkedNetwork.lammpsNetwork.write_data("Si");
-        // linkedNetwork.lammpsNetwork.write_restart("Si");
 
         // Check linkedNetwork
         logger->debug("Diagnosing simulation...");
@@ -210,12 +213,14 @@ int main(int argc, char *argv[]) {
 
         // Log time taken
         auto end = std::chrono::high_resolution_clock::now();
-        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start) / 1000;
-        logger->info("Total run time: {} s", duration.count());
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start) / 1000.0;
+        logger->info("Total run time: {:.3f} s", duration.count());
+        logger->info("Time spent switching: {:.3f} s", timeSpentSwitching / 1000.0);
         spdlog::shutdown();
     } catch (std::exception &e) {
         logger->error("Exception: {}", e.what());
         logger->flush();
+        spdlog::shutdown();
         return 1;
     }
     return 0;

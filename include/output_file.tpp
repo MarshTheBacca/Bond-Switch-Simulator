@@ -3,11 +3,8 @@
 
 #include "output_file.h"
 
-
 /**
  * @brief Writes two values to the output file with a new line
- *
- *
  */
 template <typename... Args>
 void OutputFile::writeValues(Args... args) {
