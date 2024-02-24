@@ -3,6 +3,7 @@
 #define NL_NETWORK_H
 
 #include "node.h"
+#include "output_file.h"
 #include "vector_tools.h"
 #include <cmath>
 #include <fstream>
@@ -19,10 +20,12 @@ using LoggerPtr = std::shared_ptr<spdlog::logger>;
 class Network {
   public:
     // Data members
+    int minNetCnxs; // Minimum coordination number of nodes to nodes
     int maxNetCnxs; // Maximum coordination number of nodes to nodes
+    int minDualCnxs;
     int maxDualCnxs;
     std::vector<double> dimensions;                 // Periodic boundary of network, xlo = ylo = 0, so dimensions = [xhi, yhi]
-    std::vector<double> rpb;                        // Reciprical periodic boundary = [1/xhi, 1/yhi]
+    std::vector<double> reciprocalDimensions;       // Reciprical periodic boundary = [1/xhi, 1/yhi]
     std::string geometryCode;                       // geometry of system
                                                     // Maximum coordination number of nodes to dual nodes
     std::vector<Node> nodes;                        // list of nodes
@@ -51,11 +54,13 @@ class Network {
     bool r_ij(int i, int j, double cutoff);
 
     int getMaxCnxs();
-    int getMaxDualCnxs();
     int getMinCnxs();
+    int getMaxDualCnxs();
+    int getMinDualCnxs();
 
     std::vector<double> getCoords();
     void getCoords(std::vector<double> &coords);
+    void centreRings(const Network &baseNetwork);
 
   private:
     // Refactored the initialiseTriangleLattice function
@@ -70,9 +75,9 @@ class Network {
     void addUnorderedDualConnections(Network &dualNetwork);
     void orderDualConnections(Network &dualNetwork);
     void addOrderedNetworkConnections(Network &dualNetwork);
-    void setCoordinatesAtCentreOfDualConnections(Network &dualNetwork);
 
     void initialiseDescriptors(const int &maxCnxs);
+    void writeRingStatsHeader(OutputFile &ringStatsFile) const;
 };
 
 #endif // NL_NETWORK_H

@@ -15,7 +15,7 @@ inline int roundedSqrt(const int &num) {
 /**
  * @brief default constructor
  */
-Network::Network() : maxNetCnxs(0), maxDualCnxs(0), dimensions(2), rpb(2), geometryCode("") {
+Network::Network() : maxNetCnxs(0), maxDualCnxs(0), dimensions(2), reciprocalDimensions(2), geometryCode("") {
     nodes.reserve(0);
 }
 /**
@@ -110,15 +110,15 @@ Network::Network(const std::string &pathPrefix, const int &maxBaseCoordinationAr
     getline(auxFile, line);
     std::istringstream(line) >> geometryCode;
     dimensions = std::vector<double>(2);
-    rpb = std::vector<double>(2);
+    reciprocalDimensions = std::vector<double>(2);
     getline(auxFile, line);
     ss.str(line);
     ss >> dimensions[0];
     ss >> dimensions[1];
     getline(auxFile, line);
     ss.str(line);
-    ss >> rpb[0];
-    ss >> rpb[1];
+    ss >> reciprocalDimensions[0];
+    ss >> reciprocalDimensions[1];
     auxFile.close();
 
     nodes.reserve(nNodes);
@@ -196,11 +196,11 @@ void Network::initialiseTriangularLattice(const int &dim) {
 
     // assign coordinates in layers, with unit bond lengths
     dimensions.reserve(2);
-    rpb.reserve(2);
+    reciprocalDimensions.reserve(2);
     dimensions[0] = dim;
     dimensions[1] = dim * sqrt(3) * 0.5;
-    rpb[0] = 1.0 / dimensions[0];
-    rpb[1] = 1.0 / dimensions[1];
+    reciprocalDimensions[0] = 1.0 / dimensions[0];
+    reciprocalDimensions[1] = 1.0 / dimensions[1];
     assignCoordinates(dim);
     makeConnections(dim, dimSq);
     makeDualConnections(dim, dimSq);
@@ -307,11 +307,11 @@ Network Network::constructDual(const int &maxCnxs) {
     addUnorderedDualConnections(dualNetwork);
     orderDualConnections(dualNetwork);
     addOrderedNetworkConnections(dualNetwork);
-    setCoordinatesAtCentreOfDualConnections(dualNetwork);
+    centreRings(dualNetwork);
 
     // set remaining parameters
     dualNetwork.dimensions = dimensions;
-    dualNetwork.rpb = rpb;
+    dualNetwork.reciprocalDimensions = reciprocalDimensions;
     dualNetwork.geometryCode = geometryCode;
     dualNetwork.initialiseDescriptors(maxCnxs);
 
@@ -347,11 +347,14 @@ void Network::orderDualConnections(Network &dualNetwork) {
         std::vector<int> orderedCnxs(maxDualCnxs);
         orderedCnxs.push_back(initialDualCnxs[0]);
         for (int j = 1; j < initialDualCnxs.size(); ++j) {
-            std::vector<int> common = intersectVectors(nodes[orderedCnxs[j - 1]].netCnxs, initialDualCnxs);
-            if (!vectorContains(orderedCnxs, common[0]))
-                orderedCnxs.push_back(common[0]);
-            else
-                orderedCnxs.push_back(common[1]);
+            std::unordered_set<int> common = intersectVectors(nodes[orderedCnxs[j - 1]].netCnxs, initialDualCnxs);
+            auto it = common.begin();
+            if (!vectorContains(orderedCnxs, *it))
+                orderedCnxs.push_back(*it);
+            else {
+                ++it;
+                orderedCnxs.push_back(*it);
+            }
         }
         dualNetwork.nodes[i].dualCnxs = orderedCnxs;
     }
@@ -360,47 +363,54 @@ void Network::orderDualConnections(Network &dualNetwork) {
 void Network::addOrderedNetworkConnections(Network &dualNetwork) {
     for (int i = 0; i < dualNetwork.nodes.size(); ++i) {
         std::vector<int> dualCnxs = dualNetwork.nodes[i].dualCnxs;
-        std::vector<int> common;
+        std::unordered_set<int> common;
         for (int j = 0; j < dualCnxs.size(); ++j) {
             int k = (j + 1) % dualCnxs.size();
             common = intersectVectors(nodes[dualCnxs[j]].dualCnxs,
                                       nodes[dualCnxs[k]].dualCnxs);
-            deleteByValues(common, i);
-            dualNetwork.nodes[i].netCnxs.push_back(common[0]);
+            common.erase(i);
+            dualNetwork.nodes[i].netCnxs.push_back(*common.begin());
         }
     }
 }
 
-void Network::setCoordinatesAtCentreOfDualConnections(Network &dualNetwork) {
-    for (int i = 0; i < dualNetwork.nodes.size(); ++i) {
-        std::vector<double> x(dualNetwork.nodes[i].dualCnxs.size());
-        std::vector<double> y(dualNetwork.nodes[i].dualCnxs.size());
-        for (int j = 0; j < dualNetwork.nodes[i].dualCnxs.size(); ++j) {
-            x[j] = nodes[dualNetwork.nodes[i].dualCnxs[j]].crd[0];
-            y[j] = nodes[dualNetwork.nodes[i].dualCnxs[j]].crd[1];
+void Network::centreRings(const Network &baseNetwork) {
+    // Sync B coordinates
+    std::vector<double> total(2, 0.0);
+    for (int ringNode = 0; ringNode < nodes.size(); ++ringNode) {
+        Node &selectedRingNode = nodes[ringNode];
+        total[0] = total[1] = 0.0;
+        for (int neighbour = 0; neighbour < selectedRingNode.dualCnxs.size(); ++neighbour) {
+            std::vector<double> pbcCoords = pbcVector(selectedRingNode.crd,
+                                                      baseNetwork.nodes[selectedRingNode.dualCnxs[neighbour]].crd,
+                                                      dimensions);
+            total[0] += pbcCoords[0];
+            total[1] += pbcCoords[1];
         }
-        std::vector<double> origin(2);
-        origin[0] = x[0];
-        origin[1] = y[0];
-        subtractFromVector(x, origin[0]);
-        subtractFromVector(y, origin[1]);
-        for (int j = 0; j < x.size(); ++j)
-            x[j] -= dimensions[0] * nearbyint(x[j] * rpb[0]);
-        for (int j = 0; j < y.size(); ++j)
-            y[j] -= dimensions[1] * nearbyint(y[j] * rpb[1]);
-        std::vector<double> c(2);
-        c[0] = origin[0] + vectorMean(x);
-        c[1] = origin[1] + vectorMean(y);
-        dualNetwork.nodes[i].crd = c;
+        total[0] /= selectedRingNode.dualCnxs.size();
+        total[1] /= selectedRingNode.dualCnxs.size();
+
+        selectedRingNode.crd[0] += total[0];
+        selectedRingNode.crd[1] += total[1];
+
+        // Wrap the new coordinates back into the box
+        for (size_t i = 0; i < selectedRingNode.crd.size(); ++i) {
+            while (selectedRingNode.crd[i] < 0) {
+                selectedRingNode.crd[i] += dimensions[i];
+            }
+            while (selectedRingNode.crd[i] >= dimensions[i]) {
+                selectedRingNode.crd[i] -= dimensions[i];
+            }
+        }
     }
 }
 
 // Rescale coordinates and lattice dimensions
 void Network::rescale(const double &scaleFactor) {
-    multiplyVector(dimensions, scaleFactor);
-    divideVector(rpb, scaleFactor);
+    vectorMultiply(dimensions, scaleFactor);
+    divideVector(reciprocalDimensions, scaleFactor);
     std::for_each(nodes.begin(), nodes.end(), [&scaleFactor](Node &node) {
-        multiplyVector(node.crd, scaleFactor);
+        vectorMultiply(node.crd, scaleFactor);
     });
 }
 
@@ -572,8 +582,8 @@ void Network::write(const std::string &prefix) {
     for (int i = 0; i < dimensions.size(); ++i)
         auxFile << std::setw(20) << std::left << dimensions[i];
     auxFile << std::endl;
-    for (int i = 0; i < rpb.size(); ++i)
-        auxFile << std::setw(20) << std::left << rpb[i];
+    for (int i = 0; i < reciprocalDimensions.size(); ++i)
+        auxFile << std::setw(20) << std::left << reciprocalDimensions[i];
     auxFile << std::endl;
     auxFile.close();
 
@@ -612,33 +622,31 @@ void Network::write(const std::string &prefix) {
 }
 
 int Network::getMaxCnxs() {
-    int maxNetCnxsReturn = 0;
-    std::for_each(nodes.begin(), nodes.end(), [&](const Node &node) {
-        if (node.netCnxs.size() > maxNetCnxsReturn) {
-            maxNetCnxsReturn = node.netCnxs.size();
-        }
+    auto maxNode = std::max_element(nodes.begin(), nodes.end(), [](const Node &a, const Node &b) {
+        return a.netCnxs.size() < b.netCnxs.size();
     });
-    return maxNetCnxsReturn;
-}
-
-int Network::getMaxDualCnxs() {
-    int maxDualCnxsReturn = 0;
-    std::for_each(nodes.begin(), nodes.end(), [&](const Node &node) {
-        if (node.dualCnxs.size() > maxDualCnxsReturn) {
-            maxDualCnxsReturn = node.netCnxs.size();
-        }
-    });
-    return maxDualCnxsReturn;
+    return maxNode->netCnxs.size();
 }
 
 int Network::getMinCnxs() {
-    int minNetCnxs = 100000;
-    std::for_each(nodes.begin(), nodes.end(), [&](const Node &node) {
-        if (node.netCnxs.size() < minNetCnxs) {
-            minNetCnxs = node.netCnxs.size();
-        }
+    auto minNode = std::min_element(nodes.begin(), nodes.end(), [](const Node &a, const Node &b) {
+        return a.netCnxs.size() < b.netCnxs.size();
     });
-    return minNetCnxs;
+    return minNode->netCnxs.size();
+}
+
+int Network::getMaxDualCnxs() {
+    auto maxNode = std::max_element(nodes.begin(), nodes.end(), [](const Node &a, const Node &b) {
+        return a.dualCnxs.size() < b.dualCnxs.size();
+    });
+    return maxNode->dualCnxs.size();
+}
+
+int Network::getMinDualCnxs() {
+    auto minNode = std::min_element(nodes.begin(), nodes.end(), [](const Node &a, const Node &b) {
+        return a.dualCnxs.size() < b.dualCnxs.size();
+    });
+    return minNode->dualCnxs.size();
 }
 
 /**
@@ -668,4 +676,14 @@ void Network::getCoords(std::vector<double> &coords) {
         coords[i * 2] = nodes[i].crd[0];
         coords[i * 2 + 1] = nodes[i].crd[1];
     }
+}
+
+void Network::writeRingStatsHeader(OutputFile &ringStatsFile) const {
+    ringStatsFile.write("Next line is ring sizes, following lines are the proportion of that ring size for each step of the simulation.\n");
+    std::vector<int> ringSizes;
+    ringSizes.reserve(maxNetCnxs - minNetCnxs + 1);
+    for (int i = minNetCnxs; i <= maxNetCnxs; ++i) {
+        ringSizes.push_back(i);
+    }
+    ringStatsFile.writeVector(ringSizes);
 }
