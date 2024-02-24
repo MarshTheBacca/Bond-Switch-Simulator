@@ -50,8 +50,8 @@ struct LinkedNetwork {
     double maximumAngle;         // Maximum angle between atoms
     bool writeMovie;             // Write movie file or not
 
-    std::vector<int> fixedRings; // IDs of the fixed rings
-    std::vector<int> fixedNodes; // IDs of the fixed nodes
+    std::unordered_set<int> fixedRings; // IDs of the fixed rings
+    std::unordered_set<int> fixedNodes; // IDs of the fixed nodes
 
     int numSwitches = 0;            // Number of switches performed
     int numAcceptedSwitches = 0;    // Number of switches accepted
@@ -60,6 +60,7 @@ struct LinkedNetwork {
     int failedEnergyChecks = 0;     // Number of failed energy checks
 
     LoggerPtr logger; // Logger
+    std::vector<double> weights;
 
     // Constructors
     LinkedNetwork();
@@ -71,24 +72,23 @@ struct LinkedNetwork {
 
     // Member Functions
     void rescale(double scaleFactor); // rescale lattice dimensions
+    void updateWeights();
     std::tuple<int, int, int, int> pickRandomConnection();
     int assignValues(int randNodeCoordination, int randNodeConnectionCoordination) const;
 
     int findCommonConnection(const int &baseNode, const int &ringNode, const int &excludeNode) const;
     int findCommonRing(const int &baseNode1, const int &baseNode2, const int &excludeNode) const;
 
-    bool checkThreeRingEdges(const int &ringNode) const; // prevent edges being part of three rings
-                                                         // maintain convexity
     void monteCarloSwitchMoveLAMMPS();
-    void wrapCoords(std::vector<double> &coords); // generate convex ring intersection interactions
-    bool checkConsistency();                      // check networks are consistent
-    bool checkCnxConsistency();                   // check for mutual connections
-    bool checkDescriptorConsistency();            // check descriptors are accurate
+    bool checkConsistency();           // check networks are consistent
+    bool checkCnxConsistency();        // check for mutual connections
+    bool checkDescriptorConsistency(); // check descriptors are accurate
 
     void write(const std::string &prefix);
 
     void pushCoords(const std::vector<double> &coords);
     void showCoords(const std::vector<double> &coords) const;
+    void wrapCoords(std::vector<double> &coords) const; // generate convex ring intersection interactions
 
     bool genSwitchOperations(int baseNode1, int baseNode2, int ringNode1, int ringNode2,
                              std::vector<int> &bondBreaks, std::vector<int> &bondMakes,
