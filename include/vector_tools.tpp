@@ -68,7 +68,7 @@ void divideVector(std::vector<T> &vector, const double &divideBy) {
  * @param multiplyBy The value to multiply the vector by
  */
 template <typename T>
-void multiplyVector(std::vector<T> &vector, const double &multiplyBy) {
+void vectorMultiply(std::vector<T> &vector, const double &multiplyBy) {
     for (auto &value : vector) {
         value *= multiplyBy;
     }
@@ -80,8 +80,8 @@ void multiplyVector(std::vector<T> &vector, const double &multiplyBy) {
  * @param vector The vector to be added to
  * @param addition The value to add to the vector
  */
-template <typename T>
-void addToVector(std::vector<double> &vector, const double &addition) {
+template <typename T, typename U>
+void addToVector(std::vector<T> &vector, const U &addition) {
     for (auto &value : vector) {
         value += addition;
     }
@@ -90,13 +90,14 @@ void addToVector(std::vector<double> &vector, const double &addition) {
 /**
  * @brief Subtracts a constant from all the values in a vector
  * @tparam T The type of the vector
+ * @tparam U The type of the subtraction value
  * @param vector The vector to be subtracted from
  * @param subtraction The value to subtract from the vector
  */
-template <typename T>
-void subtractFromVector(std::vector<T> &vector, const double &subtraction) {
+template <typename T, typename U>
+void vectorSubtract(std::vector<T> &vector, const U &subtraction) {
     for (auto &value : vector) {
-        value -= subtraction;
+        value -= static_cast<T>(subtraction);
     }
 }
 
@@ -137,15 +138,15 @@ std::vector<T> multiplyVectors(const std::vector<T> &vector1, const std::vector<
  * @tparam T The type of the vectors
  * @param vector1 The first vector
  * @param vector2 The second vector
- * @return A vector of common values
+ * @return A set of common values
  */
 template <typename T>
-std::vector<T> intersectVectors(const std::vector<T> &vector1, const std::vector<T> &vector2) {
+std::unordered_set<T> intersectVectors(const std::vector<T> &vector1, const std::vector<T> &vector2) {
     std::unordered_set<T> set2(vector2.begin(), vector2.end());
-    std::vector<T> result;
+    std::unordered_set<T> result;
     for (const auto &value : vector1) {
-        if (set2.find(value) != set2.end()) {
-            result.push_back(value);
+        if (set2.count(value) > 0) {
+            result.insert(value);
         }
     }
     return result;
@@ -206,4 +207,61 @@ std::vector<T> getUniqueValues(const std::vector<T> &vector) {
         }
     }
     return uniqueVector;
+}
+
+/**
+ * @brief Converts a vector to a string
+ * @tparam T The type of the vector
+ * @param vector The vector to be converted
+ * @return A string representation of the vector
+ */
+template <typename T>
+std::string vectorToString(const std::vector<T> &vector) {
+    std::string result;
+    for (const auto &value : vector) {
+        result += value + " ";
+    }
+    return result;
+}
+
+/**
+ * @brief Converts a set to a string
+ * @tparam T The type of the set
+ * @param set The set to be converted
+ * @return A string representation of the set
+ */
+template <typename T>
+std::string setToString(const std::unordered_set<T> &set) {
+    std::string result;
+    for (const auto &value : set) {
+        result += value + " ";
+    }
+    return result;
+}
+
+/**
+ * @brief Adds values to a vector
+ * @tparam T The type of the vector
+ * @tparam Args The type of the values to be added
+ * @param vector The vector to which the values will be added
+ */
+template <typename T, typename... Args>
+void vectorAddValues(std::vector<T> &vector, const Args &...args) {
+    (vector.push_back(args), ...);
+}
+
+/**
+ * @brief Combines two vectors into one
+ * @tparam T The type of the vectors
+ * @param vec1 The first vector
+ * @param vec2 The second vector
+ * @return A vector containing all the values from both vectors
+ */
+template <typename T>
+std::vector<T> combineVectors(const std::vector<T> &vec1, const std::vector<T> &vec2) {
+    std::vector<T> result;
+    result.reserve(vec1.size() + vec2.size()); // Reserve enough space for all elements
+    result.insert(result.end(), vec1.begin(), vec1.end());
+    result.insert(result.end(), vec2.begin(), vec2.end());
+    return result;
 }
