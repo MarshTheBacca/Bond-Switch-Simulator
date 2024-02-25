@@ -44,11 +44,59 @@
             "problemMatcher": []
         },
         {
+            "label": "runNoDebug",
+            "type": "shell",
+            "command": "./netmc.x",
+            "options": {
+                "cwd": "${workspaceFolder}/testing"
+            },
+            "dependsOn": [
+                "build",
+                "clean"
+            ],
+            "problemMatcher": []
+        },
+        {
             "label": "cleanBuildRun",
             "dependsOn": [
                 "clean",
                 "build",
                 "run"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "cleanBuildRunNoDebug",
+            "dependsOn": [
+                "clean",
+                "build",
+                "runNoDebug"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "runWithProfiling",
+            "type": "shell",
+            "command": "${workspaceFolder}/testing/netmc.x",
+            "options": {
+                "cwd": "${workspaceFolder}/testing"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "profile",
+            "type": "shell",
+            "command": "gprof ${workspaceFolder}/testing/netmc.x gmon.out > analysis.txt",
+            "dependsOn": "runWithProfiling",
+            "problemMatcher": []
+        },
+        {
+            "label": "cleanBuildRunProf",
+            "dependsOn": [
+                "clean",
+                "build",
+                "runWithProfiling",
+                "profile"
             ],
             "problemMatcher": []
         }
