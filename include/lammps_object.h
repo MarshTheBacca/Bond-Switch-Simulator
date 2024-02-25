@@ -52,7 +52,6 @@ class LammpsObject {
     void write_restart(const std::string &structureName);
 
     std::vector<double> getCoords(const int &dim) const;
-    void getCoords(std::vector<double> &coords, const int &dim) const;
     void setCoords(std::vector<double> &newCoords, int dim);
 
     void breakBond(const int &atom1, const int &atom2, const int &type);

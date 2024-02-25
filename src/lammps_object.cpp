@@ -13,10 +13,10 @@ LammpsObject::LammpsObject() = default;
  * @param logger The logger object
  */
 LammpsObject::LammpsObject(const std::string &structureName, const std::string &inputFolder, LoggerPtr logger) {
-    logger->info("Creating Lammps Object");
+    logger->debug("Creating Lammps Object");
     const char *lmpargv[] = {"liblammps", "-screen", "none"};
     int lmpargc = sizeof(lmpargv) / sizeof(const char *);
-    logger->info("lmpargc -> {} ", lmpargc);
+    logger->debug("lmpargc -> {} ", lmpargc);
     handle = lammps_open_no_mpi(lmpargc, const_cast<char **>(lmpargv), nullptr);
 
     if (handle == nullptr) {
@@ -41,7 +41,7 @@ LammpsObject::LammpsObject(const std::string &structureName, const std::string &
     }
 
     std::string inputFilePath = inputFolder + "/" + selectorToFile[structureName];
-    logger->info("Executing LAMMPS Script: {}", inputFilePath);
+    logger->debug("Executing LAMMPS Script: {}", inputFilePath);
     lammps_file(handle, inputFilePath.c_str());
     natoms = (int)(lammps_get_natoms(handle) + 0.5);
     if (const auto nbonds_ptr = static_cast<const int *>(lammps_extract_global(handle, "nbonds")); nbonds_ptr) {
@@ -55,7 +55,7 @@ LammpsObject::LammpsObject(const std::string &structureName, const std::string &
     } else {
         logger->error("Failed to extract number of angles");
     }
-    logger->info("LAMMPS #nodes: {} #bonds: {} #angles: {}", natoms, nbonds, nangles);
+    logger->debug("LAMMPS #nodes: {} #bonds: {} #angles: {}", natoms, nbonds, nangles);
     std::vector<int> angleHelper(6);
 }
 
@@ -363,18 +363,6 @@ std::vector<double> LammpsObject::getCoords(const int &dim) const {
     std::vector<double> coords(dim * natoms);
     lammps_gather_atoms(handle, "x", 1, dim, coords.data());
     return coords;
-}
-
-/**
- * @brief Populates the coordinates of the atoms in the network into a given vector
- * @param dim the number of dimensions you want to receive, 2 or 3
- */
-void LammpsObject::getCoords(std::vector<double> &coords, const int &dim) const {
-    if (dim != 2 && dim != 3) {
-        throw std::runtime_error("Invalid dimension");
-    }
-    coords.resize(dim * natoms);
-    lammps_gather_atoms(handle, "x", 1, dim, coords.data());
 }
 
 /**
