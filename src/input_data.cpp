@@ -116,7 +116,7 @@ InputData::InputData(const std::string &filePath, const LoggerPtr &loggerArg) : 
     if (!inputFile.is_open()) {
         throw std::runtime_error("Unable to open file: " + filePath);
     }
-    logger->info("Reading input file: " + filePath);
+    logger->debug("Reading input file: " + filePath);
 
     // Skip the title line
     inputFile.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
@@ -132,6 +132,6 @@ InputData::InputData(const std::string &filePath, const LoggerPtr &loggerArg) : 
     readAnalysis();
 
     // Validate input data
-    logger->info("Validating input data...");
+    logger->debug("Validating input data...");
     validate();
 }
