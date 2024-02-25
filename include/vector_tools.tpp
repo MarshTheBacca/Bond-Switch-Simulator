@@ -49,13 +49,13 @@ std::tuple<double, double, double> vectorLinearRegression(const std::vector<T> &
     return std::make_tuple(gradient, (sumY - gradient * sumX) / vecSize, r * r);
 }
 /**
- * @brief Divides all the values in a vector by a constant
+ * @brief Divides all the values in a vector by a constant in place
  * @tparam T The type of the vector
  * @param vector The vector to be divided
  * @param divideBy The value to divide the vector by
  */
 template <typename T>
-void divideVector(std::vector<T> &vector, const double &divideBy) {
+void vectorDivide(std::vector<T> &vector, const double &divideBy) {
     for (auto &value : vector) {
         value /= divideBy;
     }
@@ -217,11 +217,11 @@ std::vector<T> getUniqueValues(const std::vector<T> &vector) {
  */
 template <typename T>
 std::string vectorToString(const std::vector<T> &vector) {
-    std::string result;
+    std::ostringstream oss;
     for (const auto &value : vector) {
-        result += value + " ";
+        oss << value << " ";
     }
-    return result;
+    return oss.str();
 }
 
 /**
@@ -232,11 +232,11 @@ std::string vectorToString(const std::vector<T> &vector) {
  */
 template <typename T>
 std::string setToString(const std::unordered_set<T> &set) {
-    std::string result;
+    std::ostringstream oss;
     for (const auto &value : set) {
-        result += value + " ";
+        oss << value << " ";
     }
-    return result;
+    return oss.str();
 }
 
 /**
@@ -264,4 +264,9 @@ std::vector<T> combineVectors(const std::vector<T> &vec1, const std::vector<T> &
     result.insert(result.end(), vec1.begin(), vec1.end());
     result.insert(result.end(), vec2.begin(), vec2.end());
     return result;
+}
+
+template <typename T>
+void vectorNormalise(std::vector<T> &vec) {
+    vectorDivide(vec, vectorSum(vec));
 }

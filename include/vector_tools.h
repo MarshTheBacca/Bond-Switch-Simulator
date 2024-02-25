@@ -20,7 +20,7 @@ template <typename T>
 std::tuple<double, double, double> vectorLinearRegression(const std::vector<T> &vector1, const std::vector<T> &vector2);
 
 template <typename T>
-void divideVector(std::vector<T> &vector, const double &divideBy);
+void vectorDivide(std::vector<T> &vector, const double &divideBy);
 
 template <typename T>
 void vectorMultiply(std::vector<T> &vector, const double &multiplyBy);
@@ -63,6 +63,9 @@ void vectorAddValues(std::vector<T> &vector, const Args &...args);
 
 template <typename T>
 std::vector<T> combineVectors(const std::vector<T> &vec1, const std::vector<T> &vec2);
+
+template <typename T>
+void vectorNormalise(const std::vector<T> &vec);
 
 // Regular functions
 
