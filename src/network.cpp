@@ -278,7 +278,7 @@ void Network::makeDualConnections(const int &dim, const int &dimSq) {
 void Network::addDualConnections(const int &y, const int &id, const int &dim, const int &dimSq2) {
     int cnx = (2 * y * dim + (id + dim - 1) % dim);
     nodes[id].dualCnxs.push_back(cnx);
-    cnx = ((2 * y + 1) * dim + (id) % dim);
+    cnx = ((2 * y + 1) * dim + id % dim);
     nodes[id].dualCnxs.push_back(cnx);
     cnx = (2 * y * dim + id % dim);
     nodes[id].dualCnxs.push_back(cnx);
@@ -408,7 +408,7 @@ void Network::centreRings(const Network &baseNetwork) {
 // Rescale coordinates and lattice dimensions
 void Network::rescale(const double &scaleFactor) {
     vectorMultiply(dimensions, scaleFactor);
-    divideVector(reciprocalDimensions, scaleFactor);
+    vectorDivide(reciprocalDimensions, scaleFactor);
     std::for_each(nodes.begin(), nodes.end(), [&scaleFactor](Node &node) {
         vectorMultiply(node.crd, scaleFactor);
     });
@@ -416,11 +416,9 @@ void Network::rescale(const double &scaleFactor) {
 
 // Get proportion of nodes of each size
 std::vector<double> Network::getNodeDistribution() const {
-    std::vector<double> distribution(nodeDistribution.size());
-    for (int i = 0; i < nodeDistribution.size(); ++i)
-        distribution[i] = nodeDistribution[i];
-    divideVector(distribution, vectorSum(distribution));
-    return distribution;
+    std::vector<double> nodeDistributionDouble(nodeDistribution.begin(), nodeDistribution.end());
+    vectorNormalise(nodeDistributionDouble);
+    return nodeDistributionDouble;
 }
 
 // Get proportion of edges with a node of each size at each end
@@ -434,7 +432,7 @@ std::vector<std::vector<double>> Network::getEdgeDistribution() const {
         sum += vectorSum(edgeDistribution[i]);
     }
     for (int i = 0; i < edgeDistribution.size(); ++i)
-        divideVector(normalisedDist[i], sum);
+        vectorDivide(normalisedDist[i], sum);
 
     return normalisedDist;
 }
@@ -479,7 +477,7 @@ std::tuple<double, double, double> Network::getAboavWeaireParams() const {
 }
 
 // Calculate network assortativity through the degree correlation coefficient
-double Network::getAssortativity() {
+double Network::getAssortativityOld() const {
     /* definitions:
      * 1) e_ij degree correlation matrix, prob of finding nodes with degree i,j at
      * end of random link 2) q_k prob of finding node with degree k at end of
@@ -539,7 +537,7 @@ double Network::getAboavWeaireEstimate() {
 }
 
 // Calculate entropy of node and edge distribution
-std::vector<double> Network::getEntropy() {
+std::vector<double> Network::getEntropyOld() const {
     double s0 = 0.0;
     double s1 = 0.0;
     double s2 = 0.0;
@@ -567,6 +565,37 @@ std::vector<double> Network::getEntropy() {
     }
 
     return std::vector<double>{s0, s1, s2};
+}
+
+double Network::getAboavWeaire() const {
+    return 0.0;
+}
+double Network::getEntropy() const {
+    return 0.0;
+}
+
+double Network::getAssortativity() const {
+    return 0.0;
+}
+
+/**
+ * @brief Get the number of nodes with a given number of connections
+ * @param minRingSize Minimum number of connections
+ * @param maxRingSize Maximum number of connections
+ * @return Vector of the number of nodes with a given number of connections
+ */
+std::vector<int> Network::getCoordinations(const int &minCoordination, const int &maxCoordination) const {
+    std::vector<int> ringSizes(maxCoordination - minCoordination + 1, 0);
+    for (int i = 0; i < nodes.size(); ++i) {
+        try {
+            ringSizes[nodes[i].netCnxs.size() - minCoordination]++;
+        } catch (std::out_of_range &e) {
+            throw std::runtime_error("Node " + std::to_string(i) + " has " + std::to_string(nodes[i].netCnxs.size()) +
+                                     " connections, which is outside the range " + std::to_string(minCoordination) +
+                                     " to " + std::to_string(maxCoordination));
+        }
+    }
+    return ringSizes;
 }
 
 // Write network in format which can be loaded
@@ -650,40 +679,15 @@ int Network::getMinDualCnxs() {
 }
 
 /**
- * @brief Get the coordinates of the network
+ * @brief Get the coordinates of the network in pairs
  * @return 1D vector of node coordinates
  */
 std::vector<double> Network::getCoords() {
     std::vector<double> returnCoords;
+    returnCoords.reserve(nodes.size() * 2);
     for (int i = 0; i < nodes.size(); i++) {
-        returnCoords[i] = nodes[i].crd[0];
-        returnCoords[i + 1] = nodes[i].crd[1];
+        returnCoords[i * 2] = nodes[i].crd[0];
+        returnCoords[i * 2 + 1] = nodes[i].crd[1];
     }
     return returnCoords;
-}
-
-/**
- * @brief Populate a given vector with the coordinates of the network
- */
-void Network::getCoords(std::vector<double> &coords) {
-    if (coords.size() != nodes.size() * 2) {
-        std::ostringstream oss;
-        oss << "The input vector must have the same size as the number of node. Got "
-            << coords.size() << " instead of " << nodes.size() * 2;
-        throw std::invalid_argument(oss.str());
-    }
-    for (int i = 0; i < nodes.size(); i++) {
-        coords[i * 2] = nodes[i].crd[0];
-        coords[i * 2 + 1] = nodes[i].crd[1];
-    }
-}
-
-void Network::writeRingStatsHeader(OutputFile &ringStatsFile) const {
-    ringStatsFile.write("Next line is ring sizes, following lines are the proportion of that ring size for each step of the simulation.\n");
-    std::vector<int> ringSizes;
-    ringSizes.reserve(maxNetCnxs - minNetCnxs + 1);
-    for (int i = minNetCnxs; i <= maxNetCnxs; ++i) {
-        ringSizes.push_back(i);
-    }
-    ringStatsFile.writeVector(ringSizes);
 }

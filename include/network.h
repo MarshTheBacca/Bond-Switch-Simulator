@@ -46,9 +46,15 @@ class Network {
     std::vector<double> getNodeDistribution() const;
     std::vector<std::vector<double>> getEdgeDistribution() const;    // proportion of each type of node
     std::tuple<double, double, double> getAboavWeaireParams() const; // calculate Aboav-Weaire parameters
-    double getAssortativity();                                       // calculate network assortativity
-    double getAboavWeaireEstimate();                                 // estimate aw alpha parameter
-    std::vector<double> getEntropy();                                // calculate entropy of node and edge distribution
+    double getAssortativityOld() const;
+    double getAboavWeaireEstimate();
+    std::vector<double> getEntropyOld() const; // calculate entropy of node and edge distribution
+
+    double getAssortativity() const;
+    double getAboavWeaire() const;
+    double getEntropy() const;
+
+    std::vector<int> getCoordinations(const int &minRingSize, const int &maxRingSize) const;
 
     void write(const std::string &prefix);
     bool r_ij(int i, int j, double cutoff);
@@ -59,7 +65,6 @@ class Network {
     int getMinDualCnxs();
 
     std::vector<double> getCoords();
-    void getCoords(std::vector<double> &coords);
     void centreRings(const Network &baseNetwork);
 
   private:
@@ -77,7 +82,6 @@ class Network {
     void addOrderedNetworkConnections(Network &dualNetwork);
 
     void initialiseDescriptors(const int &maxCnxs);
-    void writeRingStatsHeader(OutputFile &ringStatsFile) const;
 };
 
 #endif // NL_NETWORK_H
