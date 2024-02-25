@@ -41,14 +41,14 @@ struct LinkedNetwork {
 
     std::vector<double> currentCoords;
 
-    bool isOpenMPIEnabled;       // Whether to use MPI
-    SelectionType selectionType; // Either 'weighted' or 'random'
-    std::mt19937 mtGen;          // mersenne twister random number generator
-    Metropolis mc;               // monte carlo metropolis condition
-    double weightedDecay;        // decay factor for weighted monte carlo
-    double maximumBondLength;    // Maximum bond length
-    double maximumAngle;         // Maximum angle between atoms
-    bool writeMovie;             // Write movie file or not
+    bool isOpenMPIEnabled;          // Whether to use MPI
+    SelectionType selectionType;    // Either 'weighted' or 'random'
+    std::mt19937 mtGen;             // mersenne twister random number generator
+    Metropolis metropolisCondition; // monte carlo metropolis condition
+    double weightedDecay;           // decay factor for weighted monte carlo
+    double maximumBondLength;       // Maximum bond length
+    double maximumAngle;            // Maximum angle between atoms
+    bool writeMovie;                // Write movie file or not
 
     std::unordered_set<int> fixedRings; // IDs of the fixed rings
     std::unordered_set<int> fixedNodes; // IDs of the fixed nodes
@@ -111,6 +111,10 @@ struct LinkedNetwork {
     bool checkAnglesWithinRange(const std::vector<int> &nodeIDs, const std::vector<double> &coords);
     bool checkBondLengths(const int &nodeID, const std::vector<double> &coords) const;
     bool checkBondLengths(const std::vector<int> &nodeIDs, const std::vector<double> &coords) const;
+
+    std::vector<double> getRingSizes() const;
+    double calculatePolygonArea(const std::vector<std::vector<double>> &vertices) const;
+    std::vector<double> getRingAreas() const;
 };
 
 #endif // NL_LINKED_NETWORK_H
