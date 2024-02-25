@@ -1,6 +1,5 @@
 #include "output_file.h"
 
-
 /**
  * @brief Constructor that wipes file if it exists and creates file if it doesn't exist
  * @throw std::runtime_error if file cannot be opened
@@ -36,15 +35,16 @@ void OutputFile::writeDatetime() {
 }
 
 /**
- * @brief Writes a message followed by the current date and time with a new line
+ * @brief Writes the current date and time followed by a message with a new line
+ * @param message The message to be written
  */
 void OutputFile::writeDatetime(const std::string &message) {
     auto now = std::chrono::system_clock::now();
     auto now_time_t = std::chrono::system_clock::to_time_t(now);
     std::tm localtime;
     localtime_r(&now_time_t, &localtime);
-    file << message;
-    file << std::put_time(&localtime, "%Y-%m-%d %H:%M:%S") << '\n';
+    file << std::put_time(&localtime, "%Y-%m-%d %H:%M:%S");
+    file << " " << message << '\n';
 }
 
 /**
