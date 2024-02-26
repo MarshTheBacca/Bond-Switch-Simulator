@@ -43,7 +43,9 @@ LoggerPtr initialiseLogger(int argc, char *argv[]) {
  */
 void runSimulation(const std::vector<double> &expTemperatures, LinkedNetwork &linkedNetwork,
                    OutputFile &allStatsFile, const int &writeInterval, LoggerPtr logger) {
-    for (int i = 1; i <= expTemperatures.size(); ++i) {
+    int totalSteps = expTemperatures.size();
+    int tenPercentSteps = totalSteps / 10;
+    for (int i = 1; i <= totalSteps; ++i) {
         linkedNetwork.metropolisCondition.setTemperature(expTemperatures[i]);
         logger->debug("Temperature: {:.2f}", expTemperatures[i]);
         linkedNetwork.monteCarloSwitchMoveLAMMPS();
@@ -51,6 +53,9 @@ void runSimulation(const std::vector<double> &expTemperatures, LinkedNetwork &li
             allStatsFile.writeValues(linkedNetwork.numSwitches, expTemperatures[i], linkedNetwork.energy,
                                      linkedNetwork.networkA.getEntropy(), linkedNetwork.networkA.getAssortativity(),
                                      linkedNetwork.networkA.getAboavWeaire(), linkedNetwork.getRingSizes(), linkedNetwork.getRingAreas());
+        }
+        if (i % tenPercentSteps == 0) {
+            logger->info("{}%", (i / static_cast<double>(totalSteps)) * 100);
         }
     }
 }
@@ -106,7 +111,7 @@ int main(int argc, char *argv[]) {
         OutputFile allStatsFile(prefixOut + "_all_stats.csv");
         allStatsFile.writeDatetime("Written by LAMMPS-NetMC (Marshall Hunt, Wilson Group, 2024)");
         allStatsFile.writeLine("The data is structured as follows: Each value is comma separated, with inner vectors having their elements separated by semi-colons");
-        std::string line = "For the ring size distribution, the sizes range from " + std::to_string(inputData.minRingSize) + " to " + std::to_string(inputData.maxRingSize);
+        std::string line = "For the ring size distribution, the sizes range from " + std::to_string(linkedNetwork.analysisMinBCnxs) + " to " + std::to_string(linkedNetwork.analysisMaxBCnxs);
         allStatsFile.writeLine(line);
         allStatsFile.writeLine("Step, Temperature, Energy, Entropy, Assortativity, Aboave Weaire, Ring Size Distribution (vector), Ring Areas (vector)");
 
