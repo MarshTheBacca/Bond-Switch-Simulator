@@ -373,9 +373,11 @@ void Network::addOrderedNetworkConnections(Network &dualNetwork) {
         }
     }
 }
-
+/**
+ * @brief Centres all nodes relative to their dual connections
+ * @param baseNetwork Base network to provide dual node IDs
+ */
 void Network::centreRings(const Network &baseNetwork) {
-    // Sync B coordinates
     std::vector<double> total(2, 0.0);
     for (int ringNode = 0; ringNode < nodes.size(); ++ringNode) {
         Node &selectedRingNode = nodes[ringNode];
@@ -514,7 +516,7 @@ double Network::getAssortativityOld() const {
 }
 
 // Estimate alpha parameter from degree correlation coefficient
-double Network::getAboavWeaireEstimate() {
+double Network::getAboavWeaireEstimate() const {
     /* Can derive by substituting aw law into equation for r */
     std::vector<double> p = getNodeDistribution();
     std::vector<double> k(p.size());
@@ -598,80 +600,183 @@ std::vector<int> Network::getCoordinations(const int &minCoordination, const int
     return ringSizes;
 }
 
-// Write network in format which can be loaded
-void Network::write(const std::string &prefix) {
-    // auxilary information
-    std::ofstream auxFile(prefix + "_aux.dat", std::ios::in | std::ios::trunc);
+/**
+ * @brief Write the aux file with number of nodes, connectivity limits, geometry code and dimensions
+ * @param auxFile File to write to
+ */
+void Network::writeAux(std::ofstream &auxFile) const {
     auxFile << std::fixed << std::showpoint << std::setprecision(1);
     auxFile << std::setw(10) << std::left << nodes.size() << std::endl;
-    auxFile << std::setw(10) << std::left << getMaxCnxs()
-            << std::setw(10) << std::left << getMaxDualCnxs() << std::endl;
+    auxFile << std::setw(10) << std::left << maxNetCnxs
+            << std::setw(10) << std::left << maxDualCnxs << std::endl;
     auxFile << std::setw(10) << std::left << geometryCode << std::endl;
     auxFile << std::fixed << std::showpoint << std::setprecision(6);
-    for (int i = 0; i < dimensions.size(); ++i)
-        auxFile << std::setw(20) << std::left << dimensions[i];
+    std::for_each(dimensions.begin(), dimensions.end(), [&auxFile](const double &dimension) {
+        auxFile << std::setw(20) << std::left << dimension;
+    });
     auxFile << std::endl;
-    for (int i = 0; i < reciprocalDimensions.size(); ++i)
-        auxFile << std::setw(20) << std::left << reciprocalDimensions[i];
+    std::for_each(reciprocalDimensions.begin(), reciprocalDimensions.end(), [&auxFile](const double &reciprocalDimension) {
+        auxFile << std::setw(20) << std::left << reciprocalDimension;
+    });
     auxFile << std::endl;
     auxFile.close();
-
-    // coordinates
-    std::ofstream crdFile(prefix + "_crds.dat", std::ios::in | std::ios::trunc);
-    crdFile << std::fixed << std::showpoint << std::setprecision(6);
-    for (int i = 0; i < nodes.size(); ++i) {
-        for (int j = 0; j < nodes[i].crd.size(); ++j) {
-            crdFile << std::setw(20) << std::left << nodes[i].crd[j];
-        }
-        crdFile << std::endl;
-    }
-    crdFile.close();
-
-    // network connections
-    std::ofstream netFile(prefix + "_net.dat", std::ios::in | std::ios::trunc);
-    netFile << std::fixed << std::showpoint << std::setprecision(1);
-    for (int i = 0; i < nodes.size(); ++i) {
-        for (int j = 0; j < nodes[i].netCnxs.size(); ++j) {
-            netFile << std::setw(20) << std::left << nodes[i].netCnxs[j];
-        }
-        netFile << std::endl;
-    }
-    netFile.close();
-
-    // dual connections
-    std::ofstream dualFile(prefix + "_dual.dat", std::ios::in | std::ios::trunc);
-    dualFile << std::fixed << std::showpoint << std::setprecision(1);
-    for (int i = 0; i < nodes.size(); ++i) {
-        for (int j = 0; j < nodes[i].dualCnxs.size(); ++j) {
-            dualFile << std::setw(20) << std::left << nodes[i].dualCnxs[j];
-        }
-        dualFile << std::endl;
-    }
-    dualFile.close();
 }
 
-int Network::getMaxCnxs() {
+/**
+ * @brief Write coordinates to a file
+ * @param crdFile File to write to
+ */
+void Network::writeCrds(std::ofstream &crdFile) const {
+    crdFile << std::fixed << std::showpoint << std::setprecision(6);
+    std::for_each(nodes.begin(), nodes.end(), [&crdFile](const Node &node) {
+        std::for_each(node.crd.begin(), node.crd.end(), [&crdFile](const double &crd) {
+            crdFile << std::setw(20) << std::left << crd;
+        });
+        crdFile << std::endl;
+    });
+    crdFile.close();
+}
+
+/**
+ * @brief Write connections to a file
+ * @param cnxFile File to write to
+ * @param cnxs Connections to write
+ */
+void Network::writeCnxs(std::ofstream &cnxFile, const std::vector<std::vector<int>> &cnxs) const {
+    cnxFile << std::fixed << std::showpoint << std::setprecision(1);
+    for (int i = 0; i < nodes.size(); ++i) {
+        std::for_each(cnxs[i].begin(), cnxs[i].end(), [&cnxFile](const int &cnx) {
+            cnxFile << std::setw(20) << std::left << cnx;
+        });
+        cnxFile << std::endl;
+    }
+    cnxFile.close();
+}
+
+/**
+ * @brief Get the net connections of the network
+ * @return 2D vector of net connections
+ */
+std::vector<std::vector<int>> Network::getNetCnxs() const {
+    std::vector<std::vector<int>> netCnxs(nodes.size());
+    for (int i = 0; i < nodes.size(); ++i) {
+        netCnxs[i] = nodes[i].netCnxs;
+    }
+    return netCnxs;
+}
+
+/**
+ * @brief Get the dual connections of the network
+ * @return 2D vector of dual connections
+ */
+std::vector<std::vector<int>> Network::getDualCnxs() const {
+    std::vector<std::vector<int>> dualCnxs(nodes.size());
+    for (int i = 0; i < nodes.size(); ++i) {
+        dualCnxs[i] = nodes[i].dualCnxs;
+    }
+    return dualCnxs;
+}
+
+/**
+ * @brief Write network to files
+ * @param prefix The path and prefix of files to write
+ */
+void Network::write(const std::string &prefix) const {
+    std::ofstream auxFile(prefix + "_aux.dat", std::ios::in | std::ios::trunc);
+    writeAux(auxFile);
+    std::ofstream crdFile(prefix + "_crds.dat", std::ios::in | std::ios::trunc);
+    writeCrds(crdFile);
+    std::ofstream netFile(prefix + "_net.dat", std::ios::in | std::ios::trunc);
+    writeCnxs(netFile, getNetCnxs());
+    std::ofstream dualFile(prefix + "_dual.dat", std::ios::in | std::ios::trunc);
+    writeCnxs(dualFile, getDualCnxs());
+}
+/**
+ * @brief Get the maximum coordination number for all nodes in the network
+ * @return Maximum number of connections
+ */
+int Network::getMaxCnxs() const {
     auto maxNode = std::max_element(nodes.begin(), nodes.end(), [](const Node &a, const Node &b) {
         return a.netCnxs.size() < b.netCnxs.size();
     });
     return maxNode->netCnxs.size();
 }
 
-int Network::getMinCnxs() {
+/**
+ * @brief Get the maximum coordination number for all nodes in the network, excluding those in excludeNodes
+ * @param excludeNodes The IDs of all the nodes to exclude
+ * @return Maximum number of connections
+ */
+int Network::getMaxCnxs(const std::unordered_set<int> &excludeNodes) const {
+    int maxCnxs = 0;
+    for (const auto &node : nodes) {
+        if (excludeNodes.find(node.id) != excludeNodes.end())
+            continue;
+        if (node.netCnxs.size() > maxCnxs)
+            maxCnxs = node.netCnxs.size();
+    }
+    return maxCnxs;
+}
+
+/**
+ * @brief Get the minimum number of connections of all nodes in the network
+ * @return Minimum number of connections
+ */
+int Network::getMinCnxs() const {
     auto minNode = std::min_element(nodes.begin(), nodes.end(), [](const Node &a, const Node &b) {
         return a.netCnxs.size() < b.netCnxs.size();
     });
     return minNode->netCnxs.size();
 }
 
-int Network::getMaxDualCnxs() {
+/**
+ * @brief Get the minimum number of connections of all nodes in the network, excluding those in excludeNodes
+ * @param fixedNodes The IDs of all the fixed nodes
+ * @return Minimum number of connections
+ */
+int Network::getMinCnxs(const std::unordered_set<int> &excludeNodes) const {
+    int minCnxs = std::numeric_limits<int>::max();
+    for (const auto &node : nodes) {
+        if (excludeNodes.find(node.id) != excludeNodes.end())
+            continue;
+        if (node.netCnxs.size() < minCnxs)
+            minCnxs = node.netCnxs.size();
+    }
+    return minCnxs;
+}
+
+/**
+ * @brief Get the maximum dual coordination number for all nodes in the network
+ * @return Maximum number of connections
+ */
+int Network::getMaxDualCnxs() const {
     auto maxNode = std::max_element(nodes.begin(), nodes.end(), [](const Node &a, const Node &b) {
         return a.dualCnxs.size() < b.dualCnxs.size();
     });
     return maxNode->dualCnxs.size();
 }
 
-int Network::getMinDualCnxs() {
+/**
+ * @brief Get the maximum dual coordination number for all nodes in the network, excluding those in excludeNodes
+ * @param excludeNodes The IDs of all the nodes to exclude
+ * @return Maximum number of connections
+ */
+int Network::getMinDualCnxs(const std::unordered_set<int> &excludeNodes) const {
+    int minCnxs = std::numeric_limits<int>::max();
+    for (const auto &node : nodes) {
+        if (excludeNodes.find(node.id) != excludeNodes.end())
+            continue;
+        if (node.dualCnxs.size() < minCnxs)
+            minCnxs = node.dualCnxs.size();
+    }
+    return minCnxs;
+}
+
+/**
+ * @brief Get the minimum dual coordination number for all nodes in the network
+ * @return Minimum number of connections
+ */
+int Network::getMinDualCnxs() const {
     auto minNode = std::min_element(nodes.begin(), nodes.end(), [](const Node &a, const Node &b) {
         return a.dualCnxs.size() < b.dualCnxs.size();
     });

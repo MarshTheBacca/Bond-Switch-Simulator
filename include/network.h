@@ -47,7 +47,7 @@ class Network {
     std::vector<std::vector<double>> getEdgeDistribution() const;    // proportion of each type of node
     std::tuple<double, double, double> getAboavWeaireParams() const; // calculate Aboav-Weaire parameters
     double getAssortativityOld() const;
-    double getAboavWeaireEstimate();
+    double getAboavWeaireEstimate() const;
     std::vector<double> getEntropyOld() const; // calculate entropy of node and edge distribution
 
     double getAssortativity() const;
@@ -56,13 +56,25 @@ class Network {
 
     std::vector<int> getCoordinations(const int &minRingSize, const int &maxRingSize) const;
 
-    void write(const std::string &prefix);
+    // Write functions
+    void writeAux(std::ofstream &auxFile) const;
+    void writeCrds(std::ofstream &crdFile) const;
+    void writeCnxs(std::ofstream &cnxFile, const std::vector<std::vector<int>> &cnxs) const;
+    std::vector<std::vector<int>> getNetCnxs() const;
+    std::vector<std::vector<int>> getDualCnxs() const;
+    void write(const std::string &prefix) const;
+
     bool r_ij(int i, int j, double cutoff);
 
-    int getMaxCnxs();
-    int getMinCnxs();
-    int getMaxDualCnxs();
-    int getMinDualCnxs();
+    int getMaxCnxs() const;
+    int getMaxCnxs(const std::unordered_set<int> &fixedNodes) const;
+
+    int getMinCnxs() const;
+    int getMinCnxs(const std::unordered_set<int> &fixedNodes) const;
+
+    int getMaxDualCnxs() const;
+    int getMinDualCnxs() const;
+    int getMinDualCnxs(const std::unordered_set<int> &fixedNodes) const;
 
     std::vector<double> getCoords();
     void centreRings(const Network &baseNetwork);
