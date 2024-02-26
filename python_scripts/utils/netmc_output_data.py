@@ -45,14 +45,14 @@ class NetMCOutputData:
         plt.plot(self.steps, self.temperatures)
         plt.title("Temperature change over time")
         plt.xlabel("Step")
-        plt.ylabel("Temperature (K)")
+        plt.ylabel("Temperature (au)")
         plt.show()
     
     def plot_entropy(self):
         plt.plot(self.steps, self.entropies)
         plt.title("Entropy change over time")
         plt.xlabel("Step")
-        plt.ylabel("Entropy (Hartrees)")
+        plt.ylabel("Entropy (Hartrees Temperature^-1)")
         plt.show()
     
     def plot_assortativity(self):
@@ -87,7 +87,13 @@ class NetMCOutputData:
         plt.legend(loc='upper left', bbox_to_anchor=(1, 1))
         plt.tight_layout()
         plt.show()
-                
+            
+    def plot_ring_areas(self):
+        plt.plot(self.steps, [np.mean(areas) for areas in self.ring_areas])
+        plt.title("Average Ring Area change over time")
+        plt.xlabel("Step")
+        plt.ylabel("Average Area (Bohr Radii^2)")
+        plt.show()
         
         
             
