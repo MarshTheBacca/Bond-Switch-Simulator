@@ -32,6 +32,8 @@ struct LinkedNetwork {
     Network networkA; // Base network
     int minACnxs;     // Minimum coordination number of base network
     int maxACnxs;     // Maximum coordination number of base network
+    int analysisMinBCnxs;
+    int analysisMaxBCnxs;
 
     std::vector<double> dimensions;   // Periodic boundary of network, xlo = ylo = 0, so dimensions = [xhi, yhi]
     std::vector<double> centreCoords; // Centre of network = [xhi / 2, yhi / 2]

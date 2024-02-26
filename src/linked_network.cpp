@@ -38,14 +38,32 @@ LinkedNetwork::LinkedNetwork(const InputData &inputData, LoggerPtr loggerArg) : 
     std::string prefix = inputData.inputFolder + '/' + inputData.inputFilePrefix;
     networkA = Network(prefix + "_A", inputData.maxRingSize, inputData.maxRingSize, logger);
     networkB = Network(prefix + "_B", inputData.maxRingSize, inputData.maxRingSize, logger);
+
+    if (inputData.isFixRingsEnabled) {
+        findFixedRings(inputData.inputFolder + "/fixed_rings.dat");
+        findFixedNodes();
+    } else {
+        logger->info("Fixed rings disabled, setting number of fixed rings to 0.");
+    }
+    std::unordered_set<int> excludeNodes;
+    for (const auto &fixedRingID : fixedRings) {
+        excludeNodes.insert(networkB.nodes[fixedRingID].netCnxs.begin(), networkB.nodes[fixedRingID].netCnxs.end());
+    }
+
     int loadedMinBCnxs = networkB.getMinCnxs();
     int loadedMaxBCnxs = networkB.getMaxCnxs();
 
     if (loadedMinBCnxs < minBCnxs) {
-        throw std::runtime_error("Loaded network has a min ring size of " + std::to_string(loadedMinBCnxs) + ", which is lower than input file's " + std::to_string(minBCnxs));
+        analysisMinBCnxs = loadedMinBCnxs;
+        logger->warn("Loaded network has a min ring size of {} which is lower than input file's {}", loadedMinBCnxs, minBCnxs);
+    } else {
+        analysisMinBCnxs = minBCnxs;
     }
     if (loadedMaxBCnxs > maxBCnxs) {
-        throw std::runtime_error("Loaded network has a max ring size of " + std::to_string(loadedMaxBCnxs) + ", which is higher than input file's " + std::to_string(maxBCnxs));
+        analysisMaxBCnxs = loadedMaxBCnxs;
+        logger->warn("Loaded network has a max ring size of {} which is higher than input file's {}", loadedMaxBCnxs, maxBCnxs);
+    } else {
+        analysisMaxBCnxs = maxBCnxs;
     }
 
     dimensions = networkA.dimensions;
@@ -68,12 +86,7 @@ LinkedNetwork::LinkedNetwork(const InputData &inputData, LoggerPtr loggerArg) : 
     else if (inputData.structureType == StructureType::BORON_NITRIDE)
     lammpsNetwork = LammpsObject("BN", inputData.inputFolder, logger);
     */
-    if (inputData.isFixRingsEnabled) {
-        findFixedRings(inputData.inputFolder + "/fixed_rings.dat");
-        findFixedNodes();
-    } else {
-        logger->info("Fixed rings disabled, setting number of fixed rings to 0.");
-    }
+
     writeMovie = inputData.writeMovie;
     if (writeMovie) {
         lammpsNetwork.startMovie();
@@ -206,7 +219,7 @@ void LinkedNetwork::monteCarloSwitchMoveLAMMPS() {
 
     logger->debug("Accepting or rejecting...");
     bool isAccepted = false;
-    if (checkAnglesWithinRange(std::vector<int>{bondBreaks[0], bondBreaks[2]}, lammpsCoords)) {
+    if (checkAnglesWithinRange(involvedNodes, lammpsCoords)) {
         if (checkBondLengths(involvedNodes, lammpsCoords)) {
             finalEnergy = lammpsNetwork.getPotentialEnergy();
             if (metropolisCondition.acceptanceCriterion(finalEnergy, initialEnergy, 1.0)) {
@@ -509,7 +522,7 @@ bool LinkedNetwork::genSwitchOperations(int baseNode1, int baseNode2, int ringNo
         logger->debug(" {:03}-----{:03}   {:03}  {:03}-----{:03}             {:03}-----{:03} {:03} {:03}-----{:03}", baseNode13, baseNode5, ringNode1, baseNode6, baseNode14, baseNode13, baseNode5, ringNode1, baseNode6, baseNode14);
         logger->debug("           \\        /                                 \\     /");
         logger->debug("            \\      /                                   \\   /");
-        logger->debug("              {:03}                                       {:03}", baseNode9, baseNode9);
+        logger->debug("               {:03}                                      {:03}", baseNode9, baseNode9);
         logger->debug("");
     } else {
         // 6+ membered ringNode1
@@ -1164,7 +1177,7 @@ std::tuple<std::vector<double>, std::vector<double>> LinkedNetwork::rotateBond(c
  * @return Vector of number of each ring size
  */
 std::vector<double> LinkedNetwork::getRingSizes() const {
-    std::vector<int> ringSizesInt = networkB.getCoordinations(minBCnxs, maxBCnxs);
+    std::vector<int> ringSizesInt = networkB.getCoordinations(analysisMinBCnxs, analysisMaxBCnxs);
     std::vector<double> ringSizes(ringSizesInt.begin(), ringSizesInt.end());
     vectorNormalise(ringSizes);
     return ringSizes;
