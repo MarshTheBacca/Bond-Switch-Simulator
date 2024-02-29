@@ -45,8 +45,6 @@ struct InputData {
     int numRings;
     int minRingSize;
     int maxRingSize;
-    int minCoordination;
-    int maxCoordination;
     bool isFixRingsEnabled;
 
     // Minimisation Protocols Data
@@ -76,6 +74,8 @@ struct InputData {
 
     LoggerPtr logger;
 
+    InputData(const std::string &filePath, const LoggerPtr &logger);
+
     // Declare template functions
     template <typename T>
     void readWord(const std::string &word, T &variable, const std::string &section) const;
@@ -98,7 +98,6 @@ struct InputData {
 
     void checkFileExists(const std::string &filename) const;
     void validate() const;
-    InputData(const std::string &filePath, const LoggerPtr &logger);
 };
 
 #include "input_data.tpp"

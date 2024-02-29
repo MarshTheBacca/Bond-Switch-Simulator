@@ -1,6 +1,37 @@
 #include "input_data.h"
 
 /**
+ * @brief Reads the input file
+ * @param filePath The path to the input file
+ * @param loggerArg The log file
+ */
+InputData::InputData(const std::string &filePath, const LoggerPtr &loggerArg) : inputFile(filePath), logger(loggerArg) {
+
+    // Check if the file was opened successfully
+    if (!inputFile.is_open()) {
+        throw std::runtime_error("Unable to open file: " + filePath);
+    }
+    logger->debug("Reading input file: " + filePath);
+
+    // Skip the title line
+    inputFile.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+    lineNumber++;
+
+    // Read sections
+    readIO();
+    readNetworkProperties();
+    readNetworkMinimisationProtocols();
+    readMonteCarloProcess();
+    readMonteCarloEnergySearch();
+    readPotentialModel();
+    readAnalysis();
+
+    // Validate input data
+    logger->debug("Validating input data...");
+    validate();
+}
+
+/**
  * @brief Converts a string to a boolean
  * @param str The string to be converted
  * @return The boolean value
@@ -20,7 +51,7 @@ bool InputData::stringToBool(const std::string &str) const {
  */
 std::string InputData::getFirstWord() {
     std::string line;
-    getline(inputFile, line);
+    std::getline(inputFile, line);
     lineNumber++;
     std::istringstream iss(line);
     std::string firstWord;
@@ -38,7 +69,7 @@ void InputData::readIO() {
 
 void InputData::readNetworkProperties() {
     readSection("Network Properties", numRings, minRingSize,
-                maxRingSize, minCoordination, maxCoordination, isFixRingsEnabled);
+                maxRingSize, isFixRingsEnabled);
 }
 
 void InputData::readNetworkMinimisationProtocols() {
@@ -85,8 +116,6 @@ void InputData::validate() const {
     checkInRange(numRings, 1, INT_MAX, "Number of rings must be at least 1");
     checkInRange(minRingSize, 3, INT_MAX, "Minimum ring size must be at least 3");
     checkInRange(maxRingSize, minRingSize, INT_MAX, "Maximum ring size must be at least the minimum ring size");
-    checkInRange(minCoordination, 1, INT_MAX, "Minimum coordination must be at least 1");
-    checkInRange(maxCoordination, minCoordination, INT_MAX, "Maximum coordination must be at least the minimum coordination");
 
     if (isFixRingsEnabled) {
         checkFileExists(inputFolder + "/fixed_rings.dat");
@@ -95,43 +124,24 @@ void InputData::validate() const {
     checkInRange(randomSeed, 0, INT_MAX, "Random seed must be at least 0");
 
     // Energy search
+    if (temperatureIncrement == 0.0) {
+        throw std::runtime_error("Temperature increment must be non-zero, otherwise you would have infinite steps");
+    }
     if (endTemperature < startTemperature && temperatureIncrement > 0) {
         throw std::runtime_error("Temperature increment must be negative if end temperature is less than start temperature");
     } else if (endTemperature > startTemperature && temperatureIncrement < 0) {
         throw std::runtime_error("Temperature increment must be positive if end temperature is greater than start temperature");
     }
+    if (stepsPerTemperature < 0) {
+        throw std::runtime_error("Steps per temperature must be at least 0");
+    }
 
     // Analysis
-    checkInRange(analysisWriteInterval, 0, 1000, "Analysis write frequency must be between 0 and 1000");
-}
-
-/**
- * @brief Reads the input file
- * @param filePath The path to the input file
- * @param logger The log file
- */
-InputData::InputData(const std::string &filePath, const LoggerPtr &loggerArg) : inputFile(filePath), logger(loggerArg) {
-
-    // Check if the file was opened successfully
-    if (!inputFile.is_open()) {
-        throw std::runtime_error("Unable to open file: " + filePath);
+    if (analysisWriteInterval < 0) {
+        throw std::runtime_error("Analysis write interval must be at least 0");
     }
-    logger->debug("Reading input file: " + filePath);
-
-    // Skip the title line
-    inputFile.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-    lineNumber++;
-
-    // Read sections
-    readIO();
-    readNetworkProperties();
-    readNetworkMinimisationProtocols();
-    readMonteCarloProcess();
-    readMonteCarloEnergySearch();
-    readPotentialModel();
-    readAnalysis();
-
-    // Validate input data
-    logger->debug("Validating input data...");
-    validate();
+    int totalSteps = (endTemperature - startTemperature) / temperatureIncrement * stepsPerTemperature + initialThermalisationSteps;
+    if (writeMovie && totalSteps > 2000) {
+        throw std::runtime_error("Cannot write a movie file for more than 2000 steps because the file would be enormous");
+    }
 }
