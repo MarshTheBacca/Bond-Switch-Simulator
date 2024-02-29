@@ -29,3 +29,28 @@ std::vector<double> pbcVector(const std::vector<double> &vector1, const std::vec
     }
     return differenceVector;
 }
+
+/**
+ * @brief Normalises the values of a map in place
+ * @tparam T The type of the map
+ */
+void normaliseMap(std::map<int, double> &map) {
+    double sum = std::accumulate(map.begin(), map.end(), 0.0, [](const double &a, const std::pair<int, double> &b) { return a + b.second; });
+    for (auto &[key, value] : map) {
+        value /= sum;
+    }
+}
+
+/**
+ * @brief Prints a nested map to the console
+ * @param map The map to print
+ */
+void showNestedMap(const std::map<int, std::map<int, double>> &map) {
+    for (const auto &[key, innerMap] : map) {
+        std::cout << key << ": {";
+        for (const auto &[innerKey, value] : innerMap) {
+            std::cout << innerKey << ": " << value << ", ";
+        }
+        std::cout << "}" << std::endl;
+    }
+}

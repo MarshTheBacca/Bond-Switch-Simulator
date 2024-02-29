@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cmath>
 #include <iostream>
+#include <map>
 #include <numeric>
 #include <sstream>
 #include <unordered_set>
@@ -67,9 +68,14 @@ std::vector<T> combineVectors(const std::vector<T> &vec1, const std::vector<T> &
 template <typename T>
 void vectorNormalise(const std::vector<T> &vec);
 
+template <typename T>
+std::unordered_set<T> setDifference(const std::unordered_set<T> &set1, const std::unordered_set<T> &set2);
+
 // Regular functions
 
 std::vector<double> pbcVector(const std::vector<double> &vector1, const std::vector<double> &vector2, const std::vector<double> &dimensions);
+void normaliseMap(std::map<int, double> &map);
+void showNestedMap(const std::map<int, std::map<int, double>> &map);
 
 #include "vector_tools.tpp"
 #endif // VEC_TOOLS_H

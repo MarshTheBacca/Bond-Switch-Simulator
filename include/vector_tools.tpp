@@ -240,6 +240,22 @@ std::string setToString(const std::unordered_set<T> &set) {
 }
 
 /**
+ * @brief Converts a map to a string
+ * @tparam T The type of the keys
+ * @tparam U The type of the values
+ * @param map The map to be converted
+ * @return A string representation of the map
+ */
+template <typename T, typename U>
+std::string mapToString(const std::unordered_map<T, U> &map) {
+    std::ostringstream oss;
+    for (const auto &value : map) {
+        oss << value.first << ": " << value.second << " ";
+    }
+    return oss.str();
+}
+
+/**
  * @brief Adds values to a vector
  * @tparam T The type of the vector
  * @tparam Args The type of the values to be added
@@ -266,7 +282,30 @@ std::vector<T> combineVectors(const std::vector<T> &vec1, const std::vector<T> &
     return result;
 }
 
+/**
+ * @brief Normalises a vector in place
+ * @tparam T The type of the vector
+ * @param vec The vector to be normalised
+ */
 template <typename T>
 void vectorNormalise(std::vector<T> &vec) {
     vectorDivide(vec, vectorSum(vec));
+}
+
+/**
+ * @brief Finds the difference between two sets
+ * @tparam T The type of the sets
+ * @param set1 The first set
+ * @param set2 The second set
+ * @return A set containing the values in set1 that are not in set2
+ */
+template <typename T>
+std::unordered_set<T> setDifference(const std::unordered_set<T> &set1, const std::unordered_set<T> &set2) {
+    std::unordered_set<T> result;
+    for (const auto &value : set1) {
+        if (set2.count(value) == 0) {
+            result.insert(value);
+        }
+    }
+    return result;
 }
