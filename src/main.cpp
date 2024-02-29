@@ -38,24 +38,36 @@ LoggerPtr initialiseLogger(int argc, char *argv[]) {
 
     return logger;
 }
+
 /**
  * @brief Attempts to switch the network at each temperature given in expTemperature
+ * @param expTemperatures The temperatures to switch at in raw form
+ * @param linkedNetwork The linked network to switch
+ * @param allStatsFile The file to write the statistics to
+ * @param writeInterval The interval to write the statistics
+ * @param logger The logger to log to
  */
 void runSimulation(const std::vector<double> &expTemperatures, LinkedNetwork &linkedNetwork,
-                   OutputFile &allStatsFile, const int &writeInterval, LoggerPtr logger) {
-    int totalSteps = expTemperatures.size();
-    int tenPercentSteps = totalSteps / 10;
-    for (int i = 1; i <= totalSteps; ++i) {
-        linkedNetwork.metropolisCondition.setTemperature(expTemperatures[i]);
-        logger->debug("Temperature: {:.2f}", expTemperatures[i]);
+                   OutputFile &allStatsFile, const int &writeInterval, const LoggerPtr &logger) {
+    if (expTemperatures.empty()) {
+        logger->warn("No temperatures given, simulation not run");
+        return;
+    }
+    double completion = 0.0;
+    for (size_t i = 1; i <= expTemperatures.size(); ++i) {
+        linkedNetwork.metropolisCondition.setTemperature(expTemperatures[i - 1]);
+        logger->debug("Temperature: {:.2f}", expTemperatures[i - 1]);
         linkedNetwork.monteCarloSwitchMoveLAMMPS();
         if (i % writeInterval == 0) {
-            allStatsFile.writeValues(linkedNetwork.numSwitches, expTemperatures[i], linkedNetwork.energy,
-                                     linkedNetwork.networkA.getEntropy(), linkedNetwork.networkA.getAssortativity(),
-                                     linkedNetwork.networkA.getAboavWeaire(), linkedNetwork.getRingSizes(), linkedNetwork.getRingAreas());
+            linkedNetwork.networkB.refreshStatistics();
+            allStatsFile.writeValues(linkedNetwork.numSwitches, expTemperatures[i - 1], linkedNetwork.energy,
+                                     linkedNetwork.networkB.entropy, linkedNetwork.networkB.pearsonsCoeff,
+                                     linkedNetwork.networkA.getAboavWeaire(), linkedNetwork.networkB.nodeSizes, linkedNetwork.getRingAreas());
         }
-        if (i % tenPercentSteps == 0) {
-            logger->info("{}%", (i / static_cast<double>(totalSteps)) * 100);
+        double currentCompletion = std::floor(static_cast<double>(i) / expTemperatures.size() / 0.1);
+        if (currentCompletion > completion) {
+            completion = currentCompletion;
+            logger->info("{:.0f}% Complete", completion * 10);
         }
     }
 }
@@ -76,7 +88,6 @@ int main(int argc, char *argv[]) {
 
         // Read input file
         InputData inputData("./netmc.inpt", logger);
-
         // Create output folder
         if (!std::filesystem::create_directory(inputData.outputFolder)) {
             logger->error("Error creating output folder {}", inputData.outputFolder);
@@ -89,11 +100,8 @@ int main(int argc, char *argv[]) {
         LinkedNetwork linkedNetwork;
         if (inputData.isFromScratchEnabled) {
             logger->debug("Creating linkedNetwork from scratch...");
-            logger->debug("numRings: {}, minCoordination: {}, maxCoordination: {}, "
-                          "minRingSize: {}, maxRingSize: {}",
-                          inputData.numRings, inputData.minCoordination,
-                          inputData.maxCoordination, inputData.minRingSize,
-                          inputData.maxRingSize);
+            logger->debug("numRings: {}, minRingSize: {}, maxRingSize: {}",
+                          inputData.numRings, inputData.minRingSize, inputData.maxRingSize);
             // Generate hexagonal linkedNetwork from scratch
             linkedNetwork = LinkedNetwork(inputData.numRings, logger);
         } else {
@@ -111,9 +119,7 @@ int main(int argc, char *argv[]) {
         OutputFile allStatsFile(prefixOut + "_all_stats.csv");
         allStatsFile.writeDatetime("Written by LAMMPS-NetMC (Marshall Hunt, Wilson Group, 2024)");
         allStatsFile.writeLine("The data is structured as follows: Each value is comma separated, with inner vectors having their elements separated by semi-colons");
-        std::string line = "For the ring size distribution, the sizes range from " + std::to_string(linkedNetwork.analysisMinBCnxs) + " to " + std::to_string(linkedNetwork.analysisMaxBCnxs);
-        allStatsFile.writeLine(line);
-        allStatsFile.writeLine("Step, Temperature, Energy, Entropy, Assortativity, Aboave Weaire, Ring Size Distribution (vector), Ring Areas (vector)");
+        allStatsFile.writeLine("Step, Temperature, Energy, Entropy, Pearson's Coefficient, Aboave Weaire, Ring Size Distribution (vector), Ring Areas (vector)");
 
         // Run monte carlo thermalisation
         std::vector<double>
@@ -132,6 +138,7 @@ int main(int argc, char *argv[]) {
                 annealingTemperatures.push_back(pow(10, temperature));
             }
         }
+
         logger->info("Annealing...");
         runSimulation(annealingTemperatures, linkedNetwork, allStatsFile, inputData.analysisWriteInterval, logger);
         logger->info("Simulation complete!");
@@ -139,7 +146,7 @@ int main(int argc, char *argv[]) {
         linkedNetwork.lammpsNetwork.stopMovie();
         logger->debug("Diagnosing simulation...");
         bool consistent = linkedNetwork.checkConsistency();
-        logger->debug("Network consistent: {}", consistent ? "true" : "false");
+        logger->debug("Network consistent (not yet implemented): {}", consistent ? "true" : "false");
 
         // Write files
         logger->debug("Writing files...");
