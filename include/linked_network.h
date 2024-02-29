@@ -6,6 +6,9 @@
 #include "lammps_object.h"
 #include "monte_carlo.h"
 #include "network.h"
+#include <algorithm>
+#include <chrono>
+#include <ctime>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -14,6 +17,7 @@
 #include <spdlog/spdlog.h>
 #include <sstream>
 #include <string_view>
+#include <unistd.h>
 
 using LoggerPtr = std::shared_ptr<spdlog::logger>;
 
@@ -26,14 +30,10 @@ struct LinkedNetwork {
     // Data members
 
     Network networkB; // Ring network
-    int minBCnxs;     // Minimum coordination number of ring network
-    int maxBCnxs;     // Maximum coordination number of ring network
+    int minRingSize;  // Minimum coordination number of ring network
+    int maxRingSize;  // Maximum coordination number of ring network
 
     Network networkA; // Base network
-    int minACnxs;     // Minimum coordination number of base network
-    int maxACnxs;     // Maximum coordination number of base network
-    int analysisMinBCnxs;
-    int analysisMaxBCnxs;
 
     std::vector<double> dimensions;   // Periodic boundary of network, xlo = ylo = 0, so dimensions = [xhi, yhi]
     std::vector<double> centreCoords; // Centre of network = [xhi / 2, yhi / 2]
@@ -45,15 +45,15 @@ struct LinkedNetwork {
 
     bool isOpenMPIEnabled;          // Whether to use MPI
     SelectionType selectionType;    // Either 'weighted' or 'random'
-    std::mt19937 mtGen;             // mersenne twister random number generator
+    std::mt19937 randomNumGen;      // mersenne twister random number generator
     Metropolis metropolisCondition; // monte carlo metropolis condition
     double weightedDecay;           // decay factor for weighted monte carlo
     double maximumBondLength;       // Maximum bond length
     double maximumAngle;            // Maximum angle between atoms
     bool writeMovie;                // Write movie file or not
 
-    std::unordered_set<int> fixedRings; // IDs of the fixed rings
-    std::unordered_set<int> fixedNodes; // IDs of the fixed nodes
+    std::unordered_map<int, int> fixedRings; // IDs of the fixed rings
+    std::unordered_set<int> fixedNodes;      // IDs of the fixed nodes
 
     int numSwitches = 0;            // Number of switches performed
     int numAcceptedSwitches = 0;    // Number of switches accepted
@@ -66,8 +66,8 @@ struct LinkedNetwork {
 
     // Constructors
     LinkedNetwork();
-    LinkedNetwork(const int &numRing, LoggerPtr logger);         // Construct hexagonal linked network from scratch
-    LinkedNetwork(const InputData &inputData, LoggerPtr logger); // Construct from files using an InputData object
+    LinkedNetwork(const int &numRing, const LoggerPtr &logger);         // Construct hexagonal linked network from scratch
+    LinkedNetwork(const InputData &inputData, const LoggerPtr &logger); // Construct from files using an InputData object
 
     void findFixedRings(const std::string &filename);
     void findFixedNodes();
@@ -82,20 +82,23 @@ struct LinkedNetwork {
     int findCommonRing(const int &baseNode1, const int &baseNode2, const int &excludeNode) const;
 
     void monteCarloSwitchMoveLAMMPS();
-    bool checkConsistency();           // check networks are consistent
-    bool checkCnxConsistency();        // check for mutual connections
-    bool checkDescriptorConsistency(); // check descriptors are accurate
+    void rejectMove(const std::vector<Node> &initialInvolvedNodesA, const std::vector<Node> &initialInvolvedNodesB,
+                    const std::vector<int> &bondBreaks, const std::vector<int> &bondMakes,
+                    const std::vector<int> &angleBreaks, const std::vector<int> &angleMakes);
+
+    bool checkConsistency();    // check networks are consistent
+    bool checkCnxConsistency(); // check for mutual connections
 
     void write(const std::string &prefix);
 
     void pushCoords(const std::vector<double> &coords);
     void showCoords(const std::vector<double> &coords) const;
-    void wrapCoords(std::vector<double> &coords) const; // generate convex ring intersection interactions
+    void wrapCoords(std::vector<double> &coords) const;
 
     bool genSwitchOperations(int baseNode1, int baseNode2, int ringNode1, int ringNode2,
                              std::vector<int> &bondBreaks, std::vector<int> &bondMakes,
                              std::vector<int> &angleBreaks, std::vector<int> &angleMakes,
-                             std::vector<int> &ringBondBreakMake, std::vector<int> &convexCheckIDs);
+                             std::vector<int> &ringBondBreakMake, std::unordered_set<int> &convexCheckIDs);
 
     void switchNetMCGraphene(const std::vector<int> &bondBreaks, const std::vector<int> &ringBondBreakMake);
     void revertNetMCGraphene(const std::vector<Node> &initialInvolvedNodesA, const std::vector<Node> &initialInvolvedNodesB);
@@ -110,11 +113,11 @@ struct LinkedNetwork {
     void arrangeNeighboursClockwise(const int &nodeID, const std::vector<double> &coords);
 
     bool checkAnglesWithinRange(const std::vector<double> &coords);
-    bool checkAnglesWithinRange(const std::vector<int> &nodeIDs, const std::vector<double> &coords);
+    bool checkAnglesWithinRange(const std::unordered_set<int> &nodeIDs, const std::vector<double> &coords);
     bool checkBondLengths(const int &nodeID, const std::vector<double> &coords) const;
-    bool checkBondLengths(const std::vector<int> &nodeIDs, const std::vector<double> &coords) const;
+    bool checkBondLengths(const std::unordered_set<int> &nodeIDs, const std::vector<double> &coords) const;
 
-    std::vector<double> getRingSizes() const;
+    std::map<int, double> getRingSizes() const;
     double calculatePolygonArea(const std::vector<std::vector<double>> &vertices) const;
     std::vector<double> getRingAreas() const;
 };
