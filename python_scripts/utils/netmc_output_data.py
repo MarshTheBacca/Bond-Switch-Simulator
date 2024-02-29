@@ -15,7 +15,7 @@ class NetMCOutputData:
         self.temperatures = [] 
         self.energies = []
         self.entropies = []
-        self.assortativities = []
+        self.pearson_coeffs = []
         self.aboav_weaires = []
         self.ring_sizes = []
         self.ring_areas = []
@@ -29,9 +29,9 @@ class NetMCOutputData:
             self.temperatures.append(float(line[1]))
             self.energies.append(float(line[2]))
             self.entropies.append(float(line[3]))
-            self.assortativities.append(float(line[4]))
+            self.pearson_coeffs.append(float(line[4]))
             self.aboav_weaires.append(float(line[5]))
-            self.ring_sizes.append([float(proportion) for proportion in line[6].split(";")])
+            self.ring_sizes.append({int(ring_size): float(proportion) for ring_size, proportion in (pair.split(":") for pair in line[6].split(";"))})
             self.ring_areas.append([float(area) for area in line[7].split(";")])
             
     def plot_energy(self):
@@ -55,11 +55,12 @@ class NetMCOutputData:
         plt.ylabel("Entropy (Hartrees Temperature^-1)")
         plt.show()
     
-    def plot_assortativity(self):
-        plt.plot(self.steps, self.assortativities)
-        plt.title("Assortativity change over time")
+    def plot_pearsons_coeffs(self):
+        plt.plot(self.steps, self.pearson_coeffs)
+        plt.ylim(-1, 1)
+        plt.title("Pearson's Correlation Coefficient change over time")
         plt.xlabel("Step")
-        plt.ylabel("Assortativity")
+        plt.ylabel("Pearson's Correlation Coefficient")
         plt.show()
     
     def plot_aboav_weaire(self):
@@ -70,9 +71,17 @@ class NetMCOutputData:
         plt.show()
         
     def plot_ring_sizes(self):
-        ring_sizes_transposed = list(map(list, zip(*self.ring_sizes)))
+        # Get all unique ring sizes across all steps
+        all_ring_sizes = sorted(set(k for d in self.ring_sizes for k in d.keys()))
+
+        # Create a 2D list where each sublist represents a ring size over time
+        ring_sizes_transposed = [[step.get(ring_size, 0) for step in self.ring_sizes] for ring_size in all_ring_sizes]
+
+        # Filter out ring sizes that are always zero
         ring_sizes_filtered = [ring for ring in ring_sizes_transposed if sum(ring) > 0]
-        ring_labels = ['Ring Size ' + str(i + 3) for i, ring in enumerate(ring_sizes_transposed) if sum(ring) > 0]
+
+        # Create labels for the ring sizes
+        ring_labels = ['Ring Size ' + str(ring_size) for ring_size, ring in zip(all_ring_sizes, ring_sizes_transposed) if sum(ring) > 0]
 
         plt.stackplot(self.steps, *ring_sizes_filtered, labels=ring_labels)
         plt.title('Proportion of Ring Sizes per Step')
