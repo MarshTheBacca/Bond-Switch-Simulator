@@ -32,6 +32,7 @@ All the parameters are read by ignoring all characters after the first white spa
 
 ### Minimisation Procols
 `Enable OpenMPI?` *Sets the program up to work on multiple threads
+
 `Structure Type` Has to be one of the following: Graphene, Silicene, *TriangleRaft, *Bilayer or *BoronNitride
 
 ### Monte Carlo Process
@@ -55,9 +56,9 @@ All the parameters are read by ignoring all characters after the first white spa
 `Thermalisation Steps` The number of steps for thermalisation
 
 ### Potential Model
-`Maximum Bond Length` The maximum bond length allowed for the final state of nodes in involved in a switch (Bohr Radii)
+`Maximum Bond Length` The maximum bond length allowed for the final state of nodes involved in a switch (Bohr Radii)
 
-`Maximum Angle` The maximum angle allowed for the final state of nodes in involved in a switch
+`Maximum Angle` The maximum angle allowed for the final state of nodes involved in a switch
 
 ### Analysis
 `Analysis Write Interval` Dictates how often analysis is written to prefix_all_stats.csv in steps (small performance hit ~1.2x slower)
