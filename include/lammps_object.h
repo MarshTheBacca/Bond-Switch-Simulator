@@ -45,8 +45,10 @@ class LammpsObject {
     std::string prefixOut;
     std::vector<int> angleHelper;
 
+    LoggerPtr logger;
+
     LammpsObject();
-    LammpsObject(const std::string &selector, const std::string &inputFolder, LoggerPtr logger);
+    LammpsObject(const std::string &selector, const std::string &inputFolderArg, const LoggerPtr &loggerArg);
 
     void write_data(const std::string &structureName);
     void write_restart(const std::string &structureName);
@@ -56,18 +58,18 @@ class LammpsObject {
 
     void breakBond(const int &atom1, const int &atom2, const int &type);
     void formBond(const int &atom1, const int &atom2, const int &type);
-    void breakAngle(const int &atom1, const int &atom2, const int &atom3, LoggerPtr logger);
-    void formAngle(const int &atom1, const int &atom2, const int &atom3, LoggerPtr logger);
+    void breakAngle(const int &atom1, const int &atom2, const int &atom3);
+    void formAngle(const int &atom1, const int &atom2, const int &atom3);
     void breakAndFormAngles(int atom3, int atom1, int atom5, int atom4, int e1, int e11, int d1, int d11);
-    std::pair<int, int> identifyAtoms(int atomA, int atomB, Network networkAArg, LoggerPtr logger);
+    std::pair<int, int> identifyAtoms(int atomA, int atomB, Network networkAArg);
 
     void switchGraphene(const std::vector<int> &bondBreaks, const std::vector<int> &bondMakes,
                         const std::vector<int> &angleBreaks, const std::vector<int> &angleMakes,
-                        const std::vector<double> &rotatedCoord1, const std::vector<double> &rotatedCoord2, LoggerPtr logger);
+                        const std::vector<double> &rotatedCoord1, const std::vector<double> &rotatedCoord2);
     void revertGraphene(const std::vector<int> &bondBreaks, const std::vector<int> &bondMakes,
-                        const std::vector<int> &angleBreaks, const std::vector<int> &angleMakes, LoggerPtr logger);
+                        const std::vector<int> &angleBreaks, const std::vector<int> &angleMakes);
     std::vector<int> getAngles() const;
-    void showAngles(const int &numLines, LoggerPtr logger) const;
+    void showAngles(const int &numLines) const;
     bool checkAngleUnique(const int &atom1, const int &atom2, const int &atom3) const;
 
     void minimiseNetwork();

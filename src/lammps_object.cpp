@@ -10,9 +10,9 @@ LammpsObject::LammpsObject() = default;
  * @brief Constructor for a Lammps Object
  * @param selector The selector for the structure to be created
  * @param inputFolder The folder containing the input files
- * @param logger The logger object
+ * @param loggerArg The logger object
  */
-LammpsObject::LammpsObject(const std::string &structureName, const std::string &inputFolder, LoggerPtr logger) {
+LammpsObject::LammpsObject(const std::string &structureName, const std::string &inputFolder, const LoggerPtr &loggerArg) : logger(loggerArg) {
     logger->debug("Creating Lammps Object");
     const char *lmpargv[] = {"liblammps", "-screen", "none"};
     int lmpargc = sizeof(lmpargv) / sizeof(const char *);
@@ -20,7 +20,6 @@ LammpsObject::LammpsObject(const std::string &structureName, const std::string &
     handle = lammps_open_no_mpi(lmpargc, const_cast<char **>(lmpargv), nullptr);
 
     if (handle == nullptr) {
-        logger->critical("LAMMPS initialization failed");
         lammps_mpi_finalize();
         throw std::runtime_error("LAMMPS initialization failed");
     }
@@ -36,7 +35,6 @@ LammpsObject::LammpsObject(const std::string &structureName, const std::string &
         {"BN", "BN.in"}};
 
     if (selectorToFile.find(structureName) == selectorToFile.end()) {
-        logger->critical("Invalid Selector");
         throw std::runtime_error("Invalid Selector");
     }
 
@@ -136,10 +134,9 @@ void LammpsObject::formBond(const int &atom1, const int &atom2, const int &type)
  * @param atom1 The first atom in the angle
  * @param atom2 The second atom in the angle
  * @param atom3 The third atom in the angle
- * @param logger The logger object
  * @throws std::runtime_error if the angle count doesn't decrease
  */
-void LammpsObject::breakAngle(const int &atom1, const int &atom2, const int &atom3, LoggerPtr logger) {
+void LammpsObject::breakAngle(const int &atom1, const int &atom2, const int &atom3) {
     // logger->debug("Breaking angle between {}, {}, {}", atom1, atom2, atom3);
     double initialAngleCount = lammps_get_thermo(handle, "angles");
     double finalAngleCount;
@@ -166,8 +163,8 @@ void LammpsObject::breakAngle(const int &atom1, const int &atom2, const int &ato
             // This means that when you have a triangle of atoms and delete one angle, it deletes all three angles
             // So we have to add the other two angles back in
             logger->warn("Triangle angle broken, adding the other two angles back in");
-            formAngle(atom1, atom3, atom2, logger);
-            formAngle(atom2, atom1, atom3, logger);
+            formAngle(atom1, atom3, atom2);
+            formAngle(atom2, atom1, atom3);
             // Store the other two angles in a helper vector for later use
             angleHelper = {atom1, atom3, atom2, atom2, atom1, atom3};
             return;
@@ -182,12 +179,12 @@ void LammpsObject::breakAngle(const int &atom1, const int &atom2, const int &ato
             if ((atom1 == angleHelper[0] && atom2 == angleHelper[1] && atom3 == angleHelper[2]) ||
                 (atom1 == angleHelper[2] && atom2 == angleHelper[1] && atom3 == angleHelper[0])) {
                 // If the current angle is the first angle in the angleHelper vector, then add the second angle in the angleHelper vector
-                formAngle(angleHelper[3], angleHelper[4], angleHelper[5], logger);
+                formAngle(angleHelper[3], angleHelper[4], angleHelper[5]);
                 return;
             } else if ((atom1 == angleHelper[3] && atom2 == angleHelper[4] && atom3 == angleHelper[5]) ||
                        (atom1 == angleHelper[5] && atom2 == angleHelper[4] && atom3 == angleHelper[3])) {
                 // If the current angle is the second angle in the angleHelper vector, then add the first angle in the angleHelper vector
-                formAngle(angleHelper[0], angleHelper[1], angleHelper[2], logger);
+                formAngle(angleHelper[0], angleHelper[1], angleHelper[2]);
                 return;
             } else {
                 std::ostringstream oss;
@@ -215,9 +212,8 @@ void LammpsObject::breakAngle(const int &atom1, const int &atom2, const int &ato
  * @param atom1 The first atom in the angle
  * @param atom2 The second atom in the angle
  * @param atom3 The third atom in the angle
- * @param logger The logger object
  */
-void LammpsObject::formAngle(const int &atom1, const int &atom2, const int &atom3, LoggerPtr logger) {
+void LammpsObject::formAngle(const int &atom1, const int &atom2, const int &atom3) {
     // logger->debug("Forming angle between {}, {}, {}", atom1, atom2, atom3);
     if (atom1 == atom2 || atom1 == atom3 || atom2 == atom3) {
         std::ostringstream oss;
@@ -248,11 +244,10 @@ void LammpsObject::formAngle(const int &atom1, const int &atom2, const int &atom
  * @param bondMakes The IDs of the bonds to be made (1D vector of pairs)
  * @param angleBreaks The IDs of the angles to be broken (1D vector of triples)
  * @param angleMakes The IDs of the angles to be made (1D vector of triples)
- * @param logger The logger object
  */
 void LammpsObject::switchGraphene(const std::vector<int> &bondBreaks, const std::vector<int> &bondMakes,
                                   const std::vector<int> &angleBreaks, const std::vector<int> &angleMakes,
-                                  const std::vector<double> &rotatedCoord1, const std::vector<double> &rotatedCoord2, LoggerPtr logger) {
+                                  const std::vector<double> &rotatedCoord1, const std::vector<double> &rotatedCoord2) {
     for (int i = 0; i < bondBreaks.size(); i += 2) {
         breakBond(bondBreaks[i] + 1, bondBreaks[i + 1] + 1, 1);
     }
@@ -260,10 +255,10 @@ void LammpsObject::switchGraphene(const std::vector<int> &bondBreaks, const std:
         formBond(bondMakes[i] + 1, bondMakes[i + 1] + 1, 1);
     }
     for (int i = 0; i < angleBreaks.size(); i += 3) {
-        breakAngle(angleBreaks[i] + 1, angleBreaks[i + 1] + 1, angleBreaks[i + 2] + 1, logger);
+        breakAngle(angleBreaks[i] + 1, angleBreaks[i + 1] + 1, angleBreaks[i + 2] + 1);
     }
     for (int i = 0; i < angleMakes.size(); i += 3) {
-        formAngle(angleMakes[i] + 1, angleMakes[i + 1] + 1, angleMakes[i + 2] + 1, logger);
+        formAngle(angleMakes[i] + 1, angleMakes[i + 1] + 1, angleMakes[i + 2] + 1);
     }
     int atom1ID = bondBreaks[0] + 1;
     int atom2ID = bondBreaks[2] + 1;
@@ -276,10 +271,9 @@ void LammpsObject::switchGraphene(const std::vector<int> &bondBreaks, const std:
  * @param bondMakes The IDs of the bonds that have been made (1D vector of pairs)
  * @param angleBreaks The IDs of the angles that have been broken (1D vector of triples)
  * @param angleMakes The IDs of the angles that have been made (1D vector of triples)
- * @param logger The logger object
  */
 void LammpsObject::revertGraphene(const std::vector<int> &bondBreaks, const std::vector<int> &bondMakes,
-                                  const std::vector<int> &angleBreaks, const std::vector<int> &angleMakes, LoggerPtr logger) {
+                                  const std::vector<int> &angleBreaks, const std::vector<int> &angleMakes) {
     for (int i = 0; i < bondMakes.size(); i += 2) {
         breakBond(bondMakes[i] + 1, bondMakes[i + 1] + 1, 1);
     }
@@ -287,10 +281,10 @@ void LammpsObject::revertGraphene(const std::vector<int> &bondBreaks, const std:
         formBond(bondBreaks[i] + 1, bondBreaks[i + 1] + 1, 1);
     }
     for (int i = 0; i < angleMakes.size(); i += 3) {
-        breakAngle(angleMakes[i] + 1, angleMakes[i + 1] + 1, angleMakes[i + 2] + 1, logger);
+        breakAngle(angleMakes[i] + 1, angleMakes[i + 1] + 1, angleMakes[i + 2] + 1);
     }
     for (int i = 0; i < angleBreaks.size(); i += 3) {
-        formAngle(angleBreaks[i] + 1, angleBreaks[i + 1] + 1, angleBreaks[i + 2] + 1, logger);
+        formAngle(angleBreaks[i] + 1, angleBreaks[i + 1] + 1, angleBreaks[i + 2] + 1);
     }
 }
 
@@ -385,7 +379,7 @@ std::vector<int> LammpsObject::getAngles() const {
     return angles;
 }
 
-void LammpsObject::showAngles(const int &numLines, LoggerPtr logger) const {
+void LammpsObject::showAngles(const int &numLines) const {
     std::vector<int> angles = getAngles();
     for (int i = 0; i < numLines; ++i) {
         logger->info("Angle: {:03} {:03} {:03}", angles[i * 3], angles[i * 3 + 1], angles[i * 3 + 2]);
