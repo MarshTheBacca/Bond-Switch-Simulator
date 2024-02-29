@@ -1,9 +1,9 @@
 LAMMPS-NetMC input file
 --------------------------------------------------
 I/O
-./output_files  Output Folder prefix
+./output_files      Output Folder
 test            	Output File prefix
-./input_files       Input Folder prefix
+./input_files       Input Folder
 gi_test            	Input File prefix
 false               Create Network from scratch?
 --------------------------------------------------
@@ -11,9 +11,7 @@ Network Properties
 1588        Number of rings
 4           min ring size
 30          max ring size
-3           min node coordination
-3           max node coordination
-true       Enable fix rings?
+true       Enable fixed rings?
 --------------------------------------------------
 Minimisation Protocols
 true            Enable OpenMPI?
@@ -21,22 +19,22 @@ Silicene        Structure Type (Graphene, Silicene, TriangleRaft, Bilayer or Bor
 --------------------------------------------------
 Monte Carlo Process
 0           random seed
-Weighted      Process for choosing bonds to switch (Random, Weighted)
+Random      Process for choosing bonds to switch (Random, Weighted)
 25         weighted decay, if using weighted
 --------------------------------------------------
 Monte Carlo Energy Search
 2            start temperature (10^x)
--2.0         end temperature (10^x)
--0.1         temperature increment (10^x)
-10           thermalisation temperature (10^x)
-100          steps per temperature
-100          themalisation steps
+-5         end temperature (10^x)
+-0.1        temperature increment (10^x)
+6           thermalisation temperature (10^x)
+100         steps per temperature
+1000         themalisation steps
 --------------------------------------------------
 Potential Model
 3.5         Maximum bond length
-175         Maximum angle
+160         Maximum angle
 --------------------------------------------------
 Analysis
-1           analysis write frequency
+2           analysis write interval (Steps)
 false       Write a movie file? (takes ~15x longer)
 --------------------------------------------------
