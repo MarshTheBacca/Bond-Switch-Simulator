@@ -1,8 +1,5 @@
 #include "network.h"
 
-const int TRIANGULAR_NODE_NET_CNXS = 6;
-const int TRIANGULAR_NODE_DUAL_CNXS = 6;
-
 /**
  * @brief Calculate the rounded square root of a number
  * @param num Number to calculate the rounded square root of
@@ -15,56 +12,14 @@ inline int roundedSqrt(const int &num) {
 /**
  * @brief default constructor
  */
-Network::Network() : maxNetCnxs(0), maxDualCnxs(0), dimensions(2), reciprocalDimensions(2), geometryCode("") {
-    nodes.reserve(0);
-}
-/**
- * @brief Construct a network with a given number of nodes and max coordination
- * @param numNodes Number of nodes
- * @param maxCnxs Maximum number of connections (net and dual)
- */
-Network::Network(const int &numNodes, const int &maxCnxs) {
-    nodes.reserve(numNodes);
-    for (int i = 0; i < numNodes; ++i) {
-        Node node(i, maxCnxs, maxCnxs);
-        nodes.push_back(node);
-    }
-}
+Network::Network() = default;
+
 /**
  * @brief Construct a triangular lattice
  * @param nNodes Number of nodes
  */
 Network::Network(const int &nNodes) {
     initialiseTriangularLattice(roundedSqrt(nNodes));
-    initialiseDescriptors(TRIANGULAR_NODE_NET_CNXS);
-}
-
-/**
- * @brief Initialise node and edge distribution
- * @param maxCnxs Maximum number of connections
- * @param logger Logger to log to
- */
-void Network::initialiseDescriptors(const int &maxCnxs) {
-    // Set sizes of vectors and matrices
-    nodeDistribution = std::vector<int>(maxCnxs + 1);
-    edgeDistribution = std::vector<std::vector<int>>(maxCnxs + 1);
-    for (int i = 0; i < maxCnxs + 1; ++i)
-        edgeDistribution[i] = std::vector<int>(maxCnxs + 1);
-
-    // Count number of each node type and add to vector
-    std::for_each(nodes.begin(), nodes.end(), [this](const Node &node) {
-        ++nodeDistribution[node.netCnxs.size()];
-    });
-
-    // Double count number of each edge type and add to vector
-    std::for_each(nodes.begin(), nodes.end(), [this](const Node &node) {
-        int netCnxs_n_i = node.netCnxs.size();
-        for (int j = 0; j < netCnxs_n_i; ++j) {
-            int netCnxs_j = node.netCnxs[j];
-            int netCnxs_n_j = nodes[netCnxs_j].netCnxs.size();
-            ++edgeDistribution[netCnxs_n_i][netCnxs_n_j];
-        }
-    });
 }
 
 /**
@@ -75,55 +30,40 @@ void Network::initialiseDescriptors(const int &maxCnxs) {
  * @param logger Logger to log to
  * @throw std::runtime_error if cannot open aux file, crds file, net file or dual file
  */
-Network::Network(const std::string &pathPrefix, const int &maxBaseCoordinationArg,
-                 const int &maxDualCoordinationArg, LoggerPtr logger) {
+Network::Network(const std::string &pathPrefix, const LoggerPtr &logger) {
     logger->debug("Reading aux file {} ...", pathPrefix + "_aux.dat");
 
     // Initialise variables with aux file information
     std::istringstream ss("");
     std::ifstream auxFile(pathPrefix + "_aux.dat", std::ios::in);
     if (!auxFile.is_open()) {
-        logger->critical("Aux file not found!");
         throw std::runtime_error("Aux file not found!");
     }
 
-    int nNodes;
+    int numNodes;
     std::string line;
-    getline(auxFile, line);
-    std::istringstream(line) >> nNodes;
-    logger->debug("Number of nodes: {}", nNodes);
-    getline(auxFile, line);
-    ss.str(line);
-    ss >> maxNetCnxs;
-    ss >> maxDualCnxs;
+    std::getline(auxFile, line);
+    std::istringstream(line) >> numNodes;
+    logger->debug("Number of nodes: {}", numNodes);
+    std::getline(auxFile, line);
 
-    if (maxNetCnxs < maxBaseCoordinationArg)
-        maxNetCnxs = maxBaseCoordinationArg;
-    if (maxDualCnxs < maxDualCoordinationArg)
-        maxDualCnxs = maxDualCoordinationArg;
-
-    if (maxDualCnxs > 12) {
-        maxNetCnxs += 20;
-        maxDualCnxs += 20;
-    }
-    logger->debug("Max Net/Dual Connections: {} {}", maxNetCnxs, maxDualCnxs);
-    getline(auxFile, line);
+    std::getline(auxFile, line);
     std::istringstream(line) >> geometryCode;
     dimensions = std::vector<double>(2);
     reciprocalDimensions = std::vector<double>(2);
-    getline(auxFile, line);
+    std::getline(auxFile, line);
     ss.str(line);
     ss >> dimensions[0];
     ss >> dimensions[1];
-    getline(auxFile, line);
+    std::getline(auxFile, line);
     ss.str(line);
     ss >> reciprocalDimensions[0];
     ss >> reciprocalDimensions[1];
     auxFile.close();
 
-    nodes.reserve(nNodes);
-    for (int i = 0; i < nNodes; ++i) {
-        Node node(i, maxNetCnxs, maxDualCnxs);
+    nodes.reserve(numNodes);
+    for (int i = 0; i < numNodes; ++i) {
+        Node node(i);
         nodes.push_back(node);
     }
 
@@ -177,9 +117,7 @@ Network::Network(const std::string &pathPrefix, const int &maxBaseCoordinationAr
     dualFile.close();
 
     // Set up descriptors
-    logger->debug("Max net connections: {}", maxNetCnxs);
     logger->debug("Number of nodes: {}", nodes.size());
-    initialiseDescriptors(maxNetCnxs);
 }
 
 // Initialise triangular lattice of periodic 6-coordinate nodes
@@ -190,7 +128,7 @@ void Network::initialiseTriangularLattice(const int &dim) {
     // make 6 coordinate nodes
     nodes.reserve(dimSq);
     for (int i = 0; i < nodes.size(); ++i) {
-        Node node(i, TRIANGULAR_NODE_NET_CNXS, TRIANGULAR_NODE_DUAL_CNXS);
+        Node node(i);
         nodes.push_back(node);
     }
 
@@ -302,7 +240,7 @@ void Network::addDualConnections(const int &y, const int &id, const int &dim, co
 
 Network Network::constructDual(const int &maxCnxs) {
     int numberOfUniqueDualNodes = findNumberOfUniqueDualNodes();
-    Network dualNetwork(numberOfUniqueDualNodes, maxCnxs);
+    Network dualNetwork(numberOfUniqueDualNodes);
 
     addUnorderedDualConnections(dualNetwork);
     orderDualConnections(dualNetwork);
@@ -313,12 +251,11 @@ Network Network::constructDual(const int &maxCnxs) {
     dualNetwork.dimensions = dimensions;
     dualNetwork.reciprocalDimensions = reciprocalDimensions;
     dualNetwork.geometryCode = geometryCode;
-    dualNetwork.initialiseDescriptors(maxCnxs);
 
     return dualNetwork;
 }
 /**
- * @brief Find the number of unique dual nodes in the entire network
+ * @brief Find the number of unique dual nodes in all the node's dualCnxs
  * @return Number of unique dual nodes
  */
 int Network::findNumberOfUniqueDualNodes() {
@@ -344,7 +281,7 @@ void Network::addUnorderedDualConnections(Network &dualNetwork) {
 void Network::orderDualConnections(Network &dualNetwork) {
     for (int i = 0; i < dualNetwork.nodes.size(); ++i) {
         std::vector<int> initialDualCnxs = dualNetwork.nodes[i].dualCnxs;
-        std::vector<int> orderedCnxs(maxDualCnxs);
+        std::vector<int> orderedCnxs;
         orderedCnxs.push_back(initialDualCnxs[0]);
         for (int j = 1; j < initialDualCnxs.size(); ++j) {
             std::unordered_set<int> common = intersectVectors(nodes[orderedCnxs[j - 1]].netCnxs, initialDualCnxs);
@@ -373,6 +310,7 @@ void Network::addOrderedNetworkConnections(Network &dualNetwork) {
         }
     }
 }
+
 /**
  * @brief Centres all nodes relative to their dual connections
  * @param baseNetwork Base network to provide dual node IDs
@@ -407,7 +345,10 @@ void Network::centreRings(const Network &baseNetwork) {
     }
 }
 
-// Rescale coordinates and lattice dimensions
+/**
+ * @brief Rescale the network by a given factor
+ * @param scaleFactor Factor to rescale by
+ */
 void Network::rescale(const double &scaleFactor) {
     vectorMultiply(dimensions, scaleFactor);
     vectorDivide(reciprocalDimensions, scaleFactor);
@@ -416,188 +357,131 @@ void Network::rescale(const double &scaleFactor) {
     });
 }
 
-// Get proportion of nodes of each size
-std::vector<double> Network::getNodeDistribution() const {
-    std::vector<double> nodeDistributionDouble(nodeDistribution.begin(), nodeDistribution.end());
-    vectorNormalise(nodeDistributionDouble);
-    return nodeDistributionDouble;
-}
-
-// Get proportion of edges with a node of each size at each end
-std::vector<std::vector<double>> Network::getEdgeDistribution() const {
-    std::vector<std::vector<double>> normalisedDist(edgeDistribution.size());
-    double sum = 0.0;
-    for (int i = 0; i < edgeDistribution.size(); ++i) {
-        normalisedDist[i] = std::vector<double>(edgeDistribution[i].size());
-        for (int j = 0; j < edgeDistribution[i].size(); ++j)
-            normalisedDist[i][j] = edgeDistribution[i][j];
-        sum += vectorSum(edgeDistribution[i]);
-    }
-    for (int i = 0; i < edgeDistribution.size(); ++i)
-        vectorDivide(normalisedDist[i], sum);
-
-    return normalisedDist;
-}
-
-// Calculate Aboav-Weaire fitting parameters
-std::tuple<double, double, double> Network::getAboavWeaireParams() const {
-    /* Aboav-Weaire's law: nm_n=<n>^2+mu+<n>(1-alpha)(n-<n>)
-     * calculate mean node size, <n>^2
-     * calculate mean node size about a node of size n
-     * perform linear fit */
-
-    // mean from node distribution
-    double mean = 0.0;
-    for (int i = 0; i < nodeDistribution.size(); ++i)
-        mean += i * nodeDistribution[i];
-    mean /= vectorSum(nodeDistribution);
-
-    // find x,y only for sizes which are present
-    std::vector<double> x(edgeDistribution.size());
-    std::vector<double> y(edgeDistribution.size());
-    for (int i = 0; i < edgeDistribution.size(); ++i) {
-        const int num = vectorSum(edgeDistribution[i]);
-        if (num > 0) {
-            double mn = 0.0;
-            for (int j = 0; j < edgeDistribution[i].size(); ++j)
-                mn += j * edgeDistribution[i][j];
-            mn /= num;
-            x.push_back(mean * (i - mean));
-            y.push_back(i * mn);
-        }
-    }
-
-    // linear fit if more than one data point, return: alpha, mu, rsq
-    if (x.size() > 1) {
-        double gradient;
-        double intercept;
-        double rSquared;
-        std::tie(gradient, intercept, rSquared) = vectorLinearRegression(x, y);
-        return std::make_tuple(1.0 - gradient, intercept - mean * mean, rSquared);
-    }
-    return std::make_tuple(0.0, 0.0, 0.0);
-}
-
-// Calculate network assortativity through the degree correlation coefficient
-double Network::getAssortativityOld() const {
-    /* definitions:
-     * 1) e_ij degree correlation matrix, prob of finding nodes with degree i,j at
-     * end of random link 2) q_k prob of finding node with degree k at end of
-     * random link, q_k=kp_k/<k> */
-    std::vector<std::vector<double>> e = getEdgeDistribution();
-    std::vector<double> q = getNodeDistribution();
-    double mean = 0.0;
-    for (int i = 0; i < q.size(); ++i)
-        mean += i * q[i];
-    for (int i = 0; i < q.size(); ++i)
-        q[i] = i * q[i] / mean;
-
-    /* degree correlation coefficient:
-     * r=sum_jk jk(e_jk-q_j*q_k)/sig^2
-     * sig^2 = sum_k k^2*q_k - (sum_k k*q_k)^2
-     * bounded between -1 (perfectly disasssortative) and 1 (perfectly
-     * assortative) with 0 as neutral */
-    double r = 0.0;
-    for (int j = 0; j < e.size(); ++j) {
-        for (int k = 0; k < e.size(); ++k)
-            r += j * k * (e[j][k] - q[j] * q[k]);
-    }
-    double sigSq;
-    double a = 0.0;
-    double b = 0.0; // dummy variables
-    for (int k = 0; k < q.size(); ++k) {
-        a += k * k * q[k];
-        b += k * q[k];
-    }
-    sigSq = a - b * b;
-    r /= sigSq;
-
-    return r;
-}
-
-// Estimate alpha parameter from degree correlation coefficient
-double Network::getAboavWeaireEstimate() const {
-    /* Can derive by substituting aw law into equation for r */
-    std::vector<double> p = getNodeDistribution();
-    std::vector<double> k(p.size());
-    for (int i = 0; i < p.size(); ++i)
-        k[i] = i;
-    double n;
-    double n2;
-    double n3;
-    double nSq;
-    n = vectorSum(multiplyVectors(k, p));
-    n2 = vectorSum(multiplyVectors(multiplyVectors(k, k), p));
-    n3 = vectorSum(multiplyVectors(multiplyVectors(multiplyVectors(k, k), k), p));
-    nSq = n * n;
-    double alpha;
-    double r = getAssortativity();
-    double mu = n2 - nSq;
-    alpha = (-r * (n * n3 - n2 * n2) - mu * mu) / (nSq * mu);
-
-    return alpha;
-}
-
-// Calculate entropy of node and edge distribution
-std::vector<double> Network::getEntropyOld() const {
-    double s0 = 0.0;
-    double s1 = 0.0;
-    double s2 = 0.0;
-    std::vector<double> p = getNodeDistribution();
-    std::vector<double> q = p;
-    double mean = 0.0;
-    for (int i = 0; i < q.size(); ++i)
-        mean += i * q[i];
-    for (int i = 0; i < q.size(); ++i)
-        q[i] = i * q[i] / mean;
-    std::vector<std::vector<double>> e = getEdgeDistribution();
-
-    std::for_each(p.begin(), p.end(), [&s0](const double &i) {
-        if (i > 0.0)
-            s0 -= i * log(i);
+/**
+ * @brief Refresh the entropy of node sizes
+ */
+void Network::refreshEntropy() {
+    entropy = 0.0;
+    std::for_each(nodeSizes.begin(), nodeSizes.end(), [this](const std::pair<int, double> &pair) {
+        entropy -= pair.second * std::log(pair.second);
     });
-
-    for (int i = 0; i < e.size(); ++i) {
-        for (int j = 0; j < e[i].size(); ++j) {
-            if (e[i][j] > 0.0) {
-                s1 -= e[i][j] * log(e[i][j]);
-                s2 += e[i][j] * log(e[i][j] / (q[i] * q[j]));
-            }
-        }
-    }
-
-    return std::vector<double>{s0, s1, s2};
-}
-
-double Network::getAboavWeaire() const {
-    return 0.0;
-}
-double Network::getEntropy() const {
-    return 0.0;
-}
-
-double Network::getAssortativity() const {
-    return 0.0;
 }
 
 /**
- * @brief Get the number of nodes with a given number of connections
- * @param minRingSize Minimum number of connections
- * @param maxRingSize Maximum number of connections
- * @return Vector of the number of nodes with a given number of connections
+ * @brief Refresh the assortativity distribution of the network, which is a map of maps
  */
-std::vector<int> Network::getCoordinations(const int &minCoordination, const int &maxCoordination) const {
-    std::vector<int> ringSizes(maxCoordination - minCoordination + 1, 0);
-    for (int i = 0; i < nodes.size(); ++i) {
-        try {
-            ringSizes[nodes[i].netCnxs.size() - minCoordination]++;
-        } catch (std::out_of_range &e) {
-            throw std::runtime_error("Node " + std::to_string(i) + " has " + std::to_string(nodes[i].netCnxs.size()) +
-                                     " connections, which is outside the range " + std::to_string(minCoordination) +
-                                     " to " + std::to_string(maxCoordination));
+void Network::refreshAssortativityDistribution() {
+    assortativityDistribution.clear();
+    std::for_each(nodes.begin(), nodes.end(), [this](const Node &node) {
+        std::for_each(node.netCnxs.begin(), node.netCnxs.end(), [&node, this](const int &cnx) {
+            int cnxRingSize = nodes[cnx].netCnxs.size();
+            auto &outerMap = assortativityDistribution[node.netCnxs.size()];
+            if (outerMap.find(cnxRingSize) == outerMap.end()) {
+                outerMap[cnxRingSize] = 1;
+            } else {
+                ++outerMap[cnxRingSize];
+            }
+        });
+    });
+    std::for_each(assortativityDistribution.begin(), assortativityDistribution.end(), [](std::pair<const int, std::map<int, double>> &pair) {
+        normaliseMap(pair.second);
+    });
+}
+
+/**
+ * @brief Get the average coordination of the network
+ * @return Average coordination
+ */
+double Network::getAverageCoordination() const {
+    double totalCoordination = 0.0;
+    std::for_each(nodes.begin(), nodes.end(), [&totalCoordination](const Node &node) {
+        totalCoordination += node.netCnxs.size();
+    });
+    return totalCoordination / nodes.size();
+}
+
+/**
+ * @brief Get the average coordination of the network to the power of a given power, ie, <k^n>
+ * @param power Power to raise the coordination to
+ * @return Average coordination to the power of the given power
+ */
+double Network::getAverageCoordination(const int &power) const {
+    double totalCoordination = 0.0;
+    std::for_each(nodes.begin(), nodes.end(), [&totalCoordination, power](const Node &node) {
+        totalCoordination += std::pow(node.netCnxs.size(), power);
+    });
+    return totalCoordination / nodes.size();
+}
+
+/**
+ * @brief Refresh Pearson's correlation coefficient for the network
+
+void Network::refreshPearsonsCoeff() {
+    // r = <k>^2 / (<k><k^3> - <k^2>^2)  * sum_(j,k) ( jkP(j,k) - <k^2>^2)
+    double avK = getAverageCoordination();                             // <k>
+    double avKSquared = std::pow(avK, 2);                              // <k>^2
+    double avKSquaredSquared = std::pow(getAverageCoordination(2), 2); // <k^2>^2
+    double avKCubed = getAverageCoordination(3);                       // <k^3>
+    showNestedMap(assortativityDistribution);
+    std::cout << "avK: " << avK << " avKSquared: " << avKSquared << std::endl;
+    std::cout << "avKSquaredSquared: " << avKSquaredSquared << " avKCubed: " << avKCubed << std::endl;
+    double sum = 0.0;
+    std::for_each(assortativityDistribution.begin(), assortativityDistribution.end(), [&sum, avKSquaredSquared](const std::pair<int, std::map<int, double>> &pair) {
+        std::for_each(pair.second.begin(), pair.second.end(), [&sum, avKSquaredSquared, &pair](const std::pair<int, double> &innerPair) {
+            sum += innerPair.first * pair.first * innerPair.second - avKSquaredSquared;
+        });
+    });
+
+    pearsonsCoeff = avKSquared / (avK * avKCubed - avKSquaredSquared) * sum;
+    std::cout << "Pearsons Coeff: " << pearsonsCoeff << std::endl;
+}
+*/
+
+void Network::refreshPearsonsCoeff() {
+    double sum_x = 0;
+    double sum_y = 0;
+    double sum_xy = 0;
+    double sum_x2 = 0;
+    double sum_y2 = 0;
+    int n = 0;
+
+    for (const auto &outerPair : assortativityDistribution) {
+        for (const auto &innerPair : outerPair.second) {
+            double x = outerPair.first;
+            double y = innerPair.first;
+            double p = innerPair.second;
+
+            sum_x += x * p;
+            sum_y += y * p;
+            sum_xy += x * y * p;
+            sum_x2 += x * x * p;
+            sum_y2 += y * y * p;
+            n++;
         }
     }
-    return ringSizes;
+
+    double mean_x = sum_x / n;
+    double mean_y = sum_y / n;
+    double cov_xy = sum_xy / n - mean_x * mean_y;
+    double var_x = sum_x2 / n - mean_x * mean_x;
+    double var_y = sum_y2 / n - mean_y * mean_y;
+
+    pearsonsCoeff = cov_xy / (std::sqrt(var_x) * std::sqrt(var_y));
+}
+
+/**
+ * @brief Refresh the probabilities of each node size
+ */
+void Network::refreshCoordinationDistribution() {
+    nodeSizes.clear();
+    std::for_each(nodes.begin(), nodes.end(), [this](const Node &node) {
+        try {
+            ++nodeSizes.at(node.netCnxs.size());
+        } catch (std::out_of_range &e) {
+            nodeSizes[node.netCnxs.size()] = 1;
+        }
+    });
+    normaliseMap(nodeSizes);
 }
 
 /**
@@ -607,8 +491,8 @@ std::vector<int> Network::getCoordinations(const int &minCoordination, const int
 void Network::writeAux(std::ofstream &auxFile) const {
     auxFile << std::fixed << std::showpoint << std::setprecision(1);
     auxFile << std::setw(10) << std::left << nodes.size() << std::endl;
-    auxFile << std::setw(10) << std::left << maxNetCnxs
-            << std::setw(10) << std::left << maxDualCnxs << std::endl;
+    auxFile << std::setw(10) << std::left << "1"
+            << std::setw(10) << std::left << "1" << std::endl;
     auxFile << std::setw(10) << std::left << geometryCode << std::endl;
     auxFile << std::fixed << std::showpoint << std::setprecision(6);
     std::for_each(dimensions.begin(), dimensions.end(), [&auxFile](const double &dimension) {
@@ -795,4 +679,15 @@ std::vector<double> Network::getCoords() {
         returnCoords[i * 2 + 1] = nodes[i].crd[1];
     }
     return returnCoords;
+}
+
+double Network::getAboavWeaire() const {
+    return 0.0;
+}
+
+void Network::refreshStatistics() {
+    refreshCoordinationDistribution();
+    refreshAssortativityDistribution();
+    refreshPearsonsCoeff();
+    refreshEntropy();
 }

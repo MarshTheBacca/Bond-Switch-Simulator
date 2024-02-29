@@ -19,42 +19,36 @@ using LoggerPtr = std::shared_ptr<spdlog::logger>;
 
 class Network {
   public:
-    // Data members
-    int minNetCnxs; // Minimum coordination number of nodes to nodes
-    int maxNetCnxs; // Maximum coordination number of nodes to nodes
-    int minDualCnxs;
-    int maxDualCnxs;
-    std::vector<double> dimensions;                 // Periodic boundary of network, xlo = ylo = 0, so dimensions = [xhi, yhi]
-    std::vector<double> reciprocalDimensions;       // Reciprical periodic boundary = [1/xhi, 1/yhi]
-    std::string geometryCode;                       // geometry of system
-                                                    // Maximum coordination number of nodes to dual nodes
-    std::vector<Node> nodes;                        // list of nodes
-    std::vector<int> nodeDistribution;              // number of each type of node
-    std::vector<std::vector<int>> edgeDistribution; // number of each type of edge
+    // Member variables
+    std::vector<Node> nodes;
+    std::vector<double> dimensions;
+    std::vector<double> reciprocalDimensions;
+    std::string geometryCode;
 
-    // Construct a triangular lattice
-    explicit Network(const int &nNodes);
+    // Statistics
+    double pearsonsCoeff;
+    double entropy;
+    std::map<int, double> nodeSizes;
+    std::map<int, std::map<int, double>> assortativityDistribution;
+
+    // Constructors
     Network();
-
-    Network(const int &nNodes, const int &maxCnxs);
-    Network(const std::string &prefix, const int &maxNetCnxsA, const int &maxDualCnxsA, LoggerPtr logger); // construct by loading from files
+    explicit Network(const int &numNodes);
+    Network(const std::string &prefix, const LoggerPtr &logger); // construct by loading from files
 
     // Member Functions
     Network constructDual(const int &maxCnxs); // make dual graph
     void rescale(const double &scaleFactor);   // rescale coordinates
 
-    std::vector<double> getNodeDistribution() const;
-    std::vector<std::vector<double>> getEdgeDistribution() const;    // proportion of each type of node
-    std::tuple<double, double, double> getAboavWeaireParams() const; // calculate Aboav-Weaire parameters
-    double getAssortativityOld() const;
-    double getAboavWeaireEstimate() const;
-    std::vector<double> getEntropyOld() const; // calculate entropy of node and edge distribution
+    void refreshStatistics();
+    void refreshAssortativityDistribution();
+    void refreshCoordinationDistribution();
+    void refreshPearsonsCoeff();
+    void refreshEntropy();
 
-    double getAssortativity() const;
+    double getAverageCoordination() const;
     double getAboavWeaire() const;
-    double getEntropy() const;
-
-    std::vector<int> getCoordinations(const int &minRingSize, const int &maxRingSize) const;
+    double getAverageCoordination(const int &power) const;
 
     // Write functions
     void writeAux(std::ofstream &auxFile) const;
@@ -63,8 +57,6 @@ class Network {
     std::vector<std::vector<int>> getNetCnxs() const;
     std::vector<std::vector<int>> getDualCnxs() const;
     void write(const std::string &prefix) const;
-
-    bool r_ij(int i, int j, double cutoff);
 
     int getMaxCnxs() const;
     int getMaxCnxs(const std::unordered_set<int> &fixedNodes) const;
@@ -92,8 +84,6 @@ class Network {
     void addUnorderedDualConnections(Network &dualNetwork);
     void orderDualConnections(Network &dualNetwork);
     void addOrderedNetworkConnections(Network &dualNetwork);
-
-    void initialiseDescriptors(const int &maxCnxs);
 };
 
 #endif // NL_NETWORK_H
