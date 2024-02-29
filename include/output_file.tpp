@@ -17,10 +17,35 @@ void OutputFile::writeVector(const std::vector<T> &vec) {
     }
 }
 
+template <typename K, typename V>
+void OutputFile::writeMap(const std::map<K, V> &map) {
+    for (auto it = map.begin(); it != map.end(); ++it) {
+        file << it->first << ':' << it->second;
+        if (std::next(it) != map.end()) {
+            file << ";";
+        }
+    }
+}
+
+template <typename K, typename VK, typename VV>
+void OutputFile::writeNestedMap(const std::map<K, std::map<VK, VV>> &map) {
+    for (auto it = map.begin(); it != map.end(); ++it) {
+        file << it->first << '!';
+        writeMap(it->second);
+        if (std::next(it) != map.end()) {
+            file << "&";
+        }
+    }
+}
+
 template <typename T>
 void OutputFile::write(const T &value) {
     if constexpr (is_vector<T>::value) {
         writeVector(value);
+    } else if constexpr (is_nested_map<T>::value) {
+        writeNestedMap(value);
+    } else if constexpr (is_map<T>::value) {
+        writeMap(value);
     } else {
         writeValue(value);
     }

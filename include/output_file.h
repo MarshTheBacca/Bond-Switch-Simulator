@@ -5,6 +5,7 @@
 #include <ctime>
 #include <fstream>
 #include <iomanip>
+#include <map>
 #include <sstream>
 #include <string>
 #include <type_traits>
@@ -32,10 +33,28 @@ struct OutputFile {
     struct is_vector<std::vector<T>> : std::true_type {};
 
     template <typename T>
+    struct is_map : std::false_type {};
+
+    template <typename K, typename V>
+    struct is_map<std::map<K, V>> : std::true_type {};
+
+    template <typename T>
+    struct is_nested_map : std::false_type {};
+
+    template <typename K, typename VK, typename VV>
+    struct is_nested_map<std::map<K, std::map<VK, VV>>> : std::true_type {};
+
+    template <typename T>
     void writeValue(const T &value);
 
     template <typename T>
     void writeVector(const std::vector<T> &vec);
+
+    template <typename K, typename V>
+    void writeMap(const std::map<K, V> &map);
+
+    template <typename K, typename VK, typename VV>
+    void writeNestedMap(const std::map<K, std::map<VK, VV>> &map);
 
     template <typename T>
     void write(const T &value);
