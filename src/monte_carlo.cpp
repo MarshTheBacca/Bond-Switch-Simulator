@@ -5,12 +5,12 @@
 // Default constructor
 Metropolis::Metropolis() {
     coinFlip = std::uniform_real_distribution<double>(0.0, 1.0);
-    mtGen.seed(0);
+    randomNumGen.seed(0);
 }
 
 // Construct with random seed, temperature and initial energy
 Metropolis::Metropolis(int seed, double temperature, double energy) {
-    mtGen.seed(seed);
+    randomNumGen.seed(seed);
     if (temperature <= 0.0)
         throw std::runtime_error("Cannot initialise Metropolis algorithm with zero temperature");
     rTemperature = 1.0 / temperature;
@@ -48,7 +48,7 @@ bool Metropolis::acceptanceCriterion(double Ef, double Ei, double T_factor) {
         return true;
     }
     double probability = exp(-deltaE * rTemperature / T_factor);
-    if (coinFlip(mtGen) < probability) {
+    if (coinFlip(randomNumGen) < probability) {
         return true;
     }
     return false;

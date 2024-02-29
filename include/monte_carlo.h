@@ -10,7 +10,7 @@ class Metropolis {
 
   private:
     // Data members
-    std::mt19937 mtGen;                              // mersenne twister generator
+    std::mt19937 randomNumGen;                       // mersenne twister generator
     std::uniform_real_distribution<double> coinFlip; // uniform distribution
     double rTemperature = 1.0;                       // reciprocal temperature
     double energyPrev = 0.0;                         // previous energy
