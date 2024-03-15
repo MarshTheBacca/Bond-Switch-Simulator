@@ -43,17 +43,15 @@ All the parameters are read by ignoring all characters after the first white spa
 `Weighted Decay` A float that dictates the rate of decay from the centre of the network if using the 'Weighted' bond selection process. Use a negative value to invert the preference for bonds near the edge.
 
 ### Monte Carlo Energy Search
-`Start Temperature (10^x)` The log of the starting temperature for the annealing process (no units)
+`Thermalisation Temperature (10^x)` The log of the starting temperature for the annealing process (no units)
 
-`End Temperature (10^x)` The log of the end temperature for the annealing process (no units)
+`Annealing Start Temperature (10^x)` The log of the end temperature for the annealing process (no units)
 
-`Temperature Increment (10^x)` The log of the temperature increment for the annealing process (no units)
+`Annealing End Temperature (10^x)` The log of the temperature increment for the annealing process (no units)
 
-`Thermalisation Temperature (10^x)` The log of the temperature for thermalisation (no units)
+`Themalisation Steps` The log of the temperature for thermalisation (no units)
 
-`Steps per Temperature` The number of steps per temperature increment during the anneaing process
-
-`Thermalisation Steps` The number of steps for thermalisation
+`Annealing Steps` The number of steps per temperature increment during the anneaing process
 
 ### Potential Model
 `Maximum Bond Length` The maximum bond length allowed for the final state of nodes involved in a switch (Bohr Radii)
@@ -72,6 +70,9 @@ The simulation is split into two parts, thermalisation and annealing. During the
 * The nodes involved in the move have no angles greater than the maximum angle size
 * The nodes involved in the move have no bond lengths greater than the maximum bond length
 * The energy of the final state is low enough such that it is accepted by the metropolis condition at the given temperature
+
+The probability of the metropolis condition accepting the move is governed by:
+$$min(1, e^(-\DeltaE/T))$$
 
 The lower the temperature, the less likely the metropolis condition accepts the move.
 
