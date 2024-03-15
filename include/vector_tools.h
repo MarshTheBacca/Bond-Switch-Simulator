@@ -76,6 +76,12 @@ std::unordered_set<T> setDifference(const std::unordered_set<T> &set1, const std
 std::vector<double> pbcVector(const std::vector<double> &vector1, const std::vector<double> &vector2, const std::vector<double> &dimensions);
 void normaliseMap(std::map<int, double> &map);
 void showNestedMap(const std::map<int, std::map<int, double>> &map);
+double getClockwiseAngleBetweenVectors(const std::vector<double> &vector1, const std::vector<double> &vector2);
+double getClockwiseAngle(const std::vector<double> &coord1, const std::vector<double> &coord2, const std::vector<double> &dimensions);
+double getClockwiseAngle(const std::vector<double> &point);
+
+void sortCoordinatesClockwise(std::vector<std::vector<double>> &coords);
+double calculatePolygonArea(std::vector<std::vector<double>> &vertices);
 
 #include "vector_tools.tpp"
 #endif // VEC_TOOLS_H
