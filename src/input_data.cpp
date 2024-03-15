@@ -122,6 +122,12 @@ void InputData::validate() const {
     // Monte Carlo Process
     checkInRange(randomSeed, 0, INT_MAX, "Random seed must be at least 0");
 
+    // Monte Carlo Energy Searcg
+    checkInRange(annealingSteps, 0, INT_MAX, "Annealing steps must be at least 0");
+    checkInRange(thermalisationSteps, 0, INT_MAX, "Thermalisation steps must be at least 0");
+    checkInRange(maximumBondLength, 0.0, std::numeric_limits<double>::max(), "Maximum bond length must be at least 0");
+    checkInRange(maximumAngle, 0.0, 360.0, "Maximum angle must be between 0 and 360");
+
     // Analysis
     if (analysisWriteInterval < 0) {
         throw std::runtime_error("Analysis write interval must be at least 0");
