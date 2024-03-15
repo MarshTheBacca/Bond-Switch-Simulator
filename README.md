@@ -72,7 +72,7 @@ The simulation is split into two parts, thermalisation and annealing. During the
 * The energy of the final state is low enough such that it is accepted by the metropolis condition at the given temperature
 
 The probability of the metropolis condition accepting the move is governed by:
-$$min(1, e^(-\DeltaE/T))$$
+$$min(1, e^{-(\Delta E)/T})$$
 
 The lower the temperature, the less likely the metropolis condition accepts the move.
 
