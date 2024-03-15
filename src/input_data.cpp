@@ -82,9 +82,8 @@ void InputData::readMonteCarloProcess() {
 }
 
 void InputData::readMonteCarloEnergySearch() {
-    readSection("Monte Carlo Energy Search", startTemperature,
-                endTemperature, temperatureIncrement, thermalisationTemperature,
-                stepsPerTemperature, initialThermalisationSteps);
+    readSection("Monte Carlo Energy Search", thermalisationTemperature, annealingStartTemperature,
+                annealingEndTemperature, thermalisationSteps, annealingSteps);
 }
 
 void InputData::readPotentialModel() {
@@ -123,25 +122,11 @@ void InputData::validate() const {
     // Monte Carlo Process
     checkInRange(randomSeed, 0, INT_MAX, "Random seed must be at least 0");
 
-    // Energy search
-    if (temperatureIncrement == 0.0) {
-        throw std::runtime_error("Temperature increment must be non-zero, otherwise you would have infinite steps");
-    }
-    if (endTemperature < startTemperature && temperatureIncrement > 0) {
-        throw std::runtime_error("Temperature increment must be negative if end temperature is less than start temperature");
-    } else if (endTemperature > startTemperature && temperatureIncrement < 0) {
-        throw std::runtime_error("Temperature increment must be positive if end temperature is greater than start temperature");
-    }
-    if (stepsPerTemperature < 0) {
-        throw std::runtime_error("Steps per temperature must be at least 0");
-    }
-
     // Analysis
     if (analysisWriteInterval < 0) {
         throw std::runtime_error("Analysis write interval must be at least 0");
     }
-    int totalSteps = (endTemperature - startTemperature) / temperatureIncrement * stepsPerTemperature + initialThermalisationSteps;
-    if (writeMovie && totalSteps > 2000) {
+    if (writeMovie && thermalisationSteps + annealingSteps > 2000) {
         throw std::runtime_error("Cannot write a movie file for more than 2000 steps because the file would be enormous");
     }
 }

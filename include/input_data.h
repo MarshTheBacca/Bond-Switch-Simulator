@@ -57,12 +57,11 @@ struct InputData {
     double weightedDecay;
 
     // Monte Carlo Energy Search Data
-    double startTemperature;
-    double endTemperature;
-    double temperatureIncrement;
     double thermalisationTemperature;
-    int stepsPerTemperature;
-    int initialThermalisationSteps;
+    double annealingStartTemperature;
+    double annealingEndTemperature;
+    int thermalisationSteps;
+    int annealingSteps;
 
     // Potential Model Data
     double maximumBondLength;
