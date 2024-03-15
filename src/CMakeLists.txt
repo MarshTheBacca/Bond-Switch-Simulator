@@ -14,7 +14,7 @@ target_sources(netmc.x PRIVATE
     lammps_object.cpp
     linked_network.cpp
     main.cpp
-    monte_carlo.cpp
+    metropolis.cpp
     network.cpp
     node.cpp
     input_data.cpp
