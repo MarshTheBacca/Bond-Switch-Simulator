@@ -1,5 +1,4 @@
 #include "input_data.h"
-#include "lammps_object.h"
 #include "linked_network.h"
 #include "output_file.h"
 #include "spdlog/sinks/basic_file_sink.h"
@@ -55,14 +54,12 @@ void runSimulation(const std::vector<double> &expTemperatures, LinkedNetwork &li
     }
     double completion = 0.0;
     for (size_t i = 1; i <= expTemperatures.size(); ++i) {
-        linkedNetwork.metropolisCondition.setTemperature(expTemperatures[i - 1]);
-        logger->debug("Temperature: {:.2f}", expTemperatures[i - 1]);
-        linkedNetwork.monteCarloSwitchMoveLAMMPS();
+        linkedNetwork.monteCarloSwitchMoveLAMMPS(expTemperatures[i - 1]);
         if (i % writeInterval == 0) {
             linkedNetwork.networkB.refreshStatistics();
             allStatsFile.writeValues(linkedNetwork.numSwitches, expTemperatures[i - 1], linkedNetwork.energy,
                                      linkedNetwork.networkB.entropy, linkedNetwork.networkB.pearsonsCoeff,
-                                     linkedNetwork.networkA.getAboavWeaire(), linkedNetwork.networkB.nodeSizes, linkedNetwork.getRingAreas());
+                                     linkedNetwork.networkA.getAboavWeaire(), linkedNetwork.networkB.nodeSizes);
         }
         double currentCompletion = std::floor(static_cast<double>(i) / expTemperatures.size() / 0.1);
         if (currentCompletion > completion) {
@@ -122,34 +119,28 @@ int main(int argc, char *argv[]) {
         allStatsFile.writeLine("Step, Temperature, Energy, Entropy, Pearson's Coefficient, Aboave Weaire, Ring Size Distribution (vector), Ring Areas (vector)");
 
         // Run monte carlo thermalisation
-        std::vector<double>
-            thermalisationTemperatures(inputData.initialThermalisationSteps, pow(10, inputData.thermalisationTemperature));
+        std::vector<double> thermalisationTemperatures(inputData.thermalisationSteps, pow(10, inputData.thermalisationTemperature));
         logger->info("Thermalising...");
         runSimulation(thermalisationTemperatures, linkedNetwork, allStatsFile, inputData.analysisWriteInterval, logger);
 
         // Run monte carlo annealing
-
         std::vector<double> annealingTemperatures;
-        int numTemperatureSteps = std::floor((inputData.endTemperature - inputData.startTemperature) / inputData.temperatureIncrement);
-        annealingTemperatures.reserve((numTemperatureSteps + 1) * inputData.stepsPerTemperature);
-        for (int i = 0; i <= numTemperatureSteps; ++i) {
-            double temperature = inputData.startTemperature + i * inputData.temperatureIncrement;
-            for (int j = 0; j < inputData.stepsPerTemperature; ++j) {
-                annealingTemperatures.push_back(pow(10, temperature));
-            }
+        annealingTemperatures.reserve(inputData.annealingSteps);
+        double temperatureIncrement = (inputData.annealingEndTemperature - inputData.annealingStartTemperature) / (inputData.annealingSteps - 1);
+        for (int i = 0; i < inputData.annealingSteps; ++i) {
+            double temperature = inputData.annealingStartTemperature + i * temperatureIncrement;
+            annealingTemperatures.push_back(pow(10, temperature));
         }
 
         logger->info("Annealing...");
         runSimulation(annealingTemperatures, linkedNetwork, allStatsFile, inputData.analysisWriteInterval, logger);
         logger->info("Simulation complete!");
-        // Check linkedNetwork
         linkedNetwork.lammpsNetwork.stopMovie();
+
         logger->debug("Diagnosing simulation...");
         bool consistent = linkedNetwork.checkConsistency();
-        logger->debug("Network consistent (not yet implemented): {}", consistent ? "true" : "false");
 
-        // Write files
-        logger->debug("Writing files...");
+        logger->debug("Writing final network files...");
         linkedNetwork.write(prefixOut);
         logger->info("");
         logger->info("Number of attempted switches: {}", linkedNetwork.numSwitches);
@@ -159,17 +150,27 @@ int main(int argc, char *argv[]) {
         logger->info("Number of failed switches due to energy: {}", linkedNetwork.failedEnergyChecks);
         logger->info("");
         logger->info("Monte Carlo acceptance: {:.3f}", (double)linkedNetwork.numAcceptedSwitches / linkedNetwork.numSwitches);
-        if (linkedNetwork.checkAllClockwiseNeighbours()) {
-            logger->info("All rings have clockwise neighbours");
-        } else {
-            logger->info("Not all rings have clockwise neighbours");
-        }
+        logger->info("Network consistent: {}", consistent ? "true" : "false");
+        logger->info("");
 
         // Log time taken
         auto end = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start) / 1000.0;
         logger->info("Total run time: {:.3f} s", duration.count());
+        logger->info("Average time per step: {:.3f} us", duration.count() / linkedNetwork.numSwitches * 1000.0);
         spdlog::shutdown();
+
+        allStatsFile.writeLine("The following line is a few statistics about the simulation");
+        allStatsFile.writeLine("Number of attempted switches, Number of accepted switches, Number of failed angle checks, Number of failed bond length checks, Number of failed energy checks, Monte Carlo acceptance, Total run time (s), Average time per step (us), Network Consistent");
+        allStatsFile.writeValues(linkedNetwork.numSwitches,
+                                 linkedNetwork.numAcceptedSwitches,
+                                 linkedNetwork.failedAngleChecks,
+                                 linkedNetwork.failedBondLengthChecks,
+                                 linkedNetwork.failedEnergyChecks,
+                                 (double)linkedNetwork.numAcceptedSwitches / linkedNetwork.numSwitches,
+                                 duration.count(),
+                                 duration.count() / linkedNetwork.numSwitches * 1000.0,
+                                 consistent ? "true" : "false");
     } catch (std::exception &e) {
         logger->error("Exception: {}", e.what());
         logger->flush();
