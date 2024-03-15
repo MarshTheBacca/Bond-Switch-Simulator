@@ -4,7 +4,7 @@
 #define NL_LINKED_NETWORK_H
 #include "input_data.h"
 #include "lammps_object.h"
-#include "monte_carlo.h"
+#include "metropolis.h"
 #include "network.h"
 #include <algorithm>
 #include <chrono>
@@ -66,14 +66,13 @@ struct LinkedNetwork {
 
     // Constructors
     LinkedNetwork();
-    LinkedNetwork(const int &numRing, const LoggerPtr &logger);         // Construct hexagonal linked network from scratch
-    LinkedNetwork(const InputData &inputData, const LoggerPtr &logger); // Construct from files using an InputData object
+    LinkedNetwork(const int &numRing, const LoggerPtr &logger);
+    LinkedNetwork(const InputData &inputData, const LoggerPtr &logger);
 
     void findFixedRings(const std::string &filename);
     void findFixedNodes();
 
-    // Member Functions
-    void rescale(double scaleFactor); // rescale lattice dimensions
+    void rescale(double scaleFactor);
     void updateWeights();
     std::tuple<int, int, int, int> pickRandomConnection();
     int assignValues(int randNodeCoordination, int randNodeConnectionCoordination) const;
@@ -81,15 +80,14 @@ struct LinkedNetwork {
     int findCommonConnection(const int &baseNode, const int &ringNode, const int &excludeNode) const;
     int findCommonRing(const int &baseNode1, const int &baseNode2, const int &excludeNode) const;
 
-    void monteCarloSwitchMoveLAMMPS();
+    void monteCarloSwitchMoveLAMMPS(const double &temperature);
     void rejectMove(const std::vector<Node> &initialInvolvedNodesA, const std::vector<Node> &initialInvolvedNodesB,
                     const std::vector<int> &bondBreaks, const std::vector<int> &bondMakes,
                     const std::vector<int> &angleBreaks, const std::vector<int> &angleMakes);
 
-    bool checkConsistency();    // check networks are consistent
-    bool checkCnxConsistency(); // check for mutual connections
+    bool checkConsistency();
 
-    void write(const std::string &prefix);
+    void write(const std::string &prefix) const;
 
     void pushCoords(const std::vector<double> &coords);
     void showCoords(const std::vector<double> &coords) const;
@@ -111,6 +109,7 @@ struct LinkedNetwork {
     bool checkClockwiseNeighbours(const int &nodeID, const std::vector<double> &coords) const;
     bool checkAllClockwiseNeighbours() const;
     void arrangeNeighboursClockwise(const int &nodeID, const std::vector<double> &coords);
+    void arrangeNeighboursClockwise(const std::unordered_set<int> &nodeIDs, const std::vector<double> &coords);
 
     bool checkAnglesWithinRange(const std::vector<double> &coords);
     bool checkAnglesWithinRange(const std::unordered_set<int> &nodeIDs, const std::vector<double> &coords);
@@ -118,7 +117,6 @@ struct LinkedNetwork {
     bool checkBondLengths(const std::unordered_set<int> &nodeIDs, const std::vector<double> &coords) const;
 
     std::map<int, double> getRingSizes() const;
-    double calculatePolygonArea(const std::vector<std::vector<double>> &vertices) const;
     std::vector<double> getRingAreas() const;
 };
 
