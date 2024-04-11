@@ -15,7 +15,7 @@ true       Enable fixed rings?
 --------------------------------------------------
 Minimisation Protocols
 true            Enable OpenMPI?
-Silicene        Structure Type (Graphene, Silicene, TriangleRaft, Bilayer or BoronNitride)
+Graphene        Structure Type (Graphene, Silicene, TriangleRaft, Bilayer or BoronNitride)
 --------------------------------------------------
 Monte Carlo Process
 0           random seed
