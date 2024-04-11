@@ -1,4 +1,5 @@
 #include "vector_tools.h"
+#include <unordered_map>
 /**
  * @brief Checks if a vector contains a value
  * @tparam T The type of the vector
