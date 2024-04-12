@@ -1,22 +1,24 @@
 /build/
-/variable_maps
-/testing/output_files/
-/testing/log.lammps
-/testing/netmc.log
-/testing/netmc.x
-/testing/Si.log
-/clean-all.cmake
-/netmc.log
-/testing/input_files (copy)/
-/testing/bond.dump
-/3d_visualise_network.py
-/chech_marsh.py
-/lammps_to_netmc_marsh.py
-/visualise_network.py
-/establish_restart_marsh.py
-/plot_e_compare.py
-/testing/*.mpg
-/testing/Time stats
-/testing/Images/*
-/VecR_VecF_Opt/*
+/run/output_files/
+/run/movies/
+/run/input_files_pore/
+/run/log.lammps
+/run/lammps_netmc.log
+/run/Si.log
+/run/bond_switch_simulator.exe
+/run/bond.dump
+/run/*.mpg
+/run/time_stats.txt
+/run/images/*
+/run/gmon.out
+/run/input_files/bss_network/
+/run/input_files/lammps_files/lammps_network.txt
+
+
+python_scripts/chech_marsh.py
+python_scripts/establish_restart_marsh.py
+python_scripts/lammps_to_netmc_marsh.py
+python_scripts/utils/__pycache__/__init__.cpython-312.pyc
+python_scripts/utils/__pycache__/netmc_output_data.cpython-312.pyc
+
 
