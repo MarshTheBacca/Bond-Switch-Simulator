@@ -23,7 +23,7 @@ The lower the temperature, the less likely the metropolis condition accepts the 
 ## Further Reading
 
 * [Installing Dependencies](docs/installing_dependencies.md)
-* [Building and Running] (docs/building_and_running.md)
+* [Building and Running](docs/building_and_running.md)
 * [Setting Up The Input File](docs/setting_up_the_input_file.md)
 * [Setting Up a Potential](docs/setting_up_a_potential.md)
 
