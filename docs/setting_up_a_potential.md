@@ -1,8 +1,10 @@
 # Setting Up a Potential
 
-There is already a template potential for you to use ![here](/testing/Si_potential.in).
+There is already a template potential for you to use ![here](/run/input_files/lammps_files/lammps_potential.txt).
 
-Please note that as set ![here](/testing/Si_script.in), the units used for the potentials (and the rest of the simulation) are in electronic units.
+Please note that as set ![here](/run/input_files/lammps_files/lammps_script.txt), the units used for the potentials (and the rest of the simulation) are in electronic units.
+
+These files must be located in _./input_files/lammps_files/_
 
 ## Bonds
 `bond_style` is a [LAMMPS command](https://docs.lammps.org/bond_style.html).
