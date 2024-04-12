@@ -8,17 +8,17 @@ struct Node {
     // Member variables
     int id = 0;                        // unique id used by other nodes for connections
     std::vector<double> crd{0.0, 0.0}; // coordinate
-    std::vector<int> netCnxs;          // connections to nodes in network
-    std::vector<int> dualCnxs;         // connections to nodes in dual network
+    std::vector<int> netConnections;          // connections to nodes in network
+    std::vector<int> dualConnections;         // connections to nodes in dual network
 
     // Constructors
     Node();
     explicit Node(const int &nodeID);
     Node(const int &nodeID, const std::vector<double> &crd);
-    Node(const int &nodeID, const std::vector<double> &crd, const std::vector<int> &netCnxs, const std::vector<int> &dualCnxs);
+    Node(const int &nodeID, const std::vector<double> &crd, const std::vector<int> &netConnections, const std::vector<int> &dualConnections);
 
     // Methods
-    std::string toString();
+    std::string toString() const;
 
     /**
      * @brief Calculate the distance between this node and a given coordinate

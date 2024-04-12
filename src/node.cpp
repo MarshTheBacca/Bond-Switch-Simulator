@@ -24,21 +24,21 @@ Node::Node(const int &nodeID, const std::vector<double> &crd) : id(nodeID), crd(
  * @brief Constructor with a given node ID, coordinates and connections
  * @param nodeID The ID of the node
  * @param crd The coordinates of the node
- * @param netCnxs The connections to nodes in the network
- * @param dualCnxs The connections to nodes in the dual network
+ * @param netConnections The connections to nodes in the network
+ * @param dualConnections The connections to nodes in the dual network
  */
-Node::Node(const int &nodeID, const std::vector<double> &crd, const std::vector<int> &netCnxs, const std::vector<int> &dualCnxs)
-    : id(nodeID), crd(crd), netCnxs(netCnxs), dualCnxs(dualCnxs) {
+Node::Node(const int &nodeID, const std::vector<double> &crd, const std::vector<int> &netConnections, const std::vector<int> &dualConnections)
+    : id(nodeID), crd(crd), netConnections(netConnections), dualConnections(dualConnections) {
 }
 
 /**
  * @brief Convert the node to a string
  */
-std::string Node::toString() {
+std::string Node::toString() const {
     std::string str = "Node " + std::to_string(id) + " at " + std::to_string(crd[0]) + ", " + std::to_string(crd[1]) +
                       " with neighbours: ";
-    std::for_each(netCnxs.begin(), netCnxs.end(), [&str](int i) { str += std::to_string(i) + " "; });
+    std::for_each(netConnections.begin(), netConnections.end(), [&str](int i) { str += std::to_string(i) + " "; });
     str += " and ring neighbours: ";
-    std::for_each(dualCnxs.begin(), dualCnxs.end(), [&str](int i) { str += std::to_string(i) + " "; });
+    std::for_each(dualConnections.begin(), dualConnections.end(), [&str](int i) { str += std::to_string(i) + " "; });
     return str;
 }
