@@ -19,6 +19,13 @@ struct OutputFile {
     explicit OutputFile(const std::string &name);
     explicit OutputFile(const std::string &path, const int &spaceArg);
 
+    // Destructor
+    ~OutputFile() {
+        if (file.is_open()) {
+            file.close();
+        }
+    }
+
     // Member functions
     void write(const std::string &string);
     void writeLine(const std::string &string);
