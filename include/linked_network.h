@@ -69,7 +69,7 @@ struct LinkedNetwork {
     LinkedNetwork(const int &numRing, const LoggerPtr &logger);
     LinkedNetwork(const InputData &inputData, const LoggerPtr &logger);
 
-    void findFixedRings(const std::string &filename);
+    void findFixedRings(const std::string &flePath);
     void findFixedNodes();
 
     void rescale(double scaleFactor);
@@ -87,7 +87,7 @@ struct LinkedNetwork {
 
     bool checkConsistency();
 
-    void write(const std::string &prefix) const;
+    void write() const;
 
     void pushCoords(const std::vector<double> &coords);
     void showCoords(const std::vector<double> &coords) const;
