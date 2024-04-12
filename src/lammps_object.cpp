@@ -290,7 +290,7 @@ void LammpsObject::setAtomCoords(const int &atomID, const std::vector<double> &n
 }
 
 void LammpsObject::startMovie() {
-    lammps_command(handle, "dump myMovie all movie 1 dump.mpg type type");
+    lammps_command(handle, "dump myMovie all movie 1 ./output_files/simulation_movie.mpg type type");
 }
 
 void LammpsObject::writeMovie() {
