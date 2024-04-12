@@ -4,7 +4,16 @@
         {
             "label": "configure",
             "type": "shell",
-            "command": "cmake .. -DCMAKE_TOOLCHAIN_FILE=${workspaceFolder}/toolchain.cmake",
+            "command": "cmake ../ -DCMAKE_TOOLCHAIN_FILE=${workspaceFolder}/toolchain.cmake -DEXEC_OUTPUT_PATH=${workspaceFolder}/run",
+            "options": {
+                "cwd": "${workspaceFolder}/build"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "configureWithProfiling",
+            "type": "shell",
+            "command": "cmake ../ -DCMAKE_TOOLCHAIN_FILE=${workspaceFolder}/toolchain.cmake -DEXEC_OUTPUT_PATH=${workspaceFolder}/run -pg",
             "options": {
                 "cwd": "${workspaceFolder}/build"
             },
@@ -13,7 +22,7 @@
         {
             "label": "build",
             "type": "shell",
-            "command": "cmake --build ${workspaceFolder}/build",
+            "command": "cmake --build ${workspaceFolder}/build/",
             "dependsOn": "configure",
             "group": {
                 "kind": "build",
@@ -22,20 +31,27 @@
             "problemMatcher": []
         },
         {
+            "label": "buildWithProfiling",
+            "type": "shell",
+            "command": "cmake --build ${workspaceFolder}/build/",
+            "dependsOn": "configureWithProfiling",
+            "group": {
+                "kind": "build"
+            },
+            "problemMatcher": []
+        },
+        {
             "label": "clean",
             "type": "shell",
-            "command": "rm -rf output_files",
-            "options": {
-                "cwd": "${workspaceFolder}/testing"
-            },
+            "command": "rm -rf {workspaceFolder}/run/output_files",
             "problemMatcher": []
         },
         {
             "label": "run",
             "type": "shell",
-            "command": "./netmc.x -d",
+            "command": "./bond_switch_simulator.exe",
             "options": {
-                "cwd": "${workspaceFolder}/testing"
+                "cwd": "${workspaceFolder}/run"
             },
             "dependsOn": [
                 "build",
@@ -44,11 +60,24 @@
             "problemMatcher": []
         },
         {
-            "label": "runNoDebug",
+            "label": "runWithProfiling",
             "type": "shell",
-            "command": "./netmc.x",
+            "command": "./bond_switch_simulator.exe",
             "options": {
-                "cwd": "${workspaceFolder}/testing"
+                "cwd": "${workspaceFolder}/run"
+            },
+            "dependsOn": [
+                "buildWithProfiling",
+                "clean"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "runWithDebug",
+            "type": "shell",
+            "command": "./bond_switch_simulator.exe -d",
+            "options": {
+                "cwd": "${workspaceFolder}/run"
             },
             "dependsOn": [
                 "build",
@@ -56,6 +85,7 @@
             ],
             "problemMatcher": []
         },
+
         {
             "label": "cleanBuildRun",
             "dependsOn": [
@@ -66,35 +96,29 @@
             "problemMatcher": []
         },
         {
-            "label": "cleanBuildRunNoDebug",
+            "label": "cleanBuildRunWithDebug",
             "dependsOn": [
                 "clean",
                 "build",
-                "runNoDebug"
+                "runWithDebug"
             ],
-            "problemMatcher": []
-        },
-        {
-            "label": "runWithProfiling",
-            "type": "shell",
-            "command": "${workspaceFolder}/testing/netmc.x",
-            "options": {
-                "cwd": "${workspaceFolder}/testing"
-            },
             "problemMatcher": []
         },
         {
             "label": "profile",
             "type": "shell",
-            "command": "gprof ${workspaceFolder}/testing/netmc.x gmon.out > analysis.txt",
+            "command": "gprof ./bond_switch_simulator.exe gmon.out > analysis.txt",
+            "options": {
+                "cwd": "${workspaceFolder}/run"
+            },
             "dependsOn": "runWithProfiling",
             "problemMatcher": []
         },
         {
-            "label": "cleanBuildRunProf",
+            "label": "cleanBuildRunWithProfiling",
             "dependsOn": [
                 "clean",
-                "build",
+                "buildWithProfiling",
                 "runWithProfiling",
                 "profile"
             ],
