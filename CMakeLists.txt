@@ -8,9 +8,12 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_TRY_COMPILE_TARGET_TYPE "STATIC_LIBRARY")
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# Make directory for executable to be saved, this is where you can put netmc.inpt and such
-file(MAKE_DIRECTORY ${CMAKE_SOURCE_DIR}/testing)
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/testing)
+# Add an option for the executable export path
+set(EXEC_OUTPUT_PATH ${CMAKE_BINARY_DIR} CACHE PATH "Path to put the executable")
+
+# Make directory for executable to be saved
+file(MAKE_DIRECTORY ${EXEC_OUTPUT_PATH})
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${EXEC_OUTPUT_PATH})
 
 # Add include directories
 add_subdirectory(src)
