@@ -1,5 +1,8 @@
 // Created by olwhi on 24/07/2023, edited by Marshall Hunt 28/01/2024.
 #include "lammps_object.h"
+#include <filesystem>
+
+std::string LAMMPS_FILES_PATH = std::filesystem::path("./input_files") / "lammps_files";
 
 /**
  * @brief Default constructor for a blank Lammps Object
@@ -12,7 +15,7 @@ LammpsObject::LammpsObject() = default;
  * @param inputFolder The folder containing the input files
  * @param loggerArg The logger object
  */
-LammpsObject::LammpsObject(const std::string &structureName, const std::string &inputFolder, const LoggerPtr &loggerArg) : logger(loggerArg) {
+LammpsObject::LammpsObject(const LoggerPtr &loggerArg) : logger(loggerArg) {
     logger->debug("Creating Lammps Object");
     const char *lmpargv[] = {"liblammps", "-screen", "none"};
     int lmpargc = sizeof(lmpargv) / sizeof(const char *);
@@ -27,18 +30,7 @@ LammpsObject::LammpsObject(const std::string &structureName, const std::string &
     version = lammps_version(handle);
     logger->debug("LAMMPS Version: {}", version);
 
-    std::map<std::string, std::string> selectorToFile = {
-        {"Si", "Si.in"},
-        {"Si2O3", "Si2O3.in"},
-        {"SiO2", "SiO2.in"},
-        {"C", "C.in"},
-        {"BN", "BN.in"}};
-
-    if (selectorToFile.find(structureName) == selectorToFile.end()) {
-        throw std::runtime_error("Invalid Selector");
-    }
-
-    std::string inputFilePath = inputFolder + "/" + selectorToFile[structureName];
+    std::string inputFilePath = std::filesystem::path(LAMMPS_FILES_PATH) / "lammps_script.txt";
     logger->debug("Executing LAMMPS Script: {}", inputFilePath);
     lammps_file(handle, inputFilePath.c_str());
     natoms = (int)(lammps_get_natoms(handle) + 0.5);
@@ -54,44 +46,24 @@ LammpsObject::LammpsObject(const std::string &structureName, const std::string &
         logger->error("Failed to extract number of angles");
     }
     logger->debug("LAMMPS #nodes: {} #bonds: {} #angles: {}", natoms, nbonds, nangles);
-    std::vector<int> angleHelper(6);
 }
 
-void LammpsObject::write_data(const std::string &structureName) {
-    std::unordered_map<std::string, std::string> selectorToFile = {
-        {"Si", "Si_results.in"},
-        {"Si2O3", "Si2O3_results.in"},
-        {"SiO2", "SiO2_results.in"},
-        {"C", "C_results.in"},
-        {"BN", "BN_results.in"}};
-
-    auto iterator = selectorToFile.find(structureName);
-    if (iterator == selectorToFile.end()) {
-        throw std::runtime_error("Invalid structure name");
-    }
-    std::string command = "write_data " + prefixFolderOut + "/" + iterator->second;
+/**
+ * @brief Exports the network to a file
+*/
+void LammpsObject::writeData() {
+    std::string savePath = std::filesystem::path("./output_files") / "lammps_network_result.txt";
+    std::string command = "write_data " + savePath;
     lammps_command(handle, command.c_str());
 }
 
-void LammpsObject::write_restart(const std::string &structureName) {
-    std::unordered_map<std::string, std::string> structureToFile = {
-        {"Si", "Si_restart.restart"},
-        {"Si2O3", "Si2O3_restart.restart"},
-        {"SiO2", "SiO2_restart.restart"},
-        {"C", "C_restart.restart"},
-        {"BN", "BN_restart.restart"}};
-
-    // the iterator is a pointer to a key value pair
-    auto iterator = structureToFile.find(structureName);
-    if (iterator == structureToFile.end()) {
-        throw std::runtime_error("Invalid structure name");
-    }
-
-    // that's why we use iterator->second to access the value of the pair
-    std::string command = "write_restart " + prefixFolderOut + "/" + iterator->second;
-    lammps_command(handle, command.c_str());
-}
-
+/**
+ * @brief Breaks a bond in the network
+ * @param atom1 The first atom in the bond
+ * @param atom2 The second atom in the bond
+ * @param type The type of the bond
+ * @throws std::runtime_error if the bond count doesn't decrease
+*/
 void LammpsObject::breakBond(const int &atom1, const int &atom2, const int &type) {
     // logger->debug("Breaking bond between {} and {} of type {}", atom1, atom2, type);
     double initialBondCount = lammps_get_thermo(handle, "bonds");
@@ -114,6 +86,13 @@ void LammpsObject::breakBond(const int &atom1, const int &atom2, const int &type
     }
 }
 
+/**
+ * @brief Forms a bond in the network
+ * @param atom1 The first atom in the bond
+ * @param atom2 The second atom in the bond
+ * @param type The type of the bond
+ * @throws std::runtime_error if the bond count doesn't increase
+*/
 void LammpsObject::formBond(const int &atom1, const int &atom2, const int &type) {
     // logger->debug("Forming bond between {} and {} of type {}", atom1, atom2, type);
     double initialBondCount = lammps_get_thermo(handle, "bonds");
@@ -220,11 +199,6 @@ void LammpsObject::formAngle(const int &atom1, const int &atom2, const int &atom
         oss << "Angle has one or more members that are the same ID: " << atom1 << " " << atom2 << " " << atom3;
         throw std::runtime_error(oss.str());
     }
-    // if (!checkAngleUnique(atom1, atom2, atom3)) {
-    //     std::ostringstream oss;
-    //     oss << "Angle already exists between " << atom1 << " and " << atom2 << " and " << atom3;
-    //     throw std::runtime_error(oss.str());
-    // }
     double initialAngleCount = lammps_get_thermo(handle, "angles");
     std::string command;
     command = "create_bonds single/angle 1 " + std::to_string(atom1) + " " + std::to_string(atom2) + " " + std::to_string(atom3);
@@ -239,7 +213,7 @@ void LammpsObject::formAngle(const int &atom1, const int &atom2, const int &atom
 }
 
 /**
- * @brief perform bond switch in the lattice using NetMC node IDs, ie, zero indexed
+ * @brief perform bond switch in the lattice using zero-indexed node IDs
  * @param bondBreaks Ths IDs of the bonds to be broken (1D vector of pairs)
  * @param bondMakes The IDs of the bonds to be made (1D vector of pairs)
  * @param angleBreaks The IDs of the angles to be broken (1D vector of triples)
@@ -266,7 +240,7 @@ void LammpsObject::switchGraphene(const std::vector<int> &bondBreaks, const std:
     setAtomCoords(atom2ID, rotatedCoord2, 2);
 }
 /**
- * @brief perform the opposite of a bond switch in the lattice using NetMC node IDs, ie, zero indexed
+ * @brief perform the opposite of a bond switch in the lattice using zero-indexed node IDs
  * @param bondBreaks Ths IDs of the bonds that have been broken (1D vector of pairs)
  * @param bondMakes The IDs of the bonds that have been made (1D vector of pairs)
  * @param angleBreaks The IDs of the angles that have been broken (1D vector of triples)
@@ -379,6 +353,10 @@ std::vector<int> LammpsObject::getAngles() const {
     return angles;
 }
 
+/**
+ * @brief Logs the first numLines angles in the network
+ * @param numLines The number of angles to log
+*/
 void LammpsObject::showAngles(const int &numLines) const {
     std::vector<int> angles = getAngles();
     for (int i = 0; i < numLines; ++i) {
@@ -401,11 +379,4 @@ bool LammpsObject::checkAngleUnique(const int &atom1, const int &atom2, const in
         }
     }
     return true;
-}
-
-void LammpsObject::saveState() const {
-    lammps_command(handle, "write_restart restart.lammps");
-}
-void LammpsObject::recoverState() {
-    lammps_command(handle, "read_restart restart.lammps");
 }

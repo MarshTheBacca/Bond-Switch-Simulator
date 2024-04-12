@@ -28,8 +28,7 @@
 
 using LoggerPtr = std::shared_ptr<spdlog::logger>;
 
-class LammpsObject {
-  public:
+struct LammpsObject {
     Network networkA;
     Network networkB;
 
@@ -40,21 +39,19 @@ class LammpsObject {
     int nangles = 0;
     double *bonds = nullptr;
 
-    std::string prefixFolderIn;
-    std::string prefixFolderOut;
-    std::string prefixOut;
-    std::vector<int> angleHelper;
+    std::vector<int> angleHelper = std::vector<int>(6);
 
     LoggerPtr logger;
 
     LammpsObject();
-    LammpsObject(const std::string &selector, const std::string &inputFolderArg, const LoggerPtr &loggerArg);
+    explicit LammpsObject(const LoggerPtr &loggerArg);
 
-    void write_data(const std::string &structureName);
-    void write_restart(const std::string &structureName);
+    void minimiseNetwork();
+    double getPotentialEnergy();
 
     std::vector<double> getCoords(const int &dim) const;
     void setCoords(std::vector<double> &newCoords, int dim);
+    void setAtomCoords(const int &atomID, const std::vector<double> &newCoords, const int &dim);
 
     void breakBond(const int &atom1, const int &atom2, const int &type);
     void formBond(const int &atom1, const int &atom2, const int &type);
@@ -69,19 +66,16 @@ class LammpsObject {
     void revertGraphene(const std::vector<int> &bondBreaks, const std::vector<int> &bondMakes,
                         const std::vector<int> &angleBreaks, const std::vector<int> &angleMakes);
     std::vector<int> getAngles() const;
-    void showAngles(const int &numLines) const;
-    bool checkAngleUnique(const int &atom1, const int &atom2, const int &atom3) const;
 
-    void minimiseNetwork();
-    double getPotentialEnergy();
+
+    void writeData();
     void startMovie();
-
     void writeMovie();
     void stopMovie();
 
-    void saveState() const;
-    void recoverState();
-    void setAtomCoords(const int &atomID, const std::vector<double> &newCoords, const int &dim);
+    void showAngles(const int &numLines) const;
+    bool checkAngleUnique(const int &atom1, const int &atom2, const int &atom3) const;
+
 };
 
 #endif // LAMMPS_OBJECT_H
