@@ -8,7 +8,6 @@ The program can be built using __cmake__ like so:
 mkdir build; cd build
 cmake ../ 
 cmake --build .
-
 ```
 
 You can use `-DEXEC_OUTPUT_PATH=<path>` in the second command to specify where you would like _bond_switch_simulator.exe_ to be located. You may want this to be in the _run_ folder (set path to _../run/_).
