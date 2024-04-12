@@ -1,4 +1,5 @@
 #include "input_data.h"
+#include <filesystem>
 
 /**
  * @brief Reads the input file
@@ -18,12 +19,9 @@ InputData::InputData(const std::string &filePath, const LoggerPtr &loggerArg) : 
     lineNumber++;
 
     // Read sections
-    readIO();
-    readNetworkProperties();
-    readNetworkMinimisationProtocols();
-    readMonteCarloProcess();
-    readMonteCarloEnergySearch();
-    readPotentialModel();
+    readNetworkRestrictions();
+    readBondSelectionProcess();
+    readTemperatureSchedule();
     readAnalysis();
 
     // Validate input data
@@ -59,35 +57,17 @@ std::string InputData::getFirstWord() {
     return firstWord;
 }
 
-/**
- * @brief Reads the IO section of the input file
- */
-void InputData::readIO() {
-    readSection("IO", outputFolder, outputFilePrefix,
-                inputFolder, inputFilePrefix, isFromScratchEnabled);
+void InputData::readNetworkRestrictions() {
+    readSection("Network Restrictions",  minRingSize, maxRingSize, maximumBondLength, maximumAngle, isFixRingsEnabled);
 }
 
-void InputData::readNetworkProperties() {
-    readSection("Network Properties", numRings, minRingSize,
-                maxRingSize, isFixRingsEnabled);
+void InputData::readBondSelectionProcess() {
+    readSection("Bond Selection Process", randomSeed, randomOrWeighted, weightedDecay);
 }
 
-void InputData::readNetworkMinimisationProtocols() {
-    readSection("Network Minimisation Protocols",
-                isOpenMPIEnabled, structureType);
-}
-
-void InputData::readMonteCarloProcess() {
-    readSection("Monte Carlo Process", randomSeed, randomOrWeighted, weightedDecay);
-}
-
-void InputData::readMonteCarloEnergySearch() {
-    readSection("Monte Carlo Energy Search", thermalisationTemperature, annealingStartTemperature,
+void InputData::readTemperatureSchedule() {
+    readSection("Temperature", thermalisationTemperature, annealingStartTemperature,
                 annealingEndTemperature, thermalisationSteps, annealingSteps);
-}
-
-void InputData::readPotentialModel() {
-    readSection("Potential Model", maximumBondLength, maximumAngle);
 }
 
 void InputData::readAnalysis() {
@@ -112,12 +92,11 @@ void InputData::checkFileExists(const std::string &path) const {
  */
 void InputData::validate() const {
     // Network Properties
-    checkInRange(numRings, 1, INT_MAX, "Number of rings must be at least 1");
     checkInRange(minRingSize, 3, INT_MAX, "Minimum ring size must be at least 3");
     checkInRange(maxRingSize, minRingSize, INT_MAX, "Maximum ring size must be at least the minimum ring size");
 
     if (isFixRingsEnabled) {
-        checkFileExists(inputFolder + "/fixed_rings.dat");
+        checkFileExists(std::filesystem::path("./input_files") / "bss_network" / "fixed_rings.txt");
     }
     // Monte Carlo Process
     checkInRange(randomSeed, 0, INT_MAX, "Random seed must be at least 0");

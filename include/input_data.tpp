@@ -33,7 +33,7 @@ void InputData::readWord(const std::string &word, T &variable, const std::string
             throw std::runtime_error("Invalid boolean: " + word + " in section: " + section + " on line: " + std::to_string(lineNumber));
         }
     } else if constexpr (std::is_same_v<T, StructureType>) {
-        if (word == "SimpleGraphene") {
+        if (word == "Graphene") {
             variable = StructureType::GRAPHENE;
         } else if (word == "Silicene") {
             variable = StructureType::SILICENE;

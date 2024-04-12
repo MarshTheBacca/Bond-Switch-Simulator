@@ -33,39 +33,25 @@ struct InputData {
     // Used for error messages
     int lineNumber = 0;
     std::ifstream inputFile;
-    // IO Data
-    std::string outputFolder;
-    std::string outputFilePrefix;
-    std::string inputFolder;
-    std::string inputFilePrefix;
 
-    bool isFromScratchEnabled;
-
-    // Network Properties Data
-    int numRings;
+    // Network Restrictions Data
     int minRingSize;
     int maxRingSize;
+    double maximumBondLength;
+    double maximumAngle;
     bool isFixRingsEnabled;
 
-    // Minimisation Protocols Data
-    bool isOpenMPIEnabled;
-    StructureType structureType;
-
-    // Monte Carlo Process Data
+    // Bond Selection Process Data
     int randomSeed;
     SelectionType randomOrWeighted;
     double weightedDecay;
 
-    // Monte Carlo Energy Search Data
+    // Temperature Schedule Data
     double thermalisationTemperature;
     double annealingStartTemperature;
     double annealingEndTemperature;
     int thermalisationSteps;
     int annealingSteps;
-
-    // Potential Model Data
-    double maximumBondLength;
-    double maximumAngle;
 
     // Analysis Data
     int analysisWriteInterval;
@@ -87,12 +73,9 @@ struct InputData {
     bool stringToBool(const std::string &str) const;
     std::string getFirstWord();
 
-    void readIO();
-    void readNetworkProperties();
-    void readNetworkMinimisationProtocols();
-    void readMonteCarloProcess();
-    void readMonteCarloEnergySearch();
-    void readPotentialModel();
+    void readNetworkRestrictions();
+    void readBondSelectionProcess();
+    void readTemperatureSchedule();
     void readAnalysis();
 
     void checkFileExists(const std::string &filename) const;
