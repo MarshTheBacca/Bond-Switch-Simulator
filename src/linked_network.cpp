@@ -73,7 +73,7 @@ void LinkedNetwork::findFixedRings(const std::string &filePath) {
         fixedRings[num] = networkB.nodes[num].netConnections.size();
     }
     logger->info("Number of fixed rings: {}", fixedRings.size());
-    logger->info("Fixed ring IDs: {}", mapToString(fixedRings));
+    logger->info("Fixed ring info (ID: Size): {}", mapToString(fixedRings));
 }
 
 /**
