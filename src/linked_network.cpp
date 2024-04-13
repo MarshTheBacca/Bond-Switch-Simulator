@@ -25,7 +25,7 @@ LinkedNetwork::LinkedNetwork(const InputData &inputData, const LoggerPtr &logger
     networkB = Network(NetworkType::DUAL_NETWORK, logger);
 
     if (inputData.isFixRingsEnabled) {
-        findFixedRings(std::filesystem::path("./input_files") /"fixed_rings.txt");
+        findFixedRings(std::filesystem::path("./input_files") / "bss_network" /"fixed_rings.txt");
         findFixedNodes();
     } else {
         logger->info("Fixed rings disabled, setting number of fixed rings to 0.");

@@ -289,8 +289,16 @@ void LammpsObject::setAtomCoords(const int &atomID, const std::vector<double> &n
     }
 }
 
+/**
+ * @brief Warns the user if the movie file already exists and starts the movie
+*/
 void LammpsObject::startMovie() {
-    lammps_command(handle, "dump myMovie all movie 1 ./output_files/simulation_movie.mpg type type");
+    std::string movieFilePath = (std::filesystem::path("./output_files") / "simulation_movie.mpg").string();
+    if (std::filesystem::exists(movieFilePath)){
+        logger->warn("Movies file already exists! Overwriting simulation_movie.mpg");
+    }
+    std::string command = "dump myMovie all movie 1 " + movieFilePath + " type type";
+    lammps_command(handle, command.c_str());
 }
 
 void LammpsObject::writeMovie() {
