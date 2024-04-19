@@ -212,6 +212,7 @@ int main(int argc, char *argv[]) {
         logger->info("Total run time: {:.3f} s", duration.count());
         logger->info("Average time per step: {:.3f} us", duration.count() / linkedNetwork.numSwitches * 1000.0);
         std::filesystem::remove("./log.lammps");
+        logger->flush();
         spdlog::shutdown();
 
 
