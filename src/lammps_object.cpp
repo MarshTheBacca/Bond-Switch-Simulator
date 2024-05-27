@@ -315,7 +315,7 @@ void LammpsObject::stopMovie() {
 void LammpsObject::minimiseNetwork() {
     // Numbers are stopping tolerance for energy, stopping tolerance for force,
     // maximum number of iterations and maximum number of energy/force evaluations
-    lammps_command(handle, "minimize 1.0e-6 0.0 1000000 10000000");
+    lammps_command(handle, "minimize ${etol} ${ftol} ${maxiter} ${maxeval}");
 }
 
 /**

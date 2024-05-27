@@ -4,18 +4,18 @@
 # The numbers in the bond_coeff command correspond to: Minimum energy (U(min)), equilibrium bond length (r0) and the critical distance (rC), at which the potential = 0
 
 bond_style harmonic/shift/cut
-bond_coeff Si-Si 60 2.3 3.5 
+bond_coeff C-C 50 2.1580672 3.5 
 
 
 # The potential is E = K(r - r0)^2
 # The numbers in the bond_coeff command correspond to: force constant (K), equilibrium bond length (r0)
 
 # bond_style harmonic
-# bond_coeff Si-Si 20 2.3 
+# bond_coeff C-C 20 2.3 
 
 
 # The potential is E = K(theta - theta_0)^2
 # The numbers in the angle_coeff command correspond to: The force constant (K) and the equilibrium angle (theta_0)
 
 angle_style harmonic
-angle_coeff Si-Si-Si 10 120
+angle_coeff C-C-C 10 120

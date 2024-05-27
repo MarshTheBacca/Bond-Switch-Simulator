@@ -5,7 +5,7 @@ Network Restrictions
 30          Max Ring Size
 3.5         Maximum bond length
 170         Maximum angle
-true        Enable Fixed Rings? (You must include a fixed_rings.txt file)
+false        Enable Fixed Rings? (You must include a fixed_rings.txt file)
 --------------------------------------------------
 Bond Selection Process
 0           Random Seed
@@ -16,10 +16,10 @@ Temperature Schedule
 6           Thermalisation temperature (10^x)
 2           Annealing Start Temperature (10^x)
 -5          Annealing End Temperature (10^x)
-100        Themalisation steps
-100       Annealing Steps
+0        Themalisation steps
+0       Annealing Steps
 --------------------------------------------------
 Analysis
-2           Analysis Write Interval (Steps)
+1           Analysis Write Interval (Steps)
 false       Write a Movie File? (takes ~15x longer)
 --------------------------------------------------

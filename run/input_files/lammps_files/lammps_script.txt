@@ -15,6 +15,8 @@ thermo_style custom pe angles
 thermo_modify line yaml
 
 min_style sd
-minimize 1.0e-6 0.0 1000000 10000000
-
-
+variable etol equal 1.0e-6
+variable ftol equal 0.0
+variable maxiter equal 1.0e6
+variable maxeval equal 1.0e7
+minimize ${etol} ${ftol} ${maxiter} ${maxeval}
