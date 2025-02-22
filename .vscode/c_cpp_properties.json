@@ -3,14 +3,11 @@
         {
             "name": "Linux",
             "includePath": [
-                "${workspaceFolder}/**",
-                "/home/marshthebacca/.local/include/lammps/**"
+                "${workspaceFolder}/include"
             ],
             "defines": [],
-            "compilerPath": "/usr/bin/gcc",
-            "cStandard": "c11",
-            "cppStandard": "c++17",
-            "intelliSenseMode": "gcc-x64"
+            "cppStandard": "c++23",
+            "intelliSenseMode": "linux-clang-x64"
         }
     ],
     "version": 4

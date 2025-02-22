@@ -1,19 +1,18 @@
-cmake_minimum_required(VERSION 3.10)
+# Set the minimum version of CMake that can be used
+cmake_minimum_required(VERSION 3.20)
 
-project(NetMCMarsh LANGUAGES CXX)
+# Set the project name and the language
+project(Bond-Switch-Simulator LANGUAGES CXX)
 
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON CACHE BOOL "Force C++17 or better")
-set(CMAKE_CXX_EXTENSIONS OFF)
-set(CMAKE_TRY_COMPILE_TARGET_TYPE "STATIC_LIBRARY")
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+# Set the C++ standard to C++23
+set(CMAKE_CXX_STANDARD 23)
 
-# Add an option for the executable export path
-set(EXEC_OUTPUT_PATH ${CMAKE_BINARY_DIR} CACHE PATH "Path to put the executable")
+# Require the C++ standard
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Make directory for executable to be saved
-file(MAKE_DIRECTORY ${EXEC_OUTPUT_PATH})
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${EXEC_OUTPUT_PATH})
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+file(MAKE_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
 
 # Add include directories
 add_subdirectory(src)

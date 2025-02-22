@@ -2,11 +2,11 @@
 
 ## Building
 
-The program can be built using __cmake__ like so:
+The program can be built using **cmake** like so:
 
 ```
 mkdir build; cd build
-cmake ../ 
+cmake ../
 cmake --build .
 ```
 
