@@ -2,127 +2,74 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "configure",
+            "label": "clean",
             "type": "shell",
-            "command": "cmake ../ -DCMAKE_TOOLCHAIN_FILE=${workspaceFolder}/toolchain.cmake -DEXEC_OUTPUT_PATH=${workspaceFolder}/run",
-            "options": {
-                "cwd": "${workspaceFolder}/build"
-            },
+            "command": "cmake",
+            "args": [
+                "--build",
+                "${workspaceFolder}/build",
+                "--target",
+                "clean"
+            ],
             "problemMatcher": []
         },
         {
-            "label": "configureWithProfiling",
+            "label": "fullClean",
             "type": "shell",
-            "command": "cmake ../ -DCMAKE_TOOLCHAIN_FILE=${workspaceFolder}/toolchain.cmake -DEXEC_OUTPUT_PATH=${workspaceFolder}/run -pg",
-            "options": {
-                "cwd": "${workspaceFolder}/build"
-            },
+            "command": "rm",
+            "args": [
+                "-rf",
+                "${workspaceFolder}/build"
+            ],
             "problemMatcher": []
+        },
+        {
+            "label": "configure",
+            "type": "shell",
+            "command": "cmake",
+            "args": [
+                "-G",
+                "Ninja",
+                "-DCMAKE_CXX_COMPILER=clang++",
+                "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
+                "-S",
+                "${workspaceFolder}",
+                "-B",
+                "${workspaceFolder}/build"
+            ],
+            "problemMatcher": [],
         },
         {
             "label": "build",
             "type": "shell",
-            "command": "cmake --build ${workspaceFolder}/build/",
-            "dependsOn": "configure",
-            "group": {
-                "kind": "build",
-                "isDefault": true
-            },
-            "problemMatcher": []
-        },
-        {
-            "label": "buildWithProfiling",
-            "type": "shell",
-            "command": "cmake --build ${workspaceFolder}/build/",
-            "dependsOn": "configureWithProfiling",
-            "group": {
-                "kind": "build"
-            },
-            "problemMatcher": []
-        },
-        {
-            "label": "clean",
-            "type": "shell",
-            "command": "rm -rf {workspaceFolder}/run/output_files",
+            "command": "cmake",
+            "args": [
+                "--build",
+                "${workspaceFolder}/build"
+            ],
             "problemMatcher": []
         },
         {
             "label": "run",
             "type": "shell",
-            "command": "./bond_switch_simulator.exe",
-            "options": {
-                "cwd": "${workspaceFolder}/run"
-            },
-            "dependsOn": [
-                "build",
-                "clean"
-            ],
+            "command": "${workspaceFolder}/build/bin/bond_switch_simulator",
             "problemMatcher": []
         },
         {
-            "label": "runWithProfiling",
+            "label": "clean-configure-build-run",
             "type": "shell",
-            "command": "./bond_switch_simulator.exe",
-            "options": {
-                "cwd": "${workspaceFolder}/run"
-            },
-            "dependsOn": [
-                "buildWithProfiling",
-                "clean"
-            ],
-            "problemMatcher": []
-        },
-        {
-            "label": "runWithDebug",
-            "type": "shell",
-            "command": "./bond_switch_simulator.exe -d",
-            "options": {
-                "cwd": "${workspaceFolder}/run"
-            },
-            "dependsOn": [
-                "build",
-                "clean"
-            ],
-            "problemMatcher": []
-        },
-
-        {
-            "label": "cleanBuildRun",
+            "dependsOrder": "sequence",
             "dependsOn": [
                 "clean",
+                "configure",
                 "build",
                 "run"
             ],
-            "problemMatcher": []
-        },
-        {
-            "label": "cleanBuildRunWithDebug",
-            "dependsOn": [
-                "clean",
-                "build",
-                "runWithDebug"
-            ],
-            "problemMatcher": []
-        },
-        {
-            "label": "profile",
-            "type": "shell",
-            "command": "gprof ./bond_switch_simulator.exe gmon.out > analysis.txt",
-            "options": {
-                "cwd": "${workspaceFolder}/run"
-            },
-            "dependsOn": "runWithProfiling",
-            "problemMatcher": []
-        },
-        {
-            "label": "cleanBuildRunWithProfiling",
-            "dependsOn": [
-                "clean",
-                "buildWithProfiling",
-                "runWithProfiling",
-                "profile"
-            ],
-            "problemMatcher": []
+            "problemMatcher": [],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
         }
     ]
 }
