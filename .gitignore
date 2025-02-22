@@ -18,7 +18,8 @@
 python_scripts/chech_marsh.py
 python_scripts/establish_restart_marsh.py
 python_scripts/lammps_to_netmc_marsh.py
-python_scripts/utils/__pycache__/__init__.cpython-312.pyc
-python_scripts/utils/__pycache__/netmc_output_data.cpython-312.pyc
 
+
+# All pyc files
+*.pyc
 

@@ -16,8 +16,8 @@ Temperature Schedule
 6           Thermalisation temperature (10^x)
 2           Annealing Start Temperature (10^x)
 -5          Annealing End Temperature (10^x)
-0        Themalisation steps
-0       Annealing Steps
+1000        Themalisation steps
+1000       Annealing Steps
 --------------------------------------------------
 Analysis
 1           Analysis Write Interval (Steps)
