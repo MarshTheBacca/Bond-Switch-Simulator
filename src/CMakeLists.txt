@@ -1,30 +1,49 @@
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(LAMMPS REQUIRED IMPORTED_TARGET liblammps)
+# Create a new executable
+add_executable(bond_switch_simulator)
 
-# Find the OpenMP package
-find_package(OpenMP REQUIRED)
+# Use CMAKE_PREFIX_PATH to search for lammps
+find_library(LAMMPS_LIBRARY lammps)
+
+# Get LAMMPS include directory
+find_path(LAMMPS_INCLUDE_DIR lammps.h PATHS $ENV{CMAKE_PREFIX_PATH}/include/lammps)
+
+# Check if LAMMPS include directory was found
+if(NOT LAMMPS_INCLUDE_DIR)
+# Try to set a default value
+    message(WARNING "Could not find LAMMPS include directory using CMAKE_PREFIX_PATH. Trying default path.")
+    set(LAMMPS_INCLUDE_DIR $ENV{HOME}/.local/include/lammps)
+    # Check if the default value exists
+    if(NOT EXISTS ${LAMMPS_INCLUDE_DIR})
+        message(FATAL_ERROR "LAMMPS include directory not found")
+    endif()
+endif()
+
+
+# Check if LAMMPS library was found
+if(NOT LAMMPS_LIBRARY)
+    # Try to set a default value
+    message(WARNING "Could not find LAMMPS library path using CMAKE_PREFIX_PATH. Trying default path.")
+
+    set(LAMMPS_LIBRARY $ENV{HOME}/.local/lib/liblammps.so)
+    # Check if the default value exists
+    if(NOT EXISTS ${LAMMPS_LIBRARY})
+        message(FATAL_ERROR "LAMMPS library not found")
+    endif()
+endif()
+
+# Print the LAMMPS library path and include directory
+message(STATUS "LAMMPS library: ${LAMMPS_LIBRARY}")
+message(STATUS "LAMMPS include directory: ${LAMMPS_INCLUDE_DIR}")
 
 find_package(spdlog REQUIRED)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+# Add all source files to the executable
+file(GLOB SOURCES "*.cpp")
+target_sources(bond_switch_simulator PRIVATE ${SOURCES})
 
-add_executable(bond_switch_simulator.exe)
-target_sources(bond_switch_simulator.exe PRIVATE
-    lammps_object.cpp
-    linked_network.cpp
-    main.cpp
-    metropolis.cpp
-    network.cpp
-    node.cpp
-    input_data.cpp
-    output_file.cpp
-    vector_tools.cpp
-)
-target_include_directories(bond_switch_simulator.exe PUBLIC ${LAMMPS_INCLUDE_DIRS}/lammps)
-target_include_directories(bond_switch_simulator.exe BEFORE PRIVATE ${CMAKE_SOURCE_DIR}/include)
+# Add include directories
+target_include_directories(bond_switch_simulator BEFORE PRIVATE ${CMAKE_SOURCE_DIR}/include)
+target_include_directories(bond_switch_simulator PRIVATE ${LAMMPS_INCLUDE_DIR})
 
-# Link against the LAMMPS and OpenMP libraries
-target_link_libraries(bond_switch_simulator.exe PRIVATE PkgConfig::LAMMPS OpenMP::OpenMP_CXX spdlog::spdlog_header_only)
-
-message(STATUS "LAMMPS include directories: ${LAMMPS_INCLUDE_DIRS}")
-
+# Link the LAMMPS and spdlog libraries
+target_link_libraries(bond_switch_simulator PRIVATE ${LAMMPS_LIBRARY} spdlog::spdlog_header_only)
