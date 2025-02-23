@@ -6,17 +6,13 @@
 #include "lammps_object.h"
 #include "metropolis.h"
 #include "network.h"
-#include <algorithm>
-#include <chrono>
-#include <ctime>
-#include <fstream>
-#include <iomanip>
-#include <iostream>
+#include <array>
 #include <random>
 #include <spdlog/spdlog.h>
-#include <sstream>
-#include <string_view>
-#include <unistd.h>
+#include <tuple>
+#include <unordered_map>
+#include <unordered_set>
+#include <vector>
 
 using LoggerPtr = std::shared_ptr<spdlog::logger>;
 
@@ -31,9 +27,9 @@ struct LinkedNetwork {
 
   Network networkA; // Base network
 
-  std::vector<double> dimensions;   // Periodic boundary of network, xlo = ylo =
+  std::array<double, 2> dimensions; // Periodic boundary of network, xlo = ylo =
                                     // 0, so dimensions = [xhi, yhi]
-  std::vector<double> centreCoords; // Centre of network = [xhi / 2, yhi / 2]
+  std::array<double, 2> centreCoords; // Centre of network = [xhi / 2, yhi / 2]
 
   LammpsObject lammpsNetwork; // LAMMPS object for network
   double energy;              // The current energy of the system
@@ -62,7 +58,10 @@ struct LinkedNetwork {
   std::vector<double> weights;
 
   // Constructors
-  LinkedNetwork();
+  /**
+   * @brief Default constructor
+   */
+  LinkedNetwork() = default;
   LinkedNetwork(const int &numRing, const LoggerPtr &logger);
   LinkedNetwork(const InputData &inputData, const LoggerPtr &logger);
 
