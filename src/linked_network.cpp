@@ -1,4 +1,6 @@
 #include "linked_network.h"
+#include "file_tools.h"
+#include "vector_tools.h"
 #include <algorithm>
 #include <array>
 #include <chrono>
@@ -73,21 +75,11 @@ LinkedNetwork::LinkedNetwork(const InputData &inputData,
  * @param filename the name of the input file
  */
 void LinkedNetwork::findFixedRings(const std::string &filePath) {
-  // File structure has changed to have each fixed ring per line
-  // ie, file does not start with the number of fixed rings.
-  std::ifstream fixedRingsFile(filePath, std::ios::in);
-  if (!fixedRingsFile.is_open()) {
-    logger->warn("Failed to open file: {}, setting number of fixed rings to 0 "
-                 "and they will be ignored",
-                 filePath);
-    return;
-  }
-  std::string line;
-  while (std::getline(fixedRingsFile, line)) {
-    int num;
-    std::istringstream(line) >> num;
-    fixedRings[num] = networkB.nodes[num].numConnections();
-  }
+  const std::unordered_set<int> fixedRingIDs = readFixedRings(filePath, logger);
+  std::ranges::for_each(fixedRingIDs, [this](const int fixedRingID) {
+    this->fixedRings[fixedRingID] =
+        networkB.nodes[fixedRingID].numConnections();
+  });
   logger->info("Number of fixed rings: {}", fixedRings.size());
   logger->info("Fixed ring info (ID: Size): {}", mapToString(fixedRings));
 }

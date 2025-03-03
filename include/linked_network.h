@@ -14,8 +14,6 @@
 #include <unordered_set>
 #include <vector>
 
-using LoggerPtr = std::shared_ptr<spdlog::logger>;
-
 enum class Direction { CLOCKWISE, ANTICLOCKWISE };
 
 struct LinkedNetwork {
@@ -45,8 +43,9 @@ struct LinkedNetwork {
   double maximumAngle;            // Maximum angle between atoms
   bool writeMovie;                // Write movie file or not
 
-  std::unordered_map<int, int> fixedRings; // IDs of the fixed rings
-  std::unordered_set<int> fixedNodes;      // IDs of the fixed nodes
+  // Map of Fixed Ring IDs to their size
+  std::unordered_map<int, int> fixedRings;
+  std::unordered_set<int> fixedNodes; // IDs of the fixed nodes
 
   int numSwitches = 0;            // Number of switches performed
   int numAcceptedSwitches = 0;    // Number of switches accepted
