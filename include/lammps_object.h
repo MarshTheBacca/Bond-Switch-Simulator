@@ -1,32 +1,8 @@
 #ifndef LAMMPS_OBJECT_H
 #define LAMMPS_OBJECT_H
-
-#include <cstdint>
-#include <fstream>
-#include <iomanip>
-#include <iostream>
-#include <random>
-#include <sstream>
-#include <stdio.h>
-#include <unistd.h>
-
-#include "vector_tools.h"
-
-#include "mpi.h"
-#include "stdio.h"
-#include "stdlib.h"
-#include "string.h"
-
 #include "network.h"
-
-#include "atom.h"
-#include "input.h"
-#include "lammps.h" // these are LAMMPS include files
-#include "library.h"
-
-#include <spdlog/spdlog.h>
-
-using LoggerPtr = std::shared_ptr<spdlog::logger>;
+#include "types.h"
+#include <vector>
 
 struct LammpsObject {
   Network networkA;

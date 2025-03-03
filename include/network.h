@@ -3,14 +3,13 @@
 #define NL_NETWORK_H
 
 #include "node.h"
+#include "types.h"
 #include <array>
 #include <map>
 #include <set>
 #include <spdlog/spdlog.h>
 #include <string>
 #include <vector>
-
-using LoggerPtr = std::shared_ptr<spdlog::logger>;
 
 enum class NetworkType { BASE_NETWORK, DUAL_NETWORK };
 

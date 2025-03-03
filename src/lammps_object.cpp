@@ -1,6 +1,7 @@
-// Created by olwhi on 24/07/2023, edited by Marshall Hunt 28/01/2024.
 #include "lammps_object.h"
+#include "library.h" // LAMMPS Library
 #include <filesystem>
+#include <format>
 
 const std::string LAMMPS_FILES_PATH =
     std::filesystem::path("./input_files") / "lammps_files";

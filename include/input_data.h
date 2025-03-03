@@ -2,6 +2,7 @@
 #define INPUT_DATA_H
 
 #include "output_file.h"
+#include "types.h"
 #include <climits>
 #include <fstream>
 #include <functional>
@@ -16,70 +17,69 @@
 #include <type_traits>
 #include <utility>
 
-using LoggerPtr = std::shared_ptr<spdlog::logger>;
-
-enum class StructureType { GRAPHENE,
-                           SILICENE,
-                           TRIANGLE_RAFT,
-                           BILAYER,
-                           BORON_NITRIDE };
-
-enum class SelectionType {
-    RANDOM,
-    EXPONENTIAL_DECAY
+enum class StructureType {
+  GRAPHENE,
+  SILICENE,
+  TRIANGLE_RAFT,
+  BILAYER,
+  BORON_NITRIDE
 };
 
+enum class SelectionType { RANDOM, EXPONENTIAL_DECAY };
+
 struct InputData {
-    // Used for error messages
-    int lineNumber = 0;
-    std::ifstream inputFile;
+  // Used for error messages
+  int lineNumber = 0;
+  std::ifstream inputFile;
 
-    // Network Restrictions Data
-    int minRingSize;
-    int maxRingSize;
-    double maximumBondLength;
-    double maximumAngle;
-    bool isFixRingsEnabled;
+  // Network Restrictions Data
+  int minRingSize;
+  int maxRingSize;
+  double maximumBondLength;
+  double maximumAngle;
+  bool isFixRingsEnabled;
 
-    // Bond Selection Process Data
-    int randomSeed;
-    SelectionType randomOrWeighted;
-    double weightedDecay;
+  // Bond Selection Process Data
+  int randomSeed;
+  SelectionType randomOrWeighted;
+  double weightedDecay;
 
-    // Temperature Schedule Data
-    double thermalisationTemperature;
-    double annealingStartTemperature;
-    double annealingEndTemperature;
-    int thermalisationSteps;
-    int annealingSteps;
+  // Temperature Schedule Data
+  double thermalisationTemperature;
+  double annealingStartTemperature;
+  double annealingEndTemperature;
+  int thermalisationSteps;
+  int annealingSteps;
 
-    // Analysis Data
-    int analysisWriteInterval;
-    bool writeMovie;
+  // Analysis Data
+  int analysisWriteInterval;
+  bool writeMovie;
 
-    LoggerPtr logger;
+  LoggerPtr logger;
 
-    InputData(const std::string &filePath, const LoggerPtr &logger);
+  InputData(const std::string &filePath, const LoggerPtr &logger);
 
-    // Declare template functions
-    template <typename T>
-    void readWord(const std::string &word, T &variable, const std::string &section) const;
-    template <typename... Args>
-    void readSection(const std::string &section, Args &...args);
-    template <typename T>
-    void checkInRange(const T &value, const T &lower, const T &upper, const std::string &errorMessage) const;
+  // Declare template functions
+  template <typename T>
+  void readWord(const std::string &word, T &variable,
+                const std::string &section) const;
+  template <typename... Args>
+  void readSection(const std::string &section, Args &...args);
+  template <typename T>
+  void checkInRange(const T &value, const T &lower, const T &upper,
+                    const std::string &errorMessage) const;
 
-    // Declare non-template functions
-    bool stringToBool(const std::string &str) const;
-    std::string getFirstWord();
+  // Declare non-template functions
+  bool stringToBool(const std::string &str) const;
+  std::string getFirstWord();
 
-    void readNetworkRestrictions();
-    void readBondSelectionProcess();
-    void readTemperatureSchedule();
-    void readAnalysis();
+  void readNetworkRestrictions();
+  void readBondSelectionProcess();
+  void readTemperatureSchedule();
+  void readAnalysis();
 
-    void checkFileExists(const std::string &filename) const;
-    void validate() const;
+  void checkFileExists(const std::string &filename) const;
+  void validate() const;
 };
 
 #include "input_data.tpp"
