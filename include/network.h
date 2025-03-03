@@ -46,7 +46,7 @@ struct Network {
 
   double getAverageCoordination() const;
   double getAboavWeaire() const;
-  double getAverageCoordination(const int &power) const;
+  double getAverageCoordination(const int power) const;
 
   // Write functions
   void writeInfo(std::ofstream &infoFile) const;
