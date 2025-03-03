@@ -62,7 +62,7 @@ struct LinkedNetwork {
    * @brief Default constructor
    */
   LinkedNetwork() = default;
-  LinkedNetwork(const int &numRing, const LoggerPtr &logger);
+  LinkedNetwork(const int numRing, const LoggerPtr &logger);
   LinkedNetwork(const InputData &inputData, const LoggerPtr &logger);
 
   void findFixedRings(const std::string &flePath);
@@ -74,10 +74,10 @@ struct LinkedNetwork {
   int assignValues(int randNodeCoordination,
                    int randNodeConnectionCoordination) const;
 
-  int findCommonConnection(const int &baseNode, const int &ringNode,
-                           const int &excludeNode) const;
-  int findCommonRing(const int &baseNode1, const int &baseNode2,
-                     const int &excludeNode) const;
+  int findCommonConnection(const int baseNode, const int ringNode,
+                           const int excludeNode) const;
+  int findCommonRing(const int baseNode1, const int baseNode2,
+                     const int excludeNode) const;
 
   void monteCarloSwitchMoveLAMMPS(const double &temperature);
   void rejectMove(const std::vector<Node> &initialInvolvedNodesA,
@@ -109,15 +109,15 @@ struct LinkedNetwork {
                            const std::vector<Node> &initialInvolvedNodesB);
 
   std::tuple<std::vector<double>, std::vector<double>>
-  rotateBond(const int &atomID1, const int &atomID2,
+  rotateBond(const int atomID1, const int atomID2,
              const Direction &direct) const;
   Direction getRingsDirection(const std::vector<int> &ringNodeIDs) const;
 
-  bool checkClockwiseNeighbours(const int &nodeID) const;
-  bool checkClockwiseNeighbours(const int &nodeID,
+  bool checkClockwiseNeighbours(const int nodeID) const;
+  bool checkClockwiseNeighbours(const int nodeID,
                                 const std::vector<double> &coords) const;
   bool checkAllClockwiseNeighbours() const;
-  void arrangeNeighboursClockwise(const int &nodeID,
+  void arrangeNeighboursClockwise(const int nodeID,
                                   const std::vector<double> &coords);
   void arrangeNeighboursClockwise(const std::unordered_set<int> &nodeIDs,
                                   const std::vector<double> &coords);
@@ -125,7 +125,7 @@ struct LinkedNetwork {
   bool checkAnglesWithinRange(const std::vector<double> &coords);
   bool checkAnglesWithinRange(const std::unordered_set<int> &nodeIDs,
                               const std::vector<double> &coords);
-  bool checkBondLengths(const int &nodeID,
+  bool checkBondLengths(const int nodeID,
                         const std::vector<double> &coords) const;
   bool checkBondLengths(const std::unordered_set<int> &nodeIDs,
                         const std::vector<double> &coords) const;

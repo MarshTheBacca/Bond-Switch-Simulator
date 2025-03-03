@@ -22,7 +22,7 @@ const std::string BSS_NETWORK_PATH =
  * @param num Number to calculate the rounded square root of
  * @return Rounded square root of the number
  */
-inline int roundedSqrt(const int &num) {
+inline int roundedSqrt(const int num) {
   return static_cast<int>(std::round(std::sqrt(num)));
 }
 
@@ -234,7 +234,7 @@ void Network::refreshEntropy() {
 void Network::refreshAssortativityDistribution() {
   assortativityDistribution.clear();
   std::ranges::for_each(nodes, [this](const Node &node) {
-    std::ranges::for_each(node.netConnections, [&node, this](const int &cnx) {
+    std::ranges::for_each(node.netConnections, [&node, this](const int cnx) {
       int cnxRingSize = nodes[cnx].numConnections();
       auto &outerMap = assortativityDistribution[node.numConnections()];
       if (!outerMap.contains(cnxRingSize)) {
@@ -268,7 +268,7 @@ double Network::getAverageCoordination() const {
  * @param power Power to raise the coordination to
  * @return Average coordination to the power of the given power
  */
-double Network::getAverageCoordination(const int &power) const {
+double Network::getAverageCoordination(const int power) const {
   double totalCoordination = 0.0;
   std::ranges::for_each(nodes, [&totalCoordination, power](const Node &node) {
     totalCoordination += std::pow(node.numConnections(), power);
@@ -388,7 +388,7 @@ void Network::writeConnections(
   connectionsFile << std::fixed << std::showpoint << std::setprecision(1);
   for (int i = 0; i < nodes.size(); ++i) {
     std::ranges::for_each(
-        connections[i], [&connectionsFile](const int &connection) {
+        connections[i], [&connectionsFile](const int connection) {
           connectionsFile << std::format("{:<20}", connection);
         });
     connectionsFile << std::endl;

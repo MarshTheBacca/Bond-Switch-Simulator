@@ -628,9 +628,8 @@ bool LinkedNetwork::genSwitchOperations(
  * @return ID of the common connection
  * @throw std::runtime_error if the associated node cannot be found
  */
-int LinkedNetwork::findCommonConnection(const int &baseNode,
-                                        const int &ringNode,
-                                        const int &excludeNode) const {
+int LinkedNetwork::findCommonConnection(const int baseNode, const int ringNode,
+                                        const int excludeNode) const {
   // Find node that shares baseNode and ringNode but is not excludeNode
   std::set<int> commonConnections =
       intersectSets(networkA.nodes[baseNode].netConnections,
@@ -653,8 +652,8 @@ int LinkedNetwork::findCommonConnection(const int &baseNode,
  * @return ID of the common ring connection
  * @throw std::runtime_error if the associated node cannot be found
  */
-int LinkedNetwork::findCommonRing(const int &baseNode1, const int &baseNode2,
-                                  const int &excludeNode) const {
+int LinkedNetwork::findCommonRing(const int baseNode1, const int baseNode2,
+                                  const int excludeNode) const {
   // Find node that shares baseNode1 and baseNode2 but is not excludeNode
   std::set<int> commonRings =
       intersectSets(networkA.nodes[baseNode1].dualConnections,
@@ -776,7 +775,7 @@ bool LinkedNetwork::checkConsistency() {
   bool consistent = true;
   std::ranges::for_each(networkA.nodes, [this, &consistent](const Node &node) {
     std::ranges::for_each(
-        node.netConnections, [this, &node, &consistent](const int &cnx) {
+        node.netConnections, [this, &node, &consistent](const int cnx) {
           if (networkA.nodes[cnx].netConnections.contains(node.id)) {
             return;
           }
@@ -797,7 +796,7 @@ bool LinkedNetwork::checkConsistency() {
       networkB.nodes,
       [this, &consistent, &fixedRingNeighbours](const Node &node) {
         std::ranges::for_each(
-            node.netConnections, [this, &node, &consistent](const int &cnx) {
+            node.netConnections, [this, &node, &consistent](const int cnx) {
               if (networkB.nodes[cnx].netConnections.contains(node.id)) {
                 return;
               }
@@ -817,7 +816,7 @@ bool LinkedNetwork::checkConsistency() {
       });
   std::ranges::for_each(networkA.nodes, [this, &consistent](Node &node) {
     std::ranges::for_each(
-        node.dualConnections, [this, &node, &consistent](const int &cnx) {
+        node.dualConnections, [this, &node, &consistent](const int cnx) {
           if (networkB.nodes[cnx].dualConnections.contains(node.id)) {
             return;
           }
@@ -829,7 +828,7 @@ bool LinkedNetwork::checkConsistency() {
   });
   std::ranges::for_each(networkB.nodes, [this, &consistent](const Node &node) {
     std::ranges::for_each(
-        node.dualConnections, [this, &node, &consistent](const int &cnx) {
+        node.dualConnections, [this, &node, &consistent](const int cnx) {
           if (networkA.nodes[cnx].dualConnections.contains(node.id)) {
             return;
           }
@@ -868,7 +867,7 @@ void LinkedNetwork::write() const {
  * @param nodeID ID of the node to check
  * @return true if the node has clockwise neighbours, false otherwise
  */
-bool LinkedNetwork::checkClockwiseNeighbours(const int &nodeID) const {
+bool LinkedNetwork::checkClockwiseNeighbours(const int nodeID) const {
   Node node = networkA.nodes[nodeID];
   double prevAngle = getClockwiseAngle(
       node.coord, networkA.nodes[*node.netConnections.rbegin()].coord,
@@ -899,7 +898,7 @@ bool LinkedNetwork::checkClockwiseNeighbours(const int &nodeID) const {
  * @return true if the node has clockwise neighbours, false otherwise
  */
 bool LinkedNetwork::checkClockwiseNeighbours(
-    const int &nodeID, const std::vector<double> &coords) const {
+    const int nodeID, const std::vector<double> &coords) const {
   const std::array<double, 2> nodeCoord = {coords[2 * nodeID],
                                            coords[2 * nodeID + 1]};
   const int lastNeighbourCoordsID =
@@ -940,7 +939,7 @@ bool LinkedNetwork::checkAllClockwiseNeighbours() const {
 }
 
 void LinkedNetwork::arrangeNeighboursClockwise(
-    const int &nodeID, const std::vector<double> &coords) {
+    const int nodeID, const std::vector<double> &coords) {
   return;
 }
 
@@ -980,7 +979,7 @@ bool LinkedNetwork::checkAnglesWithinRange(
  * @param coords Coordinates of all nodes as a 1D vector of coordinate pairs
  * @return true if all bonds are within the maximum bond length, false otherwise
  */
-bool LinkedNetwork::checkBondLengths(const int &nodeID,
+bool LinkedNetwork::checkBondLengths(const int nodeID,
                                      const std::vector<double> &coords) const {
   for (const auto &neighbourID : networkA.nodes[nodeID].netConnections) {
     std::array<double, 2> pbcVec = pbcArray(
@@ -1061,7 +1060,7 @@ LinkedNetwork::getRingsDirection(const std::vector<int> &ringNodeIDs) const {
  * @return Pair of vectors containing the new coordinates of the atoms
  */
 std::tuple<std::vector<double>, std::vector<double>>
-LinkedNetwork::rotateBond(const int &atomID1, const int &atomID2,
+LinkedNetwork::rotateBond(const int atomID1, const int atomID2,
                           const Direction &direct) const {
   logger->debug("Rotating bond between atoms {} and {}", atomID1, atomID2);
   std::vector<double> atom1Coord = {currentCoords[atomID1 * 2],

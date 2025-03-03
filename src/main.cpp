@@ -109,7 +109,7 @@ LoggerPtr initialiseLogger(int argc, char *argv[]) {
  */
 void runSimulation(const std::vector<double> &expTemperatures,
                    LinkedNetwork &linkedNetwork, OutputFile &allStatsFile,
-                   const int &writeInterval, const LoggerPtr &logger) {
+                   const int writeInterval, const LoggerPtr &logger) {
   if (expTemperatures.empty()) {
     logger->warn("No temperatures given, simulation not run");
     return;
