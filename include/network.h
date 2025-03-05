@@ -9,6 +9,7 @@
 #include <set>
 #include <spdlog/spdlog.h>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 enum class NetworkType { BASE_NETWORK, DUAL_NETWORK };
@@ -24,6 +25,7 @@ struct Network {
   // Statistics
   double pearsonsCoeff;
   double entropy;
+  // Map of node degree to probability
   std::map<int, double> nodeSizes;
   std::map<int, std::map<int, double>> assortativityDistribution;
 
@@ -51,26 +53,31 @@ struct Network {
   void writeInfo(std::ofstream &infoFile) const;
   void writeCoords(std::ofstream &crdFile) const;
   void writeConnections(std::ofstream &cnxFile,
-                        const std::vector<std::set<int>> &cnxs) const;
-  std::vector<std::set<int>> getConnections() const;
-  std::vector<std::set<int>> getDualConnections() const;
+                        const std::vector<std::set<uint16_t>> &cnxs) const;
+  std::vector<std::set<uint16_t>> getConnections() const;
+  std::vector<std::set<uint16_t>> getDualConnections() const;
   void write() const;
 
-  int getMaxConnections() const;
-  int getMaxConnections(const std::set<int> &fixedNodes) const;
+  size_t getMaxConnections() const;
+  size_t
+  getMaxConnections(const std::unordered_set<uint16_t> &excludeNodes) const;
 
-  int getMinConnections() const;
-  int getMinConnections(const std::set<int> &fixedNodes) const;
+  size_t getMinConnections() const;
+  size_t
+  getMinConnections(const std::unordered_set<uint16_t> &excludeNodes) const;
 
-  int getMaxDualConnections() const;
-  int getMinDualConnections() const;
-  int getMinDualConnections(const std::set<int> &fixedNodes) const;
+  size_t getMaxDualConnections() const;
+  size_t getMinDualConnections() const;
+  size_t
+  getMinDualConnections(const std::unordered_set<uint16_t> &excludeNodes) const;
 
   std::vector<double> getCoords();
   void centreRings(const Network &baseNetwork);
 
   int findNumberOfUniqueDualNodes();
   void display(const LoggerPtr &logger) const;
+  Node &getRandomNode();
+  Node &getRandomNodeConnection(const Node &node);
 };
 
 #endif // NL_NETWORK_H

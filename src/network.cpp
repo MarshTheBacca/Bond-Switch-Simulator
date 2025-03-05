@@ -1,8 +1,10 @@
 #include "network.h"
 #include "output_file.h"
+#include "random_number_generator.h"
 #include "vector_tools.h"
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
@@ -13,6 +15,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <unordered_set>
 
 const std::string BSS_NETWORK_PATH =
     std::filesystem::path("./input_files") / "bss_network";
@@ -384,7 +387,7 @@ void Network::writeCoords(std::ofstream &crdFile) const {
  */
 void Network::writeConnections(
     std::ofstream &connectionsFile,
-    const std::vector<std::set<int>> &connections) const {
+    const std::vector<std::set<uint16_t>> &connections) const {
   connectionsFile << std::fixed << std::showpoint << std::setprecision(1);
   for (int i = 0; i < nodes.size(); ++i) {
     std::ranges::for_each(
@@ -400,8 +403,8 @@ void Network::writeConnections(
  * @brief Get the net connections of the network
  * @return 2D vector of net connections
  */
-std::vector<std::set<int>> Network::getConnections() const {
-  std::vector<std::set<int>> netConnections(nodes.size());
+std::vector<std::set<uint16_t>> Network::getConnections() const {
+  std::vector<std::set<uint16_t>> netConnections(nodes.size());
   for (int i = 0; i < nodes.size(); ++i) {
     netConnections[i] = nodes[i].netConnections;
   }
@@ -412,8 +415,8 @@ std::vector<std::set<int>> Network::getConnections() const {
  * @brief Get the dual connections of the network
  * @return 2D vector of dual connections
  */
-std::vector<std::set<int>> Network::getDualConnections() const {
-  std::vector<std::set<int>> dualConnections{};
+std::vector<std::set<uint16_t>> Network::getDualConnections() const {
+  std::vector<std::set<uint16_t>> dualConnections{};
   std::ranges::for_each(nodes, [&dualConnections](const Node &node) {
     dualConnections.push_back(node.dualConnections);
   });
@@ -446,14 +449,14 @@ void Network::write() const {
  * @brief Get the maximum coordination number for all nodes in the network
  * @return Maximum number of connections
  */
-int Network::getMaxConnections() const {
+size_t Network::getMaxConnections() const {
   if (nodes.empty()) {
     throw std::runtime_error("Cannot get max connections of " + networkString +
                              ": no nodes");
   }
   auto maxNode =
-      std::ranges::max_element(nodes, [](const Node &a, const Node &b) {
-        return a.numConnections() < b.numConnections();
+      std::ranges::max_element(nodes, [](const Node &node1, const Node &node2) {
+        return node1.numConnections() < node2.numConnections();
       });
   return maxNode->numConnections();
 }
@@ -464,7 +467,8 @@ int Network::getMaxConnections() const {
  * @param excludeNodes The IDs of all the nodes to exclude
  * @return Maximum number of connections
  */
-int Network::getMaxConnections(const std::set<int> &excludeNodes) const {
+size_t Network::getMaxConnections(
+    const std::unordered_set<uint16_t> &excludeNodes) const {
   int maxConnections = 0;
   for (const auto &node : nodes) {
     if (excludeNodes.contains(node.id)) {
@@ -481,10 +485,10 @@ int Network::getMaxConnections(const std::set<int> &excludeNodes) const {
  * @brief Get the minimum number of connections of all nodes in the network
  * @return Minimum number of connections
  */
-int Network::getMinConnections() const {
+size_t Network::getMinConnections() const {
   auto minNode =
-      std::ranges::min_element(nodes, [](const Node &a, const Node &b) {
-        return a.netConnections.size() < b.netConnections.size();
+      std::ranges::min_element(nodes, [](const Node &node1, const Node &node2) {
+        return node1.netConnections.size() < node2.netConnections.size();
       });
   return minNode->numConnections();
 }
@@ -492,10 +496,11 @@ int Network::getMinConnections() const {
 /**
  * @brief Get the minimum number of connections of all nodes in the network,
  * excluding those in excludeNodes
- * @param fixedNodes The IDs of all the fixed nodes
+ * @param excludeNodes Node IDs to ignore
  * @return Minimum number of connections
  */
-int Network::getMinConnections(const std::set<int> &excludeNodes) const {
+size_t Network::getMinConnections(
+    const std::unordered_set<uint16_t> &excludeNodes) const {
   int minConnections = std::numeric_limits<int>::max();
   for (const auto &node : nodes) {
     if (excludeNodes.contains(node.id))
@@ -510,10 +515,10 @@ int Network::getMinConnections(const std::set<int> &excludeNodes) const {
  * @brief Get the maximum dual coordination number for all nodes in the network
  * @return Maximum number of connections
  */
-int Network::getMaxDualConnections() const {
+size_t Network::getMaxDualConnections() const {
   auto maxNode =
-      std::ranges::max_element(nodes, [](const Node &a, const Node &b) {
-        return a.numDualConnections() < b.numDualConnections();
+      std::ranges::max_element(nodes, [](const Node &node1, const Node &node2) {
+        return node1.numDualConnections() < node2.numDualConnections();
       });
   return maxNode->numDualConnections();
 }
@@ -524,8 +529,9 @@ int Network::getMaxDualConnections() const {
  * @param excludeNodes The IDs of all the nodes to exclude
  * @return Maximum number of connections
  */
-int Network::getMinDualConnections(const std::set<int> &excludeNodes) const {
-  int minConnections = std::numeric_limits<int>::max();
+size_t Network::getMinDualConnections(
+    const std::unordered_set<uint16_t> &excludeNodes) const {
+  size_t minConnections = std::numeric_limits<int>::max();
   for (const auto &node : nodes) {
     if (excludeNodes.contains(node.id)) {
       continue;
@@ -541,10 +547,10 @@ int Network::getMinDualConnections(const std::set<int> &excludeNodes) const {
  * @brief Get the minimum dual coordination number for all nodes in the network
  * @return Minimum number of connections
  */
-int Network::getMinDualConnections() const {
+size_t Network::getMinDualConnections() const {
   auto minNode =
-      std::ranges::min_element(nodes, [](const Node &a, const Node &b) {
-        return a.numDualConnections() < b.numDualConnections();
+      std::ranges::min_element(nodes, [](const Node &node1, const Node node2) {
+        return node1.numDualConnections() < node2.numDualConnections();
       });
   return minNode->numDualConnections();
 }
@@ -583,4 +589,13 @@ void Network::display(const LoggerPtr &logger) const {
   logger->info("Nodes:");
   std::ranges::for_each(
       nodes, [&logger](const Node &node) { logger->info(node.toString()); });
+}
+
+Node &Network::getRandomNode() {
+  return *RandomNumberGenerator::getInstance().getRandomElement(
+      this->nodes.begin(), this->nodes.end());
+}
+
+Node &Network::getRandomNodeConnection(const Node &node) {
+  return this->nodes[node.getRandomNetConnectionID()];
 }
