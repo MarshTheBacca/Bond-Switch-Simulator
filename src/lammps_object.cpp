@@ -232,27 +232,34 @@ void LammpsObject::formAngle(const int atom1, const int atom2,
  * triples)
  * @param angleMakes The IDs of the angles to be made (1D vector of triples)
  */
-void LammpsObject::switchGraphene(const std::vector<int> &bondBreaks,
-                                  const std::vector<int> &bondMakes,
-                                  const std::vector<int> &angleBreaks,
-                                  const std::vector<int> &angleMakes,
-                                  const std::vector<double> &rotatedCoord1,
-                                  const std::vector<double> &rotatedCoord2) {
-  for (int i = 0; i < bondBreaks.size(); i += 2) {
-    breakBond(bondBreaks[i] + 1, bondBreaks[i + 1] + 1, 1);
-  }
-  for (int i = 0; i < bondMakes.size(); i += 2) {
-    formBond(bondMakes[i] + 1, bondMakes[i + 1] + 1, 1);
-  }
-  for (int i = 0; i < angleBreaks.size(); i += 3) {
-    breakAngle(angleBreaks[i] + 1, angleBreaks[i + 1] + 1,
-               angleBreaks[i + 2] + 1);
-  }
-  for (int i = 0; i < angleMakes.size(); i += 3) {
-    formAngle(angleMakes[i] + 1, angleMakes[i + 1] + 1, angleMakes[i + 2] + 1);
-  }
-  int atom1ID = bondBreaks[0] + 1;
-  int atom2ID = bondBreaks[2] + 1;
+void LammpsObject::switchGraphene(
+    const std::array<std::array<uint16_t, 2>, 2> &bondBreaks,
+    const std::array<std::array<uint16_t, 2>, 2> &bondMakes,
+    const std::array<std::array<uint16_t, 3>, 8> &angleBreaks,
+    const std::array<std::array<uint16_t, 3>, 8> &angleMakes,
+    const std::vector<double> &rotatedCoord1,
+    const std::vector<double> &rotatedCoord2) {
+
+  std::ranges::for_each(bondBreaks,
+                        [this](const std::array<uint16_t, 2> &bond) {
+                          breakBond(bond[0] + 1, bond[1] + 1, 1);
+                        });
+  std::ranges::for_each(bondMakes, [this](const std::array<uint16_t, 2> &bond) {
+    formBond(bond[0] + 1, bond[1] + 1, 1);
+  });
+
+  std::ranges::for_each(angleBreaks,
+                        [this](const std::array<uint16_t, 3> &angle) {
+                          breakAngle(angle[0] + 1, angle[1] + 1, angle[2] + 1);
+                        });
+
+  std::ranges::for_each(angleMakes,
+                        [this](const std::array<uint16_t, 3> &angle) {
+                          formAngle(angle[0] + 1, angle[1] + 1, angle[2] + 1);
+                        });
+
+  int atom1ID = bondBreaks[0][0] + 1;
+  int atom2ID = bondBreaks[1][0] + 1;
   setAtomCoords(atom1ID, rotatedCoord1, 2);
   setAtomCoords(atom2ID, rotatedCoord2, 2);
 }
@@ -268,23 +275,29 @@ void LammpsObject::switchGraphene(const std::vector<int> &bondBreaks,
  * @param angleMakes The IDs of the angles that have been made (1D vector of
  * triples)
  */
-void LammpsObject::revertGraphene(const std::vector<int> &bondBreaks,
-                                  const std::vector<int> &bondMakes,
-                                  const std::vector<int> &angleBreaks,
-                                  const std::vector<int> &angleMakes) {
-  for (int i = 0; i < bondMakes.size(); i += 2) {
-    breakBond(bondMakes[i] + 1, bondMakes[i + 1] + 1, 1);
-  }
-  for (int i = 0; i < bondBreaks.size(); i += 2) {
-    formBond(bondBreaks[i] + 1, bondBreaks[i + 1] + 1, 1);
-  }
-  for (int i = 0; i < angleMakes.size(); i += 3) {
-    breakAngle(angleMakes[i] + 1, angleMakes[i + 1] + 1, angleMakes[i + 2] + 1);
-  }
-  for (int i = 0; i < angleBreaks.size(); i += 3) {
-    formAngle(angleBreaks[i] + 1, angleBreaks[i + 1] + 1,
-              angleBreaks[i + 2] + 1);
-  }
+void LammpsObject::revertGraphene(
+    const std::array<std::array<uint16_t, 2>, 2> &bondBreaks,
+    const std::array<std::array<uint16_t, 2>, 2> &bondMakes,
+    const std::array<std::array<uint16_t, 3>, 8> &angleBreaks,
+    const std::array<std::array<uint16_t, 3>, 8> &angleMakes) {
+  std::ranges::for_each(bondBreaks,
+                        [this](const std::array<uint16_t, 2> &bond) {
+                          formBond(bond[0] + 1, bond[1] + 1, 1);
+                        });
+
+  std::ranges::for_each(bondMakes, [this](const std::array<uint16_t, 2> &bond) {
+    breakBond(bond[0] + 1, bond[1] + 1, 1);
+  });
+
+  std::ranges::for_each(angleBreaks,
+                        [this](const std::array<uint16_t, 3> &angle) {
+                          formAngle(angle[0] + 1, angle[1] + 1, angle[2] + 1);
+                        });
+
+  std::ranges::for_each(angleMakes,
+                        [this](const std::array<uint16_t, 3> &angle) {
+                          breakAngle(angle[0] + 1, angle[1] + 1, angle[2] + 1);
+                        });
 }
 
 void LammpsObject::setCoords(std::vector<double> &newCoords, int dim) {

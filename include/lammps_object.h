@@ -36,18 +36,18 @@ struct LammpsObject {
   void formAngle(const int atom1, const int atom2, const int atom3);
   void breakAndFormAngles(int atom3, int atom1, int atom5, int atom4, int e1,
                           int e11, int d1, int d11);
-  std::pair<int, int> identifyAtoms(int atomA, int atomB, Network networkAArg);
 
-  void switchGraphene(const std::vector<int> &bondBreaks,
-                      const std::vector<int> &bondMakes,
-                      const std::vector<int> &angleBreaks,
-                      const std::vector<int> &angleMakes,
+  void switchGraphene(const std::array<std::array<uint16_t, 2>, 2> &bondBreaks,
+                      const std::array<std::array<uint16_t, 2>, 2> &bondMakes,
+                      const std::array<std::array<uint16_t, 3>, 8> &angleBreaks,
+                      const std::array<std::array<uint16_t, 3>, 8> &angleMakes,
                       const std::vector<double> &rotatedCoord1,
                       const std::vector<double> &rotatedCoord2);
-  void revertGraphene(const std::vector<int> &bondBreaks,
-                      const std::vector<int> &bondMakes,
-                      const std::vector<int> &angleBreaks,
-                      const std::vector<int> &angleMakes);
+
+  void revertGraphene(const std::array<std::array<uint16_t, 2>, 2> &bondBreaks,
+                      const std::array<std::array<uint16_t, 2>, 2> &bondMakes,
+                      const std::array<std::array<uint16_t, 3>, 8> &angleBreaks,
+                      const std::array<std::array<uint16_t, 3>, 8> &angleMakes);
   std::vector<int> getAngles() const;
 
   void writeData();
