@@ -1,5 +1,6 @@
 #include "file_tools.h"
 #include "types.h"
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <unordered_set>
@@ -10,8 +11,8 @@
  * @param logger Logger object
  * @note The file format is one integer per line
  */
-std::unordered_set<int> readFixedRings(const std::filesystem::path &filePath,
-                                       const LoggerPtr &logger) {
+std::unordered_set<uint16_t>
+readFixedRings(const std::filesystem::path &filePath, const LoggerPtr &logger) {
   std::ifstream fixedRingsFile(filePath);
   if (!fixedRingsFile.is_open()) {
     logger->warn(
@@ -19,11 +20,11 @@ std::unordered_set<int> readFixedRings(const std::filesystem::path &filePath,
         filePath.string());
     return {};
   }
-  std::unordered_set<int> fixedRings;
+  std::unordered_set<uint16_t> fixedRings;
   std::string line;
   while (std::getline(fixedRingsFile, line)) {
     try {
-      int ringId = std::stoi(line);
+      uint16_t ringId = std::stoi(line);
       fixedRings.insert(ringId);
     } catch (const std::exception &e) {
       logger->warn("Ignoring invalid entry in file {}: {}", filePath.string(),
