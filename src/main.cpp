@@ -1,6 +1,7 @@
 #include "input_data.h"
 #include "linked_network.h"
 #include "output_file.h"
+#include "random_number_generator.h"
 #include "spdlog/sinks/basic_file_sink.h"
 #include "spdlog/sinks/stdout_color_sinks.h"
 #include "spdlog/spdlog.h"
@@ -121,7 +122,7 @@ void runSimulation(const std::vector<double> &expTemperatures,
       cleanup(linkedNetwork, allStatsFile);
       exit(0);
     }
-    linkedNetwork.monteCarloSwitchMoveLAMMPS(expTemperatures[i - 1]);
+    linkedNetwork.performBondSwitch(expTemperatures[i - 1]);
     if (i % writeInterval == 0) {
       linkedNetwork.networkB.refreshStatistics();
       allStatsFile.writeValues(linkedNetwork.numSwitches,
@@ -168,6 +169,8 @@ int main(int argc, char *argv[]) {
         return 1;
       }
     }
+    // Initialise Random Number Generator
+    RandomNumberGenerator::initialize(inputData.randomSeed);
 
     // Initialise linkedNetwork
     logger->debug("Initialising linkedNetwork...");
