@@ -1,9 +1,12 @@
 #include "linked_network.h"
 #include "file_tools.h"
+#include "random_number_generator.h"
+#include "switch_move.h"
 #include "vector_tools.h"
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <cstdint>
 #include <ctime>
 #include <filesystem>
 #include <format>
@@ -39,13 +42,13 @@ LinkedNetwork::LinkedNetwork(const InputData &inputData,
   } else {
     logger->info("Fixed rings disabled, setting number of fixed rings to 0.");
   }
-  if (int loadedMinRingSize = networkB.getMinConnections();
+  if (size_t loadedMinRingSize = networkB.getMinConnections();
       loadedMinRingSize < minRingSize) {
     logger->warn("Loaded network has a min ring size of {} which is lower than "
                  "input file's {}",
                  loadedMinRingSize, minRingSize);
   }
-  if (int loadedMaxRingSize = networkB.getMaxConnections();
+  if (size_t loadedMaxRingSize = networkB.getMaxConnections();
       loadedMaxRingSize > maxRingSize) {
     logger->warn("Loaded network has a max ring size of {} which is higher "
                  "than input file's {}",
@@ -69,14 +72,15 @@ LinkedNetwork::LinkedNetwork(const InputData &inputData,
 }
 
 /**
- * @brief read the fixed_rings.txt file and populate fixedRings with integers
+ * @brief Read the fixed_rings.txt file and populate fixedRings with integers
  * from each line
  * @param isFixedRingsEnabled boolean to enable or disable fixed rings
  * @param filename the name of the input file
  */
 void LinkedNetwork::findFixedRings(const std::string &filePath) {
-  const std::unordered_set<int> fixedRingIDs = readFixedRings(filePath, logger);
-  std::ranges::for_each(fixedRingIDs, [this](const int fixedRingID) {
+  const std::unordered_set<uint16_t> fixedRingIDs =
+      readFixedRings(filePath, logger);
+  std::ranges::for_each(fixedRingIDs, [this](const uint16_t fixedRingID) {
     this->fixedRings[fixedRingID] =
         networkB.nodes[fixedRingID].numConnections();
   });
@@ -98,43 +102,53 @@ void LinkedNetwork::findFixedNodes() {
       });
 }
 
-/**
- * @brief Perform a monte carlo switch move, evaluate energy, and accept or
- * reject
- */
-void LinkedNetwork::monteCarloSwitchMoveLAMMPS(const double &temperature) {
-  logger->debug("Finding move...");
-  bool foundValidMove = false;
-  int baseNode1;
-  int baseNode2;
-  int ringNode1;
-  int ringNode2;
-
-  std::vector<int> bondBreaks;
-  std::vector<int> bondMakes;
-  std::vector<int> angleBreaks;
-  std::vector<int> angleMakes;
-  std::vector<int> ringBondBreakMake;
-  std::unordered_set<int> involvedNodes;
-
-  for (int i = 0; i < networkA.nodes.size() * networkA.nodes.size(); ++i) {
-    std::tuple<int, int, int, int> result;
-    result = pickRandomConnection();
-
-    std::tie(baseNode1, baseNode2, ringNode1, ringNode2) = result;
-    logger->debug("Picked base nodes: {} {} and ring nodes: {} {}", baseNode1,
-                  baseNode2, ringNode1, ringNode2);
-    foundValidMove = genSwitchOperations(
-        baseNode1, baseNode2, ringNode1, ringNode2, bondBreaks, bondMakes,
-        angleBreaks, angleMakes, ringBondBreakMake, involvedNodes);
-    if (foundValidMove)
+std::optional<SwitchMove> LinkedNetwork::getSwitchMove() {
+  // Number of bonds in a network of N nodes with degree 3 is 3 * N / 2
+  const size_t maxAttempts = networkA.nodes.size() * 3 / 2;
+  size_t attempts = 0;
+  std::set<std::set<uint16_t>> failedConnections;
+  while (true) {
+    if (attempts >= maxAttempts) {
+      logger->error("Cannot find any valid switch moves");
       break;
+    }
+    std::array<std::array<uint16_t, 2>, 2> result = pickRandomConnection();
+    auto &[baseConnection, dualConnection] = result;
+    auto &[baseNode1, baseNode2] = baseConnection;
+    auto &[ringNode1, ringNode2] = dualConnection;
+    if (failedConnections.contains(
+            std::set{baseConnection[0], baseConnection[1]})) {
+      // We have already tried this connection
+      continue;
+    }
+    logger->debug("Random connection chosen. Base: {}-{} Ring: {}-{}",
+                  baseNode1, baseNode2, ringNode1, ringNode2);
+    try {
+      return std::optional<SwitchMove>{
+          this->genSwitchMove(baseNode1, baseNode2, ringNode1, ringNode2)};
+    } catch (const SwitchMoveException &e) {
+      logger->debug("Invalid move: {}", e.what());
+      failedConnections.insert(std::set{baseConnection[0], baseConnection[1]});
+      attempts++;
+    }
   }
+  return std::nullopt;
+}
 
-  if (!foundValidMove) {
+/**
+ * @brief Perform a bond switch, evaluate energy, accept or
+ * reject
+ * @param temperature The temperature of the system
+ */
+void LinkedNetwork::performBondSwitch(const double temperature) {
+  logger->debug("Finding move...");
+  const std::optional<SwitchMove> switchMoveOpt = getSwitchMove();
+  if (!switchMoveOpt.has_value()) {
     logger->error("Cannot find any valid switch moves");
     throw std::runtime_error("Cannot find any valid switch moves");
   }
+  const SwitchMove &switchMove = switchMoveOpt.value();
+
   numSwitches++;
   logger->debug("Switch number: {}", numSwitches);
 
@@ -142,28 +156,31 @@ void LinkedNetwork::monteCarloSwitchMoveLAMMPS(const double &temperature) {
   double initialEnergy = energy;
 
   std::vector<Node> initialInvolvedNodesA;
-  for (const auto &id : involvedNodes) {
+  for (const uint16_t &id : switchMove.involvedBaseNodes) {
     initialInvolvedNodesA.push_back(networkA.nodes[id]);
   }
   std::vector<Node> initialInvolvedNodesB;
-  for (const auto &id : ringBondBreakMake) {
-    initialInvolvedNodesB.push_back(networkB.nodes[id]);
+  for (const std::array<uint16_t, 2> &bond : switchMove.ringBondBreakMake) {
+    for (const uint16_t &id : bond) {
+      initialInvolvedNodesB.push_back(networkB.nodes[id]);
+    }
   }
 
   // Switch and geometry optimise
   logger->debug("Switching BSS Network...");
-  switchNetMCGraphene(bondBreaks, ringBondBreakMake);
+  applyMove(switchMove.bondBreaks, switchMove.ringBondBreakMake);
   std::vector<double> rotatedCoord1;
   std::vector<double> rotatedCoord2;
-  std::vector<int> orderedRingNodes = {
-      ringBondBreakMake[1], ringBondBreakMake[3], ringBondBreakMake[0],
-      ringBondBreakMake[2]};
-  std::tie(rotatedCoord1, rotatedCoord2) =
-      rotateBond(baseNode1, baseNode2, getRingsDirection(orderedRingNodes));
+  std::vector<uint16_t> orderedRingNodes = {
+      switchMove.ringBondBreakMake[0][1], switchMove.ringBondBreakMake[1][1],
+      switchMove.ringBondBreakMake[0][0], switchMove.ringBondBreakMake[1][0]};
+  std::tie(rotatedCoord1, rotatedCoord2) = rotateBond(
+      switchMove.selectedBaseBond, getRingsDirection(orderedRingNodes));
 
   logger->debug("Switching LAMMPS Network...");
 
-  lammpsNetwork.switchGraphene(bondBreaks, bondMakes, angleBreaks, angleMakes,
+  lammpsNetwork.switchGraphene(switchMove.bondBreaks, switchMove.bondMakes,
+                               switchMove.angleBreaks, switchMove.angleMakes,
                                rotatedCoord1, rotatedCoord2);
 
   // Geometry optimisation of local region
@@ -172,19 +189,22 @@ void LinkedNetwork::monteCarloSwitchMoveLAMMPS(const double &temperature) {
   std::vector<double> lammpsCoords = lammpsNetwork.getCoords(2);
 
   logger->debug("Accepting or rejecting...");
-  if (!checkAnglesWithinRange(setDifference(involvedNodes, fixedNodes),
-                              lammpsCoords)) {
+  if (!checkAnglesWithinRange(
+          setDifference(switchMove.involvedBaseNodes, fixedNodes),
+          lammpsCoords)) {
     logger->debug("Rejected move: angles are not within range");
     failedAngleChecks++;
-    rejectMove(initialInvolvedNodesA, initialInvolvedNodesB, bondBreaks,
-               bondMakes, angleBreaks, angleMakes);
+    rejectMove(initialInvolvedNodesA, initialInvolvedNodesB,
+               switchMove.bondBreaks, switchMove.bondMakes,
+               switchMove.angleBreaks, switchMove.angleMakes);
     return;
   }
-  if (!checkBondLengths(involvedNodes, lammpsCoords)) {
+  if (!checkBondLengths(switchMove.involvedBaseNodes, lammpsCoords)) {
     logger->debug("Rejected move: bond lengths are not within range");
     failedBondLengthChecks++;
-    rejectMove(initialInvolvedNodesA, initialInvolvedNodesB, bondBreaks,
-               bondMakes, angleBreaks, angleMakes);
+    rejectMove(initialInvolvedNodesA, initialInvolvedNodesB,
+               switchMove.bondBreaks, switchMove.bondMakes,
+               switchMove.angleBreaks, switchMove.angleMakes);
     return;
   }
   double finalEnergy = lammpsNetwork.getPotentialEnergy();
@@ -194,8 +214,9 @@ void LinkedNetwork::monteCarloSwitchMoveLAMMPS(const double &temperature) {
                   "Ef = {:.3f} Eh",
                   initialEnergy, finalEnergy);
     failedEnergyChecks++;
-    rejectMove(initialInvolvedNodesA, initialInvolvedNodesB, bondBreaks,
-               bondMakes, angleBreaks, angleMakes);
+    rejectMove(initialInvolvedNodesA, initialInvolvedNodesB,
+               switchMove.bondBreaks, switchMove.bondMakes,
+               switchMove.angleBreaks, switchMove.angleMakes);
     return;
   }
   logger->debug("Accepted Move: Ei = {:.3f} Eh, Ef = {:.3f} Eh", initialEnergy,
@@ -205,20 +226,22 @@ void LinkedNetwork::monteCarloSwitchMoveLAMMPS(const double &temperature) {
   currentCoords = lammpsCoords;
   pushCoords(currentCoords);
   updateWeights();
-  arrangeNeighboursClockwise(involvedNodes, currentCoords);
+  arrangeNeighboursClockwise(switchMove.involvedBaseNodes, currentCoords);
   energy = finalEnergy;
-  if (writeMovie)
+  if (writeMovie) {
     lammpsNetwork.writeMovie();
+  }
 }
 
-void LinkedNetwork::rejectMove(const std::vector<Node> &initialInvolvedNodesA,
-                               const std::vector<Node> &initialInvolvedNodesB,
-                               const std::vector<int> &bondBreaks,
-                               const std::vector<int> &bondMakes,
-                               const std::vector<int> &angleBreaks,
-                               const std::vector<int> &angleMakes) {
+void LinkedNetwork::rejectMove(
+    const std::vector<Node> &initialInvolvedNodesA,
+    const std::vector<Node> &initialInvolvedNodesB,
+    const std::array<std::array<uint16_t, 2>, 2> &bondBreaks,
+    const std::array<std::array<uint16_t, 2>, 2> &bondMakes,
+    const std::array<std::array<uint16_t, 3>, 8> &angleBreaks,
+    const std::array<std::array<uint16_t, 3>, 8> &angleMakes) {
   logger->debug("Reverting BSS Network...");
-  revertNetMCGraphene(initialInvolvedNodesA, initialInvolvedNodesB);
+  revertMove(initialInvolvedNodesA, initialInvolvedNodesB);
   logger->debug("Reverting LAMMPS Network...");
   lammpsNetwork.revertGraphene(bondBreaks, bondMakes, angleBreaks, angleMakes);
   logger->debug("Syncing LAMMPS coordinates to BSS coordinates...");
@@ -268,77 +291,39 @@ void LinkedNetwork::updateWeights() {
  * @throw std::runtime_error if the nodes in the random connection have
  * coordinations other than 3 or 4.
  */
-std::tuple<int, int, int, int> LinkedNetwork::pickRandomConnection() {
-  // Create a discrete distribution based on the weights
-  std::discrete_distribution distribution(weights.begin(), weights.end());
-  int randNode;
-  int randNodeConnection;
-  int sharedRingNode1;
-  int sharedRingNode2;
-  std::uniform_int_distribution<int> randomCnx;
-  std::uniform_int_distribution randomDirection(0, 1);
+std::array<std::array<uint16_t, 2>, 2> LinkedNetwork::pickRandomConnection() {
+  const Node &randomNode = this->networkA.getRandomNode();
+  const Node &randomNodeConnection =
+      this->networkA.getRandomNodeConnection(randomNode);
 
-  while (true) {
-    randNode = distribution(randomNumGen);
-    int randNodeCoordination = networkA.nodes[randNode].numConnections();
-    randomCnx.param(std::uniform_int_distribution<int>::param_type(
-        0, randNodeCoordination - 1));
-
-    // Get a random connection from the set
-    auto it1 = networkA.nodes[randNode].netConnections.begin();
-    std::advance(it1, randomCnx(randomNumGen));
-    randNodeConnection = *it1;
-
-    // Two connected nodes should always share two ring nodes.
-    if (std::set<int> commonRings =
-            intersectSets(networkA.nodes[randNode].dualConnections,
-                          networkA.nodes[randNodeConnection].dualConnections);
-        commonRings.size() == 2) {
-      // Randomly assign ringNode1 and ringNode2 to those two common ring
-      // nodes
-      auto it2 = commonRings.begin();
-      std::advance(it2, randomDirection(randomNumGen));
-      sharedRingNode1 = *it2;
-      commonRings.erase(it2);
-      sharedRingNode2 = *commonRings.begin();
-    } else {
-      logger->warn(
-          "Selected random connection does not share two ring nodes: {} {}",
-          randNode, randNodeConnection);
-      continue;
-    }
-    break;
+  std::set<uint16_t> commonRingIDs = intersectSets(
+      randomNode.dualConnections, randomNodeConnection.dualConnections);
+  // Two connected nodes should always share two ring nodes.
+  if (commonRingIDs.size() != 2) {
+    throw std::runtime_error(std::format(
+        "Selected random connection does not share two ring nodes: {} {}",
+        randomNode.id, randomNodeConnection.id));
   }
-  return std::make_tuple(randNode, randNodeConnection, sharedRingNode1,
-                         sharedRingNode2);
+  // Randomly assign ringNode1 and ringNode2 to those two common ring
+  // nodes
+  uint16_t sharedRingNode1 =
+      *RandomNumberGenerator::getInstance().getRandomElement(
+          commonRingIDs.begin(), commonRingIDs.end());
+  commonRingIDs.erase(sharedRingNode1);
+  uint16_t sharedRingNode2 = *commonRingIDs.begin();
+
+  return {{{randomNode.id, randomNodeConnection.id},
+           {sharedRingNode1, sharedRingNode2}}};
 }
 
-/**
- * @brief Generate the bond and angle operations for a switch move
- * @param baseNode1 the id of the first node in lattice A
- * @param baseNode2 the id of the second node in lattice A
- * @param ringNode1 the id of the first node in lattice B
- * @param ringNode2 the id of the second node in lattice B
- * @param bondBreaks the bonds to break
- * @param bondMakes the bonds to make
- * @param angleBreaks the angles to break
- * @param angleMakes the angles to make
- * @param ringBondBreakMake the ring bond to break and make, first two indexes
- * are bond to break, second two are bond to make
- * @return true if the switch move is possible, false otherwise
- */
-bool LinkedNetwork::genSwitchOperations(
-    int baseNode1, int baseNode2, int ringNode1, int ringNode2,
-    std::vector<int> &bondBreaks, std::vector<int> &bondMakes,
-    std::vector<int> &angleBreaks, std::vector<int> &angleMakes,
-    std::vector<int> &ringBondBreakMake,
-    std::unordered_set<int> &convexCheckIDs) {
-  // lots of error checking to remove any potential pathological cases
+SwitchMove LinkedNetwork::genSwitchMove(const uint16_t baseNode1,
+                                        const uint16_t baseNode2,
+                                        const uint16_t ringNode1,
+                                        const uint16_t ringNode2) const {
   if (baseNode1 == baseNode2 || ringNode1 == ringNode2) {
-    logger->warn("Switch move not possible as baseNode1 = baseNode2 or "
-                 "ringNode1 = ringNode2: {} {} {} {}",
-                 baseNode1, baseNode2, ringNode1, ringNode2);
-    return false;
+    throw SwitchMoveException(std::format(
+        "Cannot switch common base nodes: {}-{} or ring nodes: {}-{}",
+        baseNode1, baseNode2, ringNode1, ringNode2));
   }
   /*
    *                7-----8                               7-----8
@@ -364,101 +349,79 @@ bool LinkedNetwork::genSwitchOperations(
    *      4-2-1, 4-2-6         4-1-2, 4-1-3
    *      5-1-2, 5-1-3         1-2-5, 6-2-5
    */
-  int baseNode5 = findCommonConnection(baseNode1, ringNode1, baseNode2);
-  int baseNode6 = findCommonConnection(baseNode2, ringNode1, baseNode1);
-  int baseNode3 = findCommonConnection(baseNode1, ringNode2, baseNode2);
-  int baseNode4 = findCommonConnection(baseNode2, ringNode2, baseNode1);
+  uint16_t baseNode5 =
+      this->findCommonConnection(baseNode1, ringNode1, baseNode2);
+  uint16_t baseNode6 =
+      this->findCommonConnection(baseNode2, ringNode1, baseNode1);
+  uint16_t baseNode3 =
+      this->findCommonConnection(baseNode1, ringNode2, baseNode2);
+  uint16_t baseNode4 =
+      this->findCommonConnection(baseNode2, ringNode2, baseNode1);
 
-  int ringNode3 = findCommonRing(baseNode1, baseNode5, ringNode1);
-  int ringNode4 = findCommonRing(baseNode2, baseNode6, ringNode1);
+  uint16_t ringNode3 = this->findCommonRing(baseNode1, baseNode5, ringNode1);
+  uint16_t ringNode4 = this->findCommonRing(baseNode2, baseNode6, ringNode1);
+  uint16_t baseNode11 =
+      this->findCommonConnection(baseNode3, ringNode3, baseNode1);
+  uint16_t baseNode7 =
+      this->findCommonConnection(baseNode3, ringNode2, baseNode1);
+  uint16_t baseNode8 =
+      this->findCommonConnection(baseNode4, ringNode2, baseNode2);
+  uint16_t baseNode12 =
+      this->findCommonConnection(baseNode4, ringNode4, baseNode2);
+  uint16_t baseNode14 =
+      this->findCommonConnection(baseNode6, ringNode4, baseNode2);
+  uint16_t baseNode10 =
+      this->findCommonConnection(baseNode6, ringNode1, baseNode2);
+  uint16_t baseNode9 =
+      this->findCommonConnection(baseNode5, ringNode1, baseNode1);
+  uint16_t baseNode13 =
+      this->findCommonConnection(baseNode5, ringNode3, baseNode1);
 
-  int baseNode11 = findCommonConnection(baseNode3, ringNode3, baseNode1);
-  int baseNode7 = findCommonConnection(baseNode3, ringNode2, baseNode1);
-  int baseNode8 = findCommonConnection(baseNode4, ringNode2, baseNode2);
-  int baseNode12 = findCommonConnection(baseNode4, ringNode4, baseNode2);
-  int baseNode14 = findCommonConnection(baseNode6, ringNode4, baseNode2);
-  int baseNode10 = findCommonConnection(baseNode6, ringNode1, baseNode2);
-  int baseNode9 = findCommonConnection(baseNode5, ringNode1, baseNode1);
-  int baseNode13 = findCommonConnection(baseNode5, ringNode3, baseNode1);
-
-  // Additional error checking
   if (baseNode5 == baseNode6 || baseNode3 == baseNode4) {
-    logger->debug("No valid move: Selected nodes describe an edge of two edge "
-                  "sharing triangles");
-    return false;
+    throw SwitchMoveException(
+        "No valid move: Selected nodes describe an edge of two edge "
+        "sharing triangles");
   }
-  // Prevent rings having only two or fewer neighbours
-  if (networkB.nodes[ringNode1].numConnections() <= 3 ||
-      networkB.nodes[ringNode2].numConnections() <= 3) {
-    logger->debug(
+
+  if (this->networkB.nodes[ringNode1].numConnections() <= 3 ||
+      this->networkB.nodes[ringNode2].numConnections() <= 3) {
+    throw SwitchMoveException(
         "No valid move: Switch would result in a ring size less than 3");
-    return false;
   }
 
-  // If the ringNodes are a member of fixedRings, the move will be allowed if
-  // the resulting ring size is within +/- 1 of the original ring size. This is
-  // to allow 3/4 membered rings adjacent to the fixedRing to be able to escape
-  // being so. This would otherwise be impossible to remove 3/4 membered rings
-  // adjacent to a fixedRing.
-  if (fixedRings.count(ringNode1) > 0) {
-    int currentSize = networkB.nodes[ringNode1].numConnections();
-    if (currentSize == fixedRings[ringNode1] - 1) {
-      logger->debug("No valid move: Switch would violate fixed ring size");
-      return false;
-    }
+  if (!this->checkConnectivityLimits(ringNode1, ringNode2, ringNode3,
+                                     ringNode4)) {
+    throw SwitchMoveException(
+        "No valid move: Switch would violate ring size limits");
   }
 
-  if (fixedRings.count(ringNode2) > 0) {
-    int currentSize = networkB.nodes[ringNode2].numConnections();
-    if (currentSize == fixedRings[ringNode2] - 1) {
-      logger->debug("No valid move: Switch would violate fixed ring size");
-      return false;
-    }
-  }
-
-  if (fixedRings.count(ringNode3) > 0) {
-    int currentSize = networkB.nodes[ringNode3].numConnections();
-    if (currentSize == fixedRings[ringNode3] + 1) {
-      logger->debug("No valid move: Switch would violate fixed ring size");
-      return false;
-    }
-  }
-
-  if (fixedRings.count(ringNode4) > 0) {
-    int currentSize = networkB.nodes[ringNode4].numConnections();
-    if (currentSize == fixedRings[ringNode4] + 1) {
-      logger->debug("No valid move: Switch would violate fixed ring size");
-      return false;
-    }
-  }
-
-  // check move will not violate dual connectivity limits
-  if (networkB.nodes[ringNode1].numConnections() == minRingSize ||
-      networkB.nodes[ringNode2].numConnections() == minRingSize ||
-      networkB.nodes[ringNode3].numConnections() == maxRingSize ||
-      networkB.nodes[ringNode4].numConnections() == maxRingSize) {
-    logger->debug(
-        "No valid move: Switch would violate dual connectivity limits");
-    return false;
-  }
-  bondBreaks = {baseNode1, baseNode5, baseNode2, baseNode4};
-
-  bondMakes = {baseNode1, baseNode4, baseNode2, baseNode5};
+  const std::array<std::array<uint16_t, 2>, 2> bondBreaks = {
+      {{baseNode1, baseNode5}, {baseNode2, baseNode4}}};
+  const std::array<std::array<uint16_t, 2>, 2> bondMakes = {
+      {{baseNode1, baseNode4}, {baseNode2, baseNode5}}};
   //                          Break                   Make
-  ringBondBreakMake = {ringNode1, ringNode2, ringNode3, ringNode4};
+  const std::array<std::array<uint16_t, 2>, 2> ringBondBreakMake = {
+      {{ringNode1, ringNode2}, {ringNode3, ringNode4}}};
 
-  convexCheckIDs = {baseNode1,  baseNode2,  baseNode3,  baseNode4, baseNode5,
-                    baseNode6,  baseNode7,  baseNode8,  baseNode9, baseNode10,
-                    baseNode11, baseNode12, baseNode13, baseNode14};
+  const std::unordered_set<uint16_t> involvedBaseNodes = {
+      baseNode1,  baseNode2,  baseNode3,  baseNode4, baseNode5,
+      baseNode6,  baseNode7,  baseNode8,  baseNode9, baseNode10,
+      baseNode11, baseNode12, baseNode13, baseNode14};
 
+  std::array<std::array<uint16_t, 3>, 8> angleMakes;
+  std::array<std::array<uint16_t, 3>, 8> angleBreaks;
   if (baseNode7 == baseNode4) {
     // 4 membered ringNode2
-    angleBreaks = {baseNode3, baseNode4, baseNode2, baseNode12,
-                   baseNode4, baseNode2, baseNode1, baseNode2,
-                   baseNode4, baseNode6, baseNode2, baseNode4};
-    angleMakes = {baseNode3, baseNode4, baseNode1, baseNode12,
-                  baseNode4, baseNode1, baseNode3, baseNode1,
-                  baseNode4, baseNode2, baseNode1, baseNode4};
+    angleBreaks[0] = {baseNode3, baseNode4, baseNode2};
+    angleBreaks[1] = {baseNode12, baseNode4, baseNode2};
+    angleBreaks[2] = {baseNode1, baseNode2, baseNode4};
+    angleBreaks[3] = {baseNode6, baseNode2, baseNode4};
+
+    angleMakes[0] = {baseNode3, baseNode4, baseNode1};
+    angleMakes[1] = {baseNode12, baseNode4, baseNode1};
+    angleMakes[2] = {baseNode3, baseNode1, baseNode4};
+    angleMakes[3] = {baseNode2, baseNode1, baseNode4};
+
     logger->debug(" {:03}------{:03}------{:03}------{:03}             "
                   "{:03}-----{:03}-----{:03}-----{:03} ",
                   baseNode11, baseNode3, baseNode4, baseNode12, baseNode11,
@@ -471,7 +434,6 @@ bool LinkedNetwork::genSwitchOperations(
     logger->debug(
         "            |       |                                  {:03}",
         baseNode1);
-
   } else if (baseNode7 == baseNode8) {
     // 5 membered ringNode2
     angleBreaks = {baseNode7, baseNode4, baseNode2, baseNode12,
@@ -497,7 +459,6 @@ bool LinkedNetwork::genSwitchOperations(
     logger->debug(
         "           \\        /                                   {:03}",
         baseNode1);
-
   } else {
     // 6+ membered ringNode2
     angleBreaks = {baseNode2, baseNode4,  baseNode8, baseNode2,
@@ -529,15 +490,11 @@ bool LinkedNetwork::genSwitchOperations(
                 ringNode3, baseNode1, baseNode2, ringNode4, ringNode3,
                 ringNode4);
   if (baseNode5 == baseNode10) {
-    // 4 membered ringNode1
-    angleBreaks.insert(angleBreaks.end(),
-                       {baseNode13, baseNode5, baseNode1, baseNode6, baseNode5,
-                        baseNode1, baseNode3, baseNode1, baseNode5, baseNode2,
-                        baseNode1, baseNode5});
-    angleMakes.insert(angleMakes.end(),
-                      {baseNode13, baseNode5, baseNode2, baseNode6, baseNode5,
-                       baseNode2, baseNode1, baseNode2, baseNode5, baseNode6,
-                       baseNode2, baseNode5});
+    // 4 membered ringNode1  SwitchMove() = default;
+    angleMakes[4] = {baseNode13, baseNode5, baseNode2};
+    angleMakes[5] = {baseNode6, baseNode5, baseNode2};
+    angleMakes[6] = {baseNode1, baseNode2, baseNode5};
+    angleMakes[7] = {baseNode6, baseNode2, baseNode5};
     logger->debug(
         "            |       |                                   {:03}",
         baseNode2);
@@ -553,15 +510,15 @@ bool LinkedNetwork::genSwitchOperations(
     logger->debug("");
   } else if (baseNode9 == baseNode10) {
     // 5 membered ringNode1
-    angleBreaks.insert(angleBreaks.end(),
-                       {baseNode13, baseNode5, baseNode1, baseNode9, baseNode5,
-                        baseNode1, baseNode3, baseNode1, baseNode5, baseNode2,
-                        baseNode1, baseNode5});
-    angleMakes.insert(angleMakes.end(),
-                      {baseNode13, baseNode5, baseNode2, baseNode9, baseNode5,
-                       baseNode2, baseNode1, baseNode2, baseNode5, baseNode6,
-                       baseNode2, baseNode5});
+    angleBreaks[4] = {baseNode13, baseNode5, baseNode1};
+    angleBreaks[5] = {baseNode9, baseNode5, baseNode1};
+    angleBreaks[6] = {baseNode3, baseNode1, baseNode5};
+    angleBreaks[7] = {baseNode2, baseNode1, baseNode5};
 
+    angleMakes[4] = {baseNode13, baseNode5, baseNode2};
+    angleMakes[5] = {baseNode9, baseNode5, baseNode2};
+    angleMakes[6] = {baseNode1, baseNode2, baseNode5};
+    angleMakes[7] = {baseNode6, baseNode2, baseNode5};
     logger->debug(
         "           /        \\                                   {:03}",
         baseNode2);
@@ -581,14 +538,15 @@ bool LinkedNetwork::genSwitchOperations(
     logger->debug("");
   } else {
     // 6+ membered ringNode1
-    angleBreaks.insert(angleBreaks.end(),
-                       {baseNode1, baseNode5, baseNode9, baseNode1, baseNode5,
-                        baseNode13, baseNode5, baseNode1, baseNode2, baseNode5,
-                        baseNode1, baseNode3});
-    angleMakes.insert(angleMakes.end(),
-                      {baseNode2, baseNode5, baseNode9, baseNode2, baseNode5,
-                       baseNode13, baseNode1, baseNode2, baseNode5, baseNode6,
-                       baseNode2, baseNode5});
+    angleBreaks[4] = {baseNode1, baseNode5, baseNode9};
+    angleBreaks[5] = {baseNode1, baseNode5, baseNode13};
+    angleBreaks[6] = {baseNode5, baseNode1, baseNode2};
+    angleBreaks[7] = {baseNode5, baseNode1, baseNode3};
+
+    angleMakes[4] = {baseNode2, baseNode5, baseNode9};
+    angleMakes[5] = {baseNode2, baseNode5, baseNode13};
+    angleMakes[6] = {baseNode1, baseNode2, baseNode5};
+    angleMakes[7] = {baseNode6, baseNode2, baseNode5};
     logger->debug(
         "           /        \\                                   {:03}",
         baseNode2);
@@ -607,7 +565,58 @@ bool LinkedNetwork::genSwitchOperations(
                   baseNode9, baseNode10, baseNode9, baseNode10);
     logger->debug("");
   }
+  return SwitchMove({{baseNode1, baseNode2}}, {{ringNode1, ringNode2}},
+                    bondBreaks, bondMakes, angleBreaks, angleMakes,
+                    ringBondBreakMake, involvedBaseNodes);
+}
 
+bool LinkedNetwork::checkConnectivityLimits(const uint16_t ringNode1,
+                                            const uint16_t ringNode2,
+                                            const uint16_t ringNode3,
+                                            const uint16_t ringNode4) const {
+
+  if (this->networkB.nodes[ringNode1].numConnections() <= 3 ||
+      this->networkB.nodes[ringNode2].numConnections() <= 3) {
+    logger->debug(
+        "No valid move: Switch would result in a ring size less than 3");
+    return false;
+  }
+
+  // If the ringNodes are a member of fixedRings, the move will be allowed if
+  // the resulting ring size is within +/- 1 of the original ring size. This is
+  // to allow 3/4 membered rings adjacent to the fixedRing to be able to escape
+  // being so. This would otherwise be impossible to remove 3/4 membered rings
+  // adjacent to a fixedRing.
+  for (const uint16_t &ringNode : {ringNode1, ringNode2}) {
+    if (this->fixedRings.contains(ringNode)) {
+      if (size_t currentSize = this->networkB.nodes[ringNode].numConnections();
+          currentSize == fixedRings.at(ringNode) - 1) {
+        // Ring nodes 1 and 2 will decrease in size, so if statement is -1 here
+        logger->debug("No valid move: Switch would violate fixed ring size");
+        return false;
+      }
+    }
+  }
+
+  for (const uint16_t &ringNode : {ringNode3, ringNode4}) {
+    if (fixedRings.contains(ringNode)) {
+      if (size_t currentSize = networkB.nodes[ringNode].numConnections();
+          currentSize == fixedRings.at(ringNode) + 1) {
+        // Ring nodes 3 and 4 will increase in size, so if statement is +1 here
+        logger->debug("No valid move: Switch would violate fixed ring size");
+        return false;
+      }
+    }
+  }
+
+  // Check move will not violate ring size limits
+  if (networkB.nodes[ringNode1].numConnections() == minRingSize ||
+      networkB.nodes[ringNode2].numConnections() == minRingSize ||
+      networkB.nodes[ringNode3].numConnections() == maxRingSize ||
+      networkB.nodes[ringNode4].numConnections() == maxRingSize) {
+    logger->debug("No valid move: Switch would violate ring size limits");
+    return false;
+  }
   return true;
 }
 
@@ -620,10 +629,11 @@ bool LinkedNetwork::genSwitchOperations(
  * @return ID of the common connection
  * @throw std::runtime_error if the associated node cannot be found
  */
-int LinkedNetwork::findCommonConnection(const int baseNode, const int ringNode,
-                                        const int excludeNode) const {
+uint16_t LinkedNetwork::findCommonConnection(const uint16_t baseNode,
+                                             const uint16_t ringNode,
+                                             const uint16_t excludeNode) const {
   // Find node that shares baseNode and ringNode but is not excludeNode
-  std::set<int> commonConnections =
+  std::set<uint16_t> commonConnections =
       intersectSets(networkA.nodes[baseNode].netConnections,
                     networkB.nodes[ringNode].dualConnections);
   commonConnections.erase(excludeNode);
@@ -644,10 +654,11 @@ int LinkedNetwork::findCommonConnection(const int baseNode, const int ringNode,
  * @return ID of the common ring connection
  * @throw std::runtime_error if the associated node cannot be found
  */
-int LinkedNetwork::findCommonRing(const int baseNode1, const int baseNode2,
-                                  const int excludeNode) const {
+uint16_t LinkedNetwork::findCommonRing(const uint16_t baseNode1,
+                                       const uint16_t baseNode2,
+                                       const uint16_t excludeNode) const {
   // Find node that shares baseNode1 and baseNode2 but is not excludeNode
-  std::set<int> commonRings =
+  std::set<uint16_t> commonRings =
       intersectSets(networkA.nodes[baseNode1].dualConnections,
                     networkA.nodes[baseNode2].dualConnections);
   commonRings.erase(excludeNode);
@@ -665,22 +676,22 @@ int LinkedNetwork::findCommonRing(const int baseNode1, const int baseNode2,
  * @param bondBreaks the bonds to break (vector of pairs)
  * @param bondMakes the bonds to make (vector of pairs)
  */
-void LinkedNetwork::switchNetMCGraphene(
-    const std::vector<int> &bondBreaks,
-    const std::vector<int> &ringBondBreakMake) {
+void LinkedNetwork::applyMove(
+    const std::array<std::array<uint16_t, 2>, 2> &bondBreaks,
+    const std::array<std::array<uint16_t, 2>, 2> &ringBondBreakMake) {
   if (bondBreaks.size() != 4 || ringBondBreakMake.size() != 4) {
-    throw std::invalid_argument("Invalid input sizes for switchNetMCGraphene");
+    throw std::invalid_argument("Invalid input sizes for applyMove");
   }
 
-  int atom1 = bondBreaks[0];
-  int atom2 = bondBreaks[2];
-  int atom4 = bondBreaks[3];
-  int atom5 = bondBreaks[1];
+  uint16_t atom1 = bondBreaks[0][0];
+  uint16_t atom2 = bondBreaks[1][0];
+  uint16_t atom4 = bondBreaks[1][1];
+  uint16_t atom5 = bondBreaks[0][1];
 
-  int ringNode1 = ringBondBreakMake[0];
-  int ringNode2 = ringBondBreakMake[1];
-  int ringNode3 = ringBondBreakMake[2];
-  int ringNode4 = ringBondBreakMake[3];
+  uint16_t ringNode1 = ringBondBreakMake[0][0];
+  uint16_t ringNode2 = ringBondBreakMake[0][1];
+  uint16_t ringNode3 = ringBondBreakMake[1][0];
+  uint16_t ringNode4 = ringBondBreakMake[1][1];
 
   auto &nodeA1 = networkA.nodes[atom1];
   auto &nodeA2 = networkA.nodes[atom2];
@@ -722,9 +733,8 @@ void LinkedNetwork::switchNetMCGraphene(
  * @param initialInvolvedNodesA the initial state of the nodes in network A
  * @param initialInvolvedNodesB the initial state of the nodes in network B
  */
-void LinkedNetwork::revertNetMCGraphene(
-    const std::vector<Node> &initialInvolvedNodesA,
-    const std::vector<Node> &initialInvolvedNodesB) {
+void LinkedNetwork::revertMove(const std::vector<Node> &initialInvolvedNodesA,
+                               const std::vector<Node> &initialInvolvedNodesB) {
   // Revert changes to descriptors due to breaking connections
   for (const Node &node : initialInvolvedNodesA) {
     networkA.nodes[node.id] = node;
@@ -859,7 +869,7 @@ void LinkedNetwork::write() const {
  * @param nodeID ID of the node to check
  * @return true if the node has clockwise neighbours, false otherwise
  */
-bool LinkedNetwork::checkClockwiseNeighbours(const int nodeID) const {
+bool LinkedNetwork::checkClockwiseNeighbours(const uint16_t nodeID) const {
   Node node = networkA.nodes[nodeID];
   double prevAngle = getClockwiseAngle(
       node.coord, networkA.nodes[*node.netConnections.rbegin()].coord,
@@ -890,7 +900,7 @@ bool LinkedNetwork::checkClockwiseNeighbours(const int nodeID) const {
  * @return true if the node has clockwise neighbours, false otherwise
  */
 bool LinkedNetwork::checkClockwiseNeighbours(
-    const int nodeID, const std::vector<double> &coords) const {
+    const uint16_t nodeID, const std::vector<double> &coords) const {
   const std::array<double, 2> nodeCoord = {coords[2 * nodeID],
                                            coords[2 * nodeID + 1]};
   const int lastNeighbourCoordsID =
@@ -931,12 +941,13 @@ bool LinkedNetwork::checkAllClockwiseNeighbours() const {
 }
 
 void LinkedNetwork::arrangeNeighboursClockwise(
-    const int nodeID, const std::vector<double> &coords) {
+    const uint16_t nodeID, const std::vector<double> &coords) {
   return;
 }
 
 void LinkedNetwork::arrangeNeighboursClockwise(
-    const std::unordered_set<int> &nodeIDs, const std::vector<double> &coords) {
+    const std::unordered_set<uint16_t> &nodeIDs,
+    const std::vector<double> &coords) {
   std::ranges::for_each(nodeIDs, [this, &coords](int nodeID) {
     arrangeNeighboursClockwise(nodeID, coords);
   });
@@ -961,7 +972,8 @@ bool LinkedNetwork::checkAnglesWithinRange(const std::vector<double> &coords) {
  * @return true if all angles are within range, false otherwise
  */
 bool LinkedNetwork::checkAnglesWithinRange(
-    const std::unordered_set<int> &nodeIDs, const std::vector<double> &coords) {
+    const std::unordered_set<uint16_t> &nodeIDs,
+    const std::vector<double> &coords) {
   return false;
 }
 
@@ -971,7 +983,7 @@ bool LinkedNetwork::checkAnglesWithinRange(
  * @param coords Coordinates of all nodes as a 1D vector of coordinate pairs
  * @return true if all bonds are within the maximum bond length, false otherwise
  */
-bool LinkedNetwork::checkBondLengths(const int nodeID,
+bool LinkedNetwork::checkBondLengths(const uint16_t nodeID,
                                      const std::vector<double> &coords) const {
   for (const auto &neighbourID : networkA.nodes[nodeID].netConnections) {
     std::array<double, 2> pbcVec = pbcArray(
@@ -994,8 +1006,9 @@ bool LinkedNetwork::checkBondLengths(const int nodeID,
  * @param coords Coordinates of all nodes as a 1D vector of coordinate pairs
  * @return true if all bonds are within the maximum bond length, false otherwise
  */
-bool LinkedNetwork::checkBondLengths(const std::unordered_set<int> &nodeIDs,
-                                     const std::vector<double> &coords) const {
+bool LinkedNetwork::checkBondLengths(
+    const std::unordered_set<uint16_t> &nodeIDs,
+    const std::vector<double> &coords) const {
   return std::ranges::all_of(nodeIDs, [this, &coords](int nodeID) {
     return checkBondLengths(nodeID, coords);
   });
@@ -1007,8 +1020,8 @@ bool LinkedNetwork::checkBondLengths(const std::unordered_set<int> &nodeIDs,
  * @param ringNodeIDs IDs of the rings to get the order of
  * @return clockwise or anti-clockwise
  */
-Direction
-LinkedNetwork::getRingsDirection(const std::vector<int> &ringNodeIDs) const {
+Direction LinkedNetwork::getRingsDirection(
+    const std::vector<uint16_t> &ringNodeIDs) const {
   if (ringNodeIDs.size() != 4) {
     throw std::invalid_argument(
         "Error getting ring direction, ringNodeIDs size is not 4");
@@ -1046,19 +1059,18 @@ LinkedNetwork::getRingsDirection(const std::vector<int> &ringNodeIDs) const {
 /**
  * @brief Calculates the new coordinates of a pair of atoms if they were rotated
  * by 90 degrees in the given direction
- * @param atomID1 ID of the first atom in the bond
- * @param atomID2 ID of the second atom in the bond
+ * @param bond The bond to rotate
  * @param direct Direction to rotate the bond
  * @return Pair of vectors containing the new coordinates of the atoms
  */
 std::tuple<std::vector<double>, std::vector<double>>
-LinkedNetwork::rotateBond(const int atomID1, const int atomID2,
+LinkedNetwork::rotateBond(const std::array<uint16_t, 2> &bond,
                           const Direction &direct) const {
-  logger->debug("Rotating bond between atoms {} and {}", atomID1, atomID2);
-  std::vector<double> atom1Coord = {currentCoords[atomID1 * 2],
-                                    currentCoords[atomID1 * 2 + 1]};
-  std::vector<double> atom2Coord = {currentCoords[atomID2 * 2],
-                                    currentCoords[atomID2 * 2 + 1]};
+  logger->debug("Rotating bond between atoms {} and {}", bond[0], bond[1]);
+  std::vector<double> atom1Coord = {currentCoords[bond[0] * 2],
+                                    currentCoords[bond[0] * 2 + 1]};
+  std::vector<double> atom2Coord = {currentCoords[bond[1] * 2],
+                                    currentCoords[bond[1] * 2 + 1]};
 
   // Calculate the center point
   double centerX = (atom1Coord[0] + atom2Coord[0]) / 2.0;
