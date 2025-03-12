@@ -34,7 +34,6 @@ LinkedNetwork::LinkedNetwork(const InputData &inputData,
       writeMovie(inputData.writeMovie), logger(loggerArg) {
   networkA = Network(NetworkType::BASE_NETWORK, logger);
   networkB = Network(NetworkType::DUAL_NETWORK, logger);
-
   if (inputData.isFixRingsEnabled) {
     findFixedRings(std::filesystem::path("./input_files") / "bss_network" /
                    "fixed_rings.txt");
@@ -94,11 +93,11 @@ void LinkedNetwork::findFixedRings(const std::string &filePath) {
  */
 void LinkedNetwork::findFixedNodes() {
   std::ranges::for_each(
-      fixedRings, [this](const std::pair<const int, int> &fixedRingPair) {
-        int fixedRing = fixedRingPair.first;
-        std::ranges::for_each(
-            this->networkB.nodes[fixedRing].dualConnections,
-            [this](int fixedNode) { fixedNodes.insert(fixedNode); });
+      fixedRings,
+      [this](const std::pair<const uint16_t, size_t> &fixedRingPair) {
+        this->fixedNodes.insert(
+            this->networkB.nodes[fixedRingPair.first].dualConnections.begin(),
+            this->networkB.nodes[fixedRingPair.first].dualConnections.end());
       });
 }
 
@@ -189,16 +188,7 @@ void LinkedNetwork::performBondSwitch(const double temperature) {
   std::vector<double> lammpsCoords = lammpsNetwork.getCoords(2);
 
   logger->debug("Accepting or rejecting...");
-  if (!checkAnglesWithinRange(
-          setDifference(switchMove.involvedBaseNodes, fixedNodes),
-          lammpsCoords)) {
-    logger->debug("Rejected move: angles are not within range");
-    failedAngleChecks++;
-    rejectMove(initialInvolvedNodesA, initialInvolvedNodesB,
-               switchMove.bondBreaks, switchMove.bondMakes,
-               switchMove.angleBreaks, switchMove.angleMakes);
-    return;
-  }
+  // TODO - Check angles are within range
   if (!checkBondLengths(switchMove.involvedBaseNodes, lammpsCoords)) {
     logger->debug("Rejected move: bond lengths are not within range");
     failedBondLengthChecks++;
@@ -226,7 +216,6 @@ void LinkedNetwork::performBondSwitch(const double temperature) {
   currentCoords = lammpsCoords;
   pushCoords(currentCoords);
   updateWeights();
-  arrangeNeighboursClockwise(switchMove.involvedBaseNodes, currentCoords);
   energy = finalEnergy;
   if (writeMovie) {
     lammpsNetwork.writeMovie();
@@ -296,7 +285,7 @@ std::array<std::array<uint16_t, 2>, 2> LinkedNetwork::pickRandomConnection() {
   const Node &randomNodeConnection =
       this->networkA.getRandomNodeConnection(randomNode);
 
-  std::set<uint16_t> commonRingIDs = intersectSets(
+  std::unordered_set<uint16_t> commonRingIDs = intersectSets(
       randomNode.dualConnections, randomNodeConnection.dualConnections);
   // Two connected nodes should always share two ring nodes.
   if (commonRingIDs.size() != 2) {
@@ -490,7 +479,7 @@ SwitchMove LinkedNetwork::genSwitchMove(const uint16_t baseNode1,
                 ringNode3, baseNode1, baseNode2, ringNode4, ringNode3,
                 ringNode4);
   if (baseNode5 == baseNode10) {
-    // 4 membered ringNode1  SwitchMove() = default;
+    // 4 membered ringNode1
     angleMakes[4] = {baseNode13, baseNode5, baseNode2};
     angleMakes[5] = {baseNode6, baseNode5, baseNode2};
     angleMakes[6] = {baseNode1, baseNode2, baseNode5};
@@ -625,7 +614,7 @@ bool LinkedNetwork::checkConnectivityLimits(const uint16_t ringNode1,
  * excluding a given node
  * @param baseNode ID of the base node
  * @param ringNode ID of the ring node
- * @param excludeNode ID of the node to be excluded
+ * @param excludeNode ID of the base node to be excluded
  * @return ID of the common connection
  * @throw std::runtime_error if the associated node cannot be found
  */
@@ -633,7 +622,7 @@ uint16_t LinkedNetwork::findCommonConnection(const uint16_t baseNode,
                                              const uint16_t ringNode,
                                              const uint16_t excludeNode) const {
   // Find node that shares baseNode and ringNode but is not excludeNode
-  std::set<uint16_t> commonConnections =
+  std::unordered_set<uint16_t> commonConnections =
       intersectSets(networkA.nodes[baseNode].netConnections,
                     networkB.nodes[ringNode].dualConnections);
   commonConnections.erase(excludeNode);
@@ -658,7 +647,7 @@ uint16_t LinkedNetwork::findCommonRing(const uint16_t baseNode1,
                                        const uint16_t baseNode2,
                                        const uint16_t excludeNode) const {
   // Find node that shares baseNode1 and baseNode2 but is not excludeNode
-  std::set<uint16_t> commonRings =
+  std::unordered_set<uint16_t> commonRings =
       intersectSets(networkA.nodes[baseNode1].dualConnections,
                     networkA.nodes[baseNode2].dualConnections);
   commonRings.erase(excludeNode);
@@ -840,7 +829,7 @@ bool LinkedNetwork::checkConsistency() {
           consistent = false;
         });
   });
-  return checkAllClockwiseNeighbours() && consistent;
+  return consistent;
 }
 
 /**
@@ -862,119 +851,6 @@ void LinkedNetwork::wrapCoords(std::vector<double> &coords) const {
 void LinkedNetwork::write() const {
   networkA.write();
   networkB.write();
-}
-
-/**
- * @brief Checks if a given node has clockwise neighbours
- * @param nodeID ID of the node to check
- * @return true if the node has clockwise neighbours, false otherwise
- */
-bool LinkedNetwork::checkClockwiseNeighbours(const uint16_t nodeID) const {
-  Node node = networkA.nodes[nodeID];
-  double prevAngle = getClockwiseAngle(
-      node.coord, networkA.nodes[*node.netConnections.rbegin()].coord,
-      dimensions);
-
-  // The angle a neighbour makes with the x axis should always increase, EXCEPT
-  // when the angle wraps around from 2π to 0 This should only happen once if
-  // the neighbours are clockwise
-  int timesDecreased = 0;
-  for (int id : node.netConnections) {
-    double angle =
-        getClockwiseAngle(node.coord, networkA.nodes[id].coord, dimensions);
-    if (angle < prevAngle) {
-      timesDecreased++;
-      if (timesDecreased == 2) {
-        // So return false if it decreases twice
-        return false;
-      }
-    }
-    prevAngle = angle;
-  }
-  return true;
-}
-/**
- * @brief Checks if a given node in network A has clockwise neighbours with
- * given coordinates
- * @param nodeID ID of the node to check
- * @return true if the node has clockwise neighbours, false otherwise
- */
-bool LinkedNetwork::checkClockwiseNeighbours(
-    const uint16_t nodeID, const std::vector<double> &coords) const {
-  const std::array<double, 2> nodeCoord = {coords[2 * nodeID],
-                                           coords[2 * nodeID + 1]};
-  const int lastNeighbourCoordsID =
-      *networkA.nodes[nodeID].netConnections.rbegin();
-  const std::array<double, 2> lastNeighbourCoord = {
-      coords[2 * lastNeighbourCoordsID], coords[2 * lastNeighbourCoordsID + 1]};
-  double prevAngle =
-      getClockwiseAngle(nodeCoord, lastNeighbourCoord, dimensions);
-  int timesDecreased = 0;
-  for (const auto &id : networkA.nodes[nodeID].netConnections) {
-    double angle = getClockwiseAngle(
-        nodeCoord, {coords[2 * id], coords[2 * id + 1]}, dimensions);
-    if (angle < prevAngle) {
-      timesDecreased++;
-      if (timesDecreased == 2) {
-        return false;
-      }
-    }
-    prevAngle = angle;
-  }
-  return true;
-}
-
-/**
- * @brief Checks if all nodes have clockwise neighbours
- * @return true if all nodes have clockwise neighbours, false otherwise
- */
-bool LinkedNetwork::checkAllClockwiseNeighbours() const {
-  bool allClockwise = true;
-  for (int nodeID = 0; nodeID < networkA.nodes.size(); ++nodeID) {
-    if (!checkClockwiseNeighbours(nodeID)) {
-      logger->warn("Node {} has anticlockwise neighbours: {}", nodeID,
-                   containerToString(networkA.nodes[nodeID].netConnections));
-      allClockwise = false;
-    }
-  }
-  return allClockwise;
-}
-
-void LinkedNetwork::arrangeNeighboursClockwise(
-    const uint16_t nodeID, const std::vector<double> &coords) {
-  return;
-}
-
-void LinkedNetwork::arrangeNeighboursClockwise(
-    const std::unordered_set<uint16_t> &nodeIDs,
-    const std::vector<double> &coords) {
-  std::ranges::for_each(nodeIDs, [this, &coords](int nodeID) {
-    arrangeNeighboursClockwise(nodeID, coords);
-  });
-}
-
-/**
- * @brief Checks if all angles around all nodes are less than or equal to
- * maximum angle
- * @param coords Coordinates of all nodes as a 1D vector of coordinate pairs
- * @return true if all angles are convex, false otherwise
- */
-bool LinkedNetwork::checkAnglesWithinRange(const std::vector<double> &coords) {
-
-  return false;
-}
-
-/**
- * @brief Checks if all angles around the given nodes are less than or equal to
- * maximum angle
- * @param nodeIDs IDs of the nodes to check
- * @param coords Coordinates of all nodes as a 1D vector of coordinate pairs
- * @return true if all angles are within range, false otherwise
- */
-bool LinkedNetwork::checkAnglesWithinRange(
-    const std::unordered_set<uint16_t> &nodeIDs,
-    const std::vector<double> &coords) {
-  return false;
 }
 
 /**

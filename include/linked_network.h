@@ -62,7 +62,6 @@ struct LinkedNetwork {
    * @brief Default constructor
    */
   LinkedNetwork() = default;
-  LinkedNetwork(const int numRing, const LoggerPtr &logger);
   LinkedNetwork(const InputData &inputData, const LoggerPtr &logger);
 
   void findFixedRings(const std::string &flePath);
@@ -72,8 +71,6 @@ struct LinkedNetwork {
   void updateWeights();
 
   std::array<std::array<uint16_t, 2>, 2> pickRandomConnection();
-  int assignValues(int randNodeCoordination,
-                   int randNodeConnectionCoordination) const;
 
   uint16_t findCommonConnection(const uint16_t baseNode,
                                 const uint16_t ringNode,
@@ -97,16 +94,6 @@ struct LinkedNetwork {
   void showCoords(const std::vector<double> &coords) const;
   void wrapCoords(std::vector<double> &coords) const;
 
-  bool
-  genSwitchOperations(uint16_t baseNode1, uint16_t baseNode2,
-                      uint16_t ringNode1, uint16_t ringNode2,
-                      std::array<std::array<uint16_t, 2>, 2> &bondBreaks,
-                      std::array<std::array<uint16_t, 2>, 2> &bondMakes,
-                      std::array<std::array<uint16_t, 3>, 8> &angleBreaks,
-                      std::array<std::array<uint16_t, 3>, 8> &angleMakes,
-                      std::array<std::array<uint16_t, 2>, 2> &ringBondBreakMake,
-                      std::unordered_set<uint16_t> &convexCheckIDs);
-
   void
   applyMove(const std::array<std::array<uint16_t, 2>, 2> &bondBreaks,
             const std::array<std::array<uint16_t, 2>, 2> &ringBondBreakMake);
@@ -118,18 +105,6 @@ struct LinkedNetwork {
              const Direction &direct) const;
   Direction getRingsDirection(const std::vector<uint16_t> &ringNodeIDs) const;
 
-  bool checkClockwiseNeighbours(const uint16_t nodeID) const;
-  bool checkClockwiseNeighbours(const uint16_t nodeID,
-                                const std::vector<double> &coords) const;
-  bool checkAllClockwiseNeighbours() const;
-  void arrangeNeighboursClockwise(const uint16_t nodeID,
-                                  const std::vector<double> &coords);
-  void arrangeNeighboursClockwise(const std::unordered_set<uint16_t> &nodeIDs,
-                                  const std::vector<double> &coords);
-
-  bool checkAnglesWithinRange(const std::vector<double> &coords);
-  bool checkAnglesWithinRange(const std::unordered_set<uint16_t> &nodeIDs,
-                              const std::vector<double> &coords);
   bool checkBondLengths(const uint16_t nodeID,
                         const std::vector<double> &coords) const;
   bool checkBondLengths(const std::unordered_set<uint16_t> &nodeIDs,
