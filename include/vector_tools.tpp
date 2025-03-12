@@ -482,8 +482,9 @@ void addArray(std::array<T, S> &array, const T addition) {
  * @return A set containing the common values
  */
 template <typename T>
-std::set<T> intersectSets(const std::set<T> &set1, const std::set<T> &set2) {
-  std::set<T> intersection;
+std::unordered_set<T> intersectSets(const std::unordered_set<T> &set1,
+                                    const std::unordered_set<T> &set2) {
+  std::unordered_set<T> intersection;
   std::ranges::set_intersection(
       set1, set2, std::inserter(intersection, intersection.begin()));
   return intersection;
@@ -526,7 +527,8 @@ void containerMultiply(Container &container,
  * @param newValue The value to replace the old value
  */
 template <typename T>
-void setReplace(std::set<T> &set, const T &oldValue, const T &newValue) {
+void setReplace(std::unordered_set<T> &set, const T &oldValue,
+                const T &newValue) {
   set.erase(oldValue);
   set.insert(newValue);
 }

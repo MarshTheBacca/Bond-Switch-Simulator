@@ -387,7 +387,7 @@ void Network::writeCoords(std::ofstream &crdFile) const {
  */
 void Network::writeConnections(
     std::ofstream &connectionsFile,
-    const std::vector<std::set<uint16_t>> &connections) const {
+    const std::vector<std::unordered_set<uint16_t>> &connections) const {
   connectionsFile << std::fixed << std::showpoint << std::setprecision(1);
   for (int i = 0; i < nodes.size(); ++i) {
     std::ranges::for_each(
@@ -403,8 +403,8 @@ void Network::writeConnections(
  * @brief Get the net connections of the network
  * @return 2D vector of net connections
  */
-std::vector<std::set<uint16_t>> Network::getConnections() const {
-  std::vector<std::set<uint16_t>> netConnections(nodes.size());
+std::vector<std::unordered_set<uint16_t>> Network::getConnections() const {
+  std::vector<std::unordered_set<uint16_t>> netConnections(nodes.size());
   for (int i = 0; i < nodes.size(); ++i) {
     netConnections[i] = nodes[i].netConnections;
   }
@@ -415,8 +415,8 @@ std::vector<std::set<uint16_t>> Network::getConnections() const {
  * @brief Get the dual connections of the network
  * @return 2D vector of dual connections
  */
-std::vector<std::set<uint16_t>> Network::getDualConnections() const {
-  std::vector<std::set<uint16_t>> dualConnections{};
+std::vector<std::unordered_set<uint16_t>> Network::getDualConnections() const {
+  std::vector<std::unordered_set<uint16_t>> dualConnections{};
   std::ranges::for_each(nodes, [&dualConnections](const Node &node) {
     dualConnections.push_back(node.dualConnections);
   });

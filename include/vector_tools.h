@@ -109,7 +109,8 @@ template <typename T, size_t S>
 void addArray(std::array<T, S> &array, const T addition);
 
 template <typename T>
-std::set<T> intersectSets(const std::set<T> &set1, const std::set<T> &set2);
+std::unordered_set<T> intersectSets(const std::unordered_set<T> &set1,
+                                    const std::unordered_set<T> &set2);
 
 template <typename Container>
   requires std::ranges::range<Container>
@@ -121,7 +122,8 @@ void containerMultiply(Container &container,
                        const typename Container::value_type &multiplyBy);
 
 template <typename T>
-void setReplace(std::set<T> &set, const T &oldValue, const T &newValue);
+void setReplace(std::unordered_set<T> &set, const T &oldValue,
+                const T &newValue);
 
 template <typename T> T &getSetAt(std::set<T> &set, size_t index);
 

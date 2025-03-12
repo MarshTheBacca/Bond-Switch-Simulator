@@ -4,8 +4,8 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
-#include <set>
 #include <string>
+#include <unordered_set>
 
 struct Node {
   // Unique ID number
@@ -13,9 +13,9 @@ struct Node {
   // Location of the node in 2D euclidean space
   std::array<double, 2> coord{0.0, 0.0};
   // IDs of connected nodes in the same network
-  std::set<uint16_t> netConnections{};
+  std::unordered_set<uint16_t> netConnections{};
   // IDs of connected nodes in the dual network
-  std::set<uint16_t> dualConnections{};
+  std::unordered_set<uint16_t> dualConnections{};
 
   /**
    * @brief Construct a node with an ID of 0, no connections and coordinate at
@@ -28,8 +28,8 @@ struct Node {
   Node(const uint16_t nodeID, const std::array<double, 2> &coord);
 
   Node(const uint16_t nodeID, const std::array<double, 2> &coord,
-       const std::set<uint16_t> &netConnections,
-       const std::set<uint16_t> &dualConnections);
+       const std::unordered_set<uint16_t> &netConnections,
+       const std::unordered_set<uint16_t> &dualConnections);
 
   Node &operator=(const Node &other);
 

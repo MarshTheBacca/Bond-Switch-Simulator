@@ -3,9 +3,9 @@
 #include <algorithm>
 #include <array>
 #include <ranges>
-#include <set>
 #include <sstream>
 #include <string>
+#include <unordered_set>
 
 /**
  * @brief Construct node with a given ID with no connections and coordinate at
@@ -30,8 +30,8 @@ Node::Node(const uint16_t nodeID, const std::array<double, 2> &coord)
  * @param dualConnections The connections to nodes in the dual network
  */
 Node::Node(const uint16_t nodeID, const std::array<double, 2> &coord,
-           const std::set<uint16_t> &netConnections,
-           const std::set<uint16_t> &dualConnections)
+           const std::unordered_set<uint16_t> &netConnections,
+           const std::unordered_set<uint16_t> &dualConnections)
     : id(nodeID), coord(coord), netConnections(netConnections),
       dualConnections(dualConnections) {}
 

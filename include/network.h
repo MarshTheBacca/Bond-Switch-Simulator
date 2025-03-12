@@ -52,10 +52,11 @@ struct Network {
   // Write functions
   void writeInfo(std::ofstream &infoFile) const;
   void writeCoords(std::ofstream &crdFile) const;
-  void writeConnections(std::ofstream &cnxFile,
-                        const std::vector<std::set<uint16_t>> &cnxs) const;
-  std::vector<std::set<uint16_t>> getConnections() const;
-  std::vector<std::set<uint16_t>> getDualConnections() const;
+  void
+  writeConnections(std::ofstream &cnxFile,
+                   const std::vector<std::unordered_set<uint16_t>> &cnxs) const;
+  std::vector<std::unordered_set<uint16_t>> getConnections() const;
+  std::vector<std::unordered_set<uint16_t>> getDualConnections() const;
   void write() const;
 
   size_t getMaxConnections() const;

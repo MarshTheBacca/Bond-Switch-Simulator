@@ -374,11 +374,22 @@ double LammpsObject::getPotentialEnergy() {
  */
 std::vector<double> LammpsObject::getCoords(const int dim) const {
   if (dim != 2 && dim != 3) {
-    throw std::runtime_error("Invalid dimension");
+    throw std::runtime_error(
+        std::format("Cannot get coordinates for dimension: {}", dim));
   }
   // Get the coordinates of the atoms
   std::vector<double> coords(dim * natoms);
-  lammps_gather_atoms(handle, "x", 1, dim, coords.data());
+  lammps_gather_atoms(
+      // LAMMPS handle
+      handle,
+      // Get coordinates
+      "x",
+      // 1 means doubles, 0 means integers
+      1,
+      // The number of values per atom
+      dim,
+      // The buffer to populate
+      coords.data());
   return coords;
 }
 
