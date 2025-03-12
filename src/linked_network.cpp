@@ -178,9 +178,7 @@ void LinkedNetwork::performBondSwitch(const double temperature) {
 
   logger->debug("Switching LAMMPS Network...");
 
-  lammpsNetwork.switchGraphene(switchMove.bondBreaks, switchMove.bondMakes,
-                               switchMove.angleBreaks, switchMove.angleMakes,
-                               rotatedCoord1, rotatedCoord2);
+  lammpsNetwork.switchGraphene(switchMove, rotatedCoord1, rotatedCoord2);
 
   // Geometry optimisation of local region
   logger->debug("Minimising network...");
@@ -192,9 +190,7 @@ void LinkedNetwork::performBondSwitch(const double temperature) {
   if (!checkBondLengths(switchMove.involvedBaseNodes, lammpsCoords)) {
     logger->debug("Rejected move: bond lengths are not within range");
     failedBondLengthChecks++;
-    rejectMove(initialInvolvedNodesA, initialInvolvedNodesB,
-               switchMove.bondBreaks, switchMove.bondMakes,
-               switchMove.angleBreaks, switchMove.angleMakes);
+    rejectMove(initialInvolvedNodesA, initialInvolvedNodesB, switchMove);
     return;
   }
   double finalEnergy = lammpsNetwork.getPotentialEnergy();
@@ -204,9 +200,7 @@ void LinkedNetwork::performBondSwitch(const double temperature) {
                   "Ef = {:.3f} Eh",
                   initialEnergy, finalEnergy);
     failedEnergyChecks++;
-    rejectMove(initialInvolvedNodesA, initialInvolvedNodesB,
-               switchMove.bondBreaks, switchMove.bondMakes,
-               switchMove.angleBreaks, switchMove.angleMakes);
+    rejectMove(initialInvolvedNodesA, initialInvolvedNodesB, switchMove);
     return;
   }
   logger->debug("Accepted Move: Ei = {:.3f} Eh, Ef = {:.3f} Eh", initialEnergy,
@@ -222,17 +216,13 @@ void LinkedNetwork::performBondSwitch(const double temperature) {
   }
 }
 
-void LinkedNetwork::rejectMove(
-    const std::vector<Node> &initialInvolvedNodesA,
-    const std::vector<Node> &initialInvolvedNodesB,
-    const std::array<std::array<uint16_t, 2>, 2> &bondBreaks,
-    const std::array<std::array<uint16_t, 2>, 2> &bondMakes,
-    const std::array<std::array<uint16_t, 3>, 8> &angleBreaks,
-    const std::array<std::array<uint16_t, 3>, 8> &angleMakes) {
+void LinkedNetwork::rejectMove(const std::vector<Node> &initialInvolvedNodesA,
+                               const std::vector<Node> &initialInvolvedNodesB,
+                               const SwitchMove &switchMove) {
   logger->debug("Reverting BSS Network...");
   revertMove(initialInvolvedNodesA, initialInvolvedNodesB);
   logger->debug("Reverting LAMMPS Network...");
-  lammpsNetwork.revertGraphene(bondBreaks, bondMakes, angleBreaks, angleMakes);
+  lammpsNetwork.revertGraphene(switchMove);
   logger->debug("Syncing LAMMPS coordinates to BSS coordinates...");
   lammpsNetwork.setCoords(currentCoords, 2);
 }

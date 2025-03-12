@@ -1,6 +1,7 @@
 #ifndef LAMMPS_OBJECT_H
 #define LAMMPS_OBJECT_H
 #include "network.h"
+#include "switch_move.h"
 #include "types.h"
 #include <vector>
 
@@ -37,17 +38,11 @@ struct LammpsObject {
   void breakAndFormAngles(int atom3, int atom1, int atom5, int atom4, int e1,
                           int e11, int d1, int d11);
 
-  void switchGraphene(const std::array<std::array<uint16_t, 2>, 2> &bondBreaks,
-                      const std::array<std::array<uint16_t, 2>, 2> &bondMakes,
-                      const std::array<std::array<uint16_t, 3>, 8> &angleBreaks,
-                      const std::array<std::array<uint16_t, 3>, 8> &angleMakes,
+  void switchGraphene(const SwitchMove &switchMove,
                       const std::vector<double> &rotatedCoord1,
                       const std::vector<double> &rotatedCoord2);
 
-  void revertGraphene(const std::array<std::array<uint16_t, 2>, 2> &bondBreaks,
-                      const std::array<std::array<uint16_t, 2>, 2> &bondMakes,
-                      const std::array<std::array<uint16_t, 3>, 8> &angleBreaks,
-                      const std::array<std::array<uint16_t, 3>, 8> &angleMakes);
+  void revertGraphene(const SwitchMove &switchMove);
   std::vector<int> getAngles() const;
 
   void writeData();

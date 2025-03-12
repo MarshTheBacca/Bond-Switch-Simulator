@@ -1,5 +1,6 @@
 #include "lammps_object.h"
 #include "library.h" // LAMMPS Library
+#include "switch_move.h"
 #include <filesystem>
 #include <format>
 
@@ -232,34 +233,31 @@ void LammpsObject::formAngle(const int atom1, const int atom2,
  * triples)
  * @param angleMakes The IDs of the angles to be made (1D vector of triples)
  */
-void LammpsObject::switchGraphene(
-    const std::array<std::array<uint16_t, 2>, 2> &bondBreaks,
-    const std::array<std::array<uint16_t, 2>, 2> &bondMakes,
-    const std::array<std::array<uint16_t, 3>, 8> &angleBreaks,
-    const std::array<std::array<uint16_t, 3>, 8> &angleMakes,
-    const std::vector<double> &rotatedCoord1,
-    const std::vector<double> &rotatedCoord2) {
+void LammpsObject::switchGraphene(const SwitchMove &switchMove,
+                                  const std::vector<double> &rotatedCoord1,
+                                  const std::vector<double> &rotatedCoord2) {
 
-  std::ranges::for_each(bondBreaks,
+  std::ranges::for_each(switchMove.bondBreaks,
                         [this](const std::array<uint16_t, 2> &bond) {
                           breakBond(bond[0] + 1, bond[1] + 1, 1);
                         });
-  std::ranges::for_each(bondMakes, [this](const std::array<uint16_t, 2> &bond) {
-    formBond(bond[0] + 1, bond[1] + 1, 1);
-  });
+  std::ranges::for_each(switchMove.bondMakes,
+                        [this](const std::array<uint16_t, 2> &bond) {
+                          formBond(bond[0] + 1, bond[1] + 1, 1);
+                        });
 
-  std::ranges::for_each(angleBreaks,
+  std::ranges::for_each(switchMove.angleBreaks,
                         [this](const std::array<uint16_t, 3> &angle) {
                           breakAngle(angle[0] + 1, angle[1] + 1, angle[2] + 1);
                         });
 
-  std::ranges::for_each(angleMakes,
+  std::ranges::for_each(switchMove.angleMakes,
                         [this](const std::array<uint16_t, 3> &angle) {
                           formAngle(angle[0] + 1, angle[1] + 1, angle[2] + 1);
                         });
 
-  int atom1ID = bondBreaks[0][0] + 1;
-  int atom2ID = bondBreaks[1][0] + 1;
+  int atom1ID = switchMove.bondBreaks[0][0] + 1;
+  int atom2ID = switchMove.bondBreaks[1][0] + 1;
   setAtomCoords(atom1ID, rotatedCoord1, 2);
   setAtomCoords(atom2ID, rotatedCoord2, 2);
 }
@@ -275,26 +273,23 @@ void LammpsObject::switchGraphene(
  * @param angleMakes The IDs of the angles that have been made (1D vector of
  * triples)
  */
-void LammpsObject::revertGraphene(
-    const std::array<std::array<uint16_t, 2>, 2> &bondBreaks,
-    const std::array<std::array<uint16_t, 2>, 2> &bondMakes,
-    const std::array<std::array<uint16_t, 3>, 8> &angleBreaks,
-    const std::array<std::array<uint16_t, 3>, 8> &angleMakes) {
-  std::ranges::for_each(bondBreaks,
+void LammpsObject::revertGraphene(const SwitchMove &switchMove) {
+  std::ranges::for_each(switchMove.bondBreaks,
                         [this](const std::array<uint16_t, 2> &bond) {
                           formBond(bond[0] + 1, bond[1] + 1, 1);
                         });
 
-  std::ranges::for_each(bondMakes, [this](const std::array<uint16_t, 2> &bond) {
-    breakBond(bond[0] + 1, bond[1] + 1, 1);
-  });
+  std::ranges::for_each(switchMove.bondMakes,
+                        [this](const std::array<uint16_t, 2> &bond) {
+                          breakBond(bond[0] + 1, bond[1] + 1, 1);
+                        });
 
-  std::ranges::for_each(angleBreaks,
+  std::ranges::for_each(switchMove.angleBreaks,
                         [this](const std::array<uint16_t, 3> &angle) {
                           formAngle(angle[0] + 1, angle[1] + 1, angle[2] + 1);
                         });
 
-  std::ranges::for_each(angleMakes,
+  std::ranges::for_each(switchMove.angleMakes,
                         [this](const std::array<uint16_t, 3> &angle) {
                           breakAngle(angle[0] + 1, angle[1] + 1, angle[2] + 1);
                         });

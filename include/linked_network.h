@@ -81,10 +81,7 @@ struct LinkedNetwork {
   void performBondSwitch(const double temperature);
   void rejectMove(const std::vector<Node> &initialInvolvedNodesA,
                   const std::vector<Node> &initialInvolvedNodesB,
-                  const std::array<std::array<uint16_t, 2>, 2> &bondBreaks,
-                  const std::array<std::array<uint16_t, 2>, 2> &bondMakes,
-                  const std::array<std::array<uint16_t, 3>, 8> &angleBreaks,
-                  const std::array<std::array<uint16_t, 3>, 8> &angleMakes);
+                  const SwitchMove &switchMove);
 
   bool checkConsistency();
 
