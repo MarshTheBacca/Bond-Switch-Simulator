@@ -18,7 +18,7 @@ struct Network {
   // Member variables
   NetworkType type;
   std::string networkString;
-  int numNodes;
+  uint16_t numNodes;
   std::vector<Node> nodes;
   std::array<double, 2> dimensions;
 
@@ -72,13 +72,20 @@ struct Network {
   size_t
   getMinDualConnections(const std::unordered_set<uint16_t> &excludeNodes) const;
 
-  std::vector<double> getCoords();
   void centreRings(const Network &baseNetwork);
 
   int findNumberOfUniqueDualNodes();
   void display(const LoggerPtr &logger) const;
   Node &getRandomNode();
   Node &getRandomNodeConnection(const Node &node);
+
+  bool checkBondLengths(const double &maxBondLength) const;
+
+  bool checkBondLengths(const uint16_t checkNodeID,
+                        const double maxBondLength) const;
+
+  bool checkBondLengths(const std::unordered_set<uint16_t> &checkNodes,
+                        const double maxBondLength) const;
 };
 
 #endif // NL_NETWORK_H

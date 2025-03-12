@@ -27,8 +27,7 @@ LinkedNetwork::LinkedNetwork(const InputData &inputData,
                              const LoggerPtr &loggerArg)
     : minRingSize(inputData.minRingSize), maxRingSize(inputData.maxRingSize),
       selectionType(inputData.randomOrWeighted),
-      metropolisCondition(inputData.randomSeed),
-      weightedDecay(inputData.weightedDecay),
+      metropolisCondition(Metropolis()), weightedDecay(inputData.weightedDecay),
       maximumBondLength(inputData.maximumBondLength),
       maximumAngle(inputData.maximumAngle * M_PI / 180),
       writeMovie(inputData.writeMovie), logger(loggerArg) {
@@ -67,7 +66,6 @@ LinkedNetwork::LinkedNetwork(const InputData &inputData,
   pushCoords(currentCoords);
   weights.resize(networkA.nodes.size());
   updateWeights();
-  randomNumGen.seed(inputData.randomSeed);
 }
 
 /**
@@ -177,15 +175,13 @@ void LinkedNetwork::performBondSwitch(const double temperature) {
       switchMove.selectedBaseBond, getRingsDirection(orderedRingNodes));
 
   logger->debug("Switching LAMMPS Network...");
-
   lammpsNetwork.switchGraphene(switchMove, rotatedCoord1, rotatedCoord2);
 
-  // Geometry optimisation of local region
   logger->debug("Minimising network...");
   lammpsNetwork.minimiseNetwork();
-  std::vector<double> lammpsCoords = lammpsNetwork.getCoords(2);
 
   logger->debug("Accepting or rejecting...");
+  std::vector<double> lammpsCoords = lammpsNetwork.getCoords(2);
   // TODO - Check angles are within range
   if (!checkBondLengths(switchMove.involvedBaseNodes, lammpsCoords)) {
     logger->debug("Rejected move: bond lengths are not within range");

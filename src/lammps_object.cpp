@@ -227,11 +227,6 @@ void LammpsObject::formAngle(const int atom1, const int atom2,
 
 /**
  * @brief perform bond switch in the lattice using zero-indexed node IDs
- * @param bondBreaks Ths IDs of the bonds to be broken (1D vector of pairs)
- * @param bondMakes The IDs of the bonds to be made (1D vector of pairs)
- * @param angleBreaks The IDs of the angles to be broken (1D vector of
- * triples)
- * @param angleMakes The IDs of the angles to be made (1D vector of triples)
  */
 void LammpsObject::switchGraphene(const SwitchMove &switchMove,
                                   const std::vector<double> &rotatedCoord1,
@@ -264,14 +259,6 @@ void LammpsObject::switchGraphene(const SwitchMove &switchMove,
 /**
  * @brief perform the opposite of a bond switch in the lattice using
  * zero-indexed node IDs
- * @param bondBreaks Ths IDs of the bonds that have been broken (1D vector of
- * pairs)
- * @param bondMakes The IDs of the bonds that have been made (1D vector of
- * pairs)
- * @param angleBreaks The IDs of the angles that have been broken (1D vector
- * of triples)
- * @param angleMakes The IDs of the angles that have been made (1D vector of
- * triples)
  */
 void LammpsObject::revertGraphene(const SwitchMove &switchMove) {
   std::ranges::for_each(switchMove.bondBreaks,

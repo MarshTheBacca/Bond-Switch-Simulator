@@ -331,7 +331,7 @@ T ndDistance(const std::array<T, S> &array1, const std::array<T, S> &array2) {
 }
 
 template <typename T, size_t S>
-  requires Multipliable<T>
+  requires Subtractable<T> && Multipliable<T>
 T arrayAbs(const std::array<T, S> &array) {
   return std::sqrt(
       std::transform_reduce(array.begin(), array.end(), T(0), std::plus<T>(),

@@ -82,8 +82,8 @@ Network::Network(const NetworkType networkType, const LoggerPtr &logger)
   readInfo(std::filesystem::path(BSS_NETWORK_PATH) /
            (networkString + "_info.txt"));
   nodes.reserve(numNodes);
-  for (int i = 0; i < numNodes; ++i) {
-    nodes.emplace_back(Node(i));
+  for (uint16_t i = 0; i < numNodes; ++i) {
+    nodes.emplace_back(i);
   }
   logger->debug("Reading file: " + networkString + "_coords.txt");
   readCoords(std::filesystem::path(BSS_NETWORK_PATH) /
@@ -111,7 +111,7 @@ void Network::readInfo(const std::string &filePath) {
     throw std::runtime_error("Cannot open info file: " + filePath);
   }
   // Read number of nodes
-  numNodes = static_cast<int>(readValueAfterColon(infoFile));
+  numNodes = static_cast<uint16_t>(readValueAfterColon(infoFile));
   // Read dimensions
   dimensions[0] = readValueAfterColon(infoFile);
   dimensions[1] = readValueAfterColon(infoFile);
@@ -469,7 +469,7 @@ size_t Network::getMaxConnections() const {
  */
 size_t Network::getMaxConnections(
     const std::unordered_set<uint16_t> &excludeNodes) const {
-  int maxConnections = 0;
+  size_t maxConnections = 0;
   for (const auto &node : nodes) {
     if (excludeNodes.contains(node.id)) {
       continue;
@@ -501,7 +501,7 @@ size_t Network::getMinConnections() const {
  */
 size_t Network::getMinConnections(
     const std::unordered_set<uint16_t> &excludeNodes) const {
-  int minConnections = std::numeric_limits<int>::max();
+  size_t minConnections = std::numeric_limits<int>::max();
   for (const auto &node : nodes) {
     if (excludeNodes.contains(node.id))
       continue;
@@ -548,25 +548,13 @@ size_t Network::getMinDualConnections(
  * @return Minimum number of connections
  */
 size_t Network::getMinDualConnections() const {
-  auto minNode =
-      std::ranges::min_element(nodes, [](const Node &node1, const Node node2) {
-        return node1.numDualConnections() < node2.numDualConnections();
-      });
-  return minNode->numDualConnections();
-}
-
-/**
- * @brief Get the coordinates of the network in pairs
- * @return 1D vector of node coordinates
- */
-std::vector<double> Network::getCoords() {
-  std::vector<double> returnCoords;
-  returnCoords.reserve(nodes.size() * 2);
-  for (int i = 0; i < nodes.size(); i++) {
-    returnCoords[i * 2] = nodes[i].coord[0];
-    returnCoords[i * 2 + 1] = nodes[i].coord[1];
-  }
-  return returnCoords;
+  // min_element returns an iterator, so we have to use -> operator
+  return std::ranges::min_element(nodes,
+                                  [](const Node &node1, const Node &node2) {
+                                    return node1.numDualConnections() <
+                                           node2.numDualConnections();
+                                  })
+      ->numDualConnections();
 }
 
 double Network::getAboavWeaire() const { return 0.0; }
@@ -591,11 +579,62 @@ void Network::display(const LoggerPtr &logger) const {
       nodes, [&logger](const Node &node) { logger->info(node.toString()); });
 }
 
+/**
+ * @brief Get a random node from the network
+ * @return Random node
+ */
 Node &Network::getRandomNode() {
   return *RandomNumberGenerator::getInstance().getRandomElement(
       this->nodes.begin(), this->nodes.end());
 }
-
+/**
+ * @brief Get a random connected node of a given node
+ * @param node Node to get a random connected node of
+ * @return Random connected node
+ */
 Node &Network::getRandomNodeConnection(const Node &node) {
   return this->nodes[node.getRandomNetConnectionID()];
+}
+
+/**
+ * @brief Check if all bonds in the network are within a given maximum length
+ * @param maxBondLength Maximum bond length
+ * @return true if all bonds are within the maximum bond length, false otherwise
+ * @note All bonds are checked twice, this could be optimised in future
+ */
+bool Network::checkBondLengths(const double &maxBondLength) const {
+  return std::ranges::all_of(nodes, [this, maxBondLength](const Node &node) {
+    return this->checkBondLengths(node.id, maxBondLength);
+  });
+}
+
+/**
+ * @brief Check if the given set of nodeIDs bonds in the network are within a
+ * given maximum length
+ * @param maxBondLength Maximum bond length
+ * @return true if all bonds are within the maximum bond length, false otherwise
+ */
+bool Network::checkBondLengths(const uint16_t checkNodeID,
+                               const double maxBondLength) const {
+  const Node &checkNode = nodes[checkNodeID];
+  return std::ranges::all_of(
+      checkNode.netConnections,
+      [this, maxBondLength, &checkNode](const uint16_t connectionID) {
+        return arrayAbs(pbcArray(checkNode.coord, nodes[connectionID].coord,
+                                 dimensions)) <= maxBondLength;
+      });
+}
+
+/**
+ * @brief Check if a given nodeID's bonds in the network are within a given
+ * maximum length
+ * @param maxBondLength Maximum bond length
+ * @return true if all bonds are within the maximum bond length, false otherwise
+ */
+bool Network::checkBondLengths(const std::unordered_set<uint16_t> &checkNodeIDs,
+                               const double maxBondLength) const {
+  return std::ranges::all_of(
+      checkNodeIDs, [this, maxBondLength](const uint16_t checkNodeID) {
+        return this->checkBondLengths(checkNodeID, maxBondLength);
+      });
 }

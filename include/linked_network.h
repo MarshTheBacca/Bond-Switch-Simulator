@@ -37,7 +37,6 @@ struct LinkedNetwork {
 
   bool isOpenMPIEnabled;          // Whether to use MPI
   SelectionType selectionType;    // Either 'weighted' or 'random'
-  std::mt19937 randomNumGen;      // mersenne twister random number generator
   Metropolis metropolisCondition; // monte carlo metropolis condition
   double weightedDecay;           // decay factor for weighted monte carlo
   double maximumBondLength;       // Maximum bond length
