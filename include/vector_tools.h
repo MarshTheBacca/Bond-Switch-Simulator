@@ -14,60 +14,11 @@
 
 // template functions
 
-template <typename T>
-bool vectorContains(const std::vector<T> &vector, const T &value);
-
-template <typename T>
-std::tuple<double, double, double>
-vectorLinearRegression(const std::vector<T> &vector1,
-                       const std::vector<T> &vector2);
-
-template <typename T>
-void vectorDivide(std::vector<T> &vector, const double &divideBy);
-
-template <typename T, typename U>
-void addToVector(std::vector<double> &vector, const U &addition);
-
-template <typename T, typename U>
-void vectorSubtract(std::vector<T> &vector, const U &subtraction);
-
 template <typename T> T vectorSum(const std::vector<T> &vector);
-
-template <typename T>
-std::vector<T> multiplyVectors(const std::vector<T> &vector1,
-                               const std::vector<T> &vector2);
-
-template <typename T>
-std::unordered_set<T> intersectVectors(const std::vector<T> &vector1,
-                                       const std::vector<T> &vector2);
-
-template <typename T, typename... Args>
-void deleteByValues(std::vector<T> &vector, const Args &...args);
-
-template <typename T>
-void replaceValue(std::vector<T> &vector, const T &oldValue, const T &newValue);
-
-template <typename T> double vectorMean(const std::vector<T> &vector);
-
-template <typename T>
-std::vector<T> getUniqueValues(const std::vector<T> &vector);
 
 template <typename T> std::string vectorToString(const std::vector<T> &vector);
 
 template <typename T> std::string setToString(const std::unordered_set<T> &set);
-
-template <typename T, typename... Args>
-void vectorAddValues(std::vector<T> &vector, const Args &...args);
-
-template <typename T>
-std::vector<T> combineVectors(const std::vector<T> &vec1,
-                              const std::vector<T> &vec2);
-
-template <typename T> void vectorNormalise(const std::vector<T> &vec);
-
-template <typename T>
-std::unordered_set<T> setDifference(const std::unordered_set<T> &set1,
-                                    const std::unordered_set<T> &set2);
 
 template <size_t S>
 std::array<double, S> pbcArray(const std::array<double, S> &vector1,
@@ -125,7 +76,13 @@ template <typename T>
 void setReplace(std::unordered_set<T> &set, const T &oldValue,
                 const T &newValue);
 
-template <typename T> T &getSetAt(std::set<T> &set, size_t index);
+template <typename T, size_t S>
+  requires Subtractable<T> && Multipliable<T>
+T ndDistance(const std::array<T, S> &array1, const std::array<T, S> &array2);
+
+template <typename T, size_t S>
+  requires Subtractable<T> && Multipliable<T>
+T arrayAbs(const std::array<T, S> &array);
 
 // Regular functions
 void normaliseMap(std::map<int, double> &map);
