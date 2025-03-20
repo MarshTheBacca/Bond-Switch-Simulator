@@ -72,7 +72,7 @@ struct Network {
   size_t
   getMinDualConnections(const std::unordered_set<uint16_t> &excludeNodes) const;
 
-  void centreRings(const Network &baseNetwork);
+  void centerByDual(const Network &dualNetwork);
 
   int findNumberOfUniqueDualNodes();
   void display(const LoggerPtr &logger) const;
@@ -86,6 +86,13 @@ struct Network {
 
   bool checkBondLengths(const std::unordered_set<uint16_t> &checkNodes,
                         const double maxBondLength) const;
+
+  std::array<double, 2>
+  getAverageCoordsPBC(const std::unordered_set<uint16_t> &nodeIDs) const;
+
+  std::array<std::array<double, 2>, 2>
+  getRotatedBond(const std::array<uint16_t, 2> &bond,
+                 const Direction &direction) const;
 };
 
 #endif // NL_NETWORK_H

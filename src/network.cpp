@@ -1,6 +1,7 @@
 #include "network.h"
 #include "output_file.h"
 #include "random_number_generator.h"
+#include "types.h"
 #include "vector_tools.h"
 #include <algorithm>
 #include <cmath>
@@ -161,9 +162,9 @@ int Network::findNumberOfUniqueDualNodes() {
   int numberOfUniqueDualNodes = -1;
   std::ranges::for_each(nodes, [&numberOfUniqueDualNodes](Node &node) {
     std::ranges::for_each(node.dualConnections,
-                          [&numberOfUniqueDualNodes](int dualCnx) {
-                            if (dualCnx > numberOfUniqueDualNodes)
-                              numberOfUniqueDualNodes = dualCnx;
+                          [&numberOfUniqueDualNodes](int dualConnectionID) {
+                            if (dualConnectionID > numberOfUniqueDualNodes)
+                              numberOfUniqueDualNodes = dualConnectionID;
                           });
   });
   return numberOfUniqueDualNodes + 1;
@@ -171,41 +172,38 @@ int Network::findNumberOfUniqueDualNodes() {
 
 /**
  * @brief Centres all nodes relative to their dual connections
- * @param pairedNetwork Base network to provide dual node IDs
+ * @param dualNetwork Dual network relative to this network
  */
-void Network::centreRings(const Network &pairedNetwork) {
+void Network::centerByDual(const Network &dualNetwork) {
+  if (this->type == dualNetwork.type) {
+    throw std::invalid_argument(
+        "Cannot a network with a dual network of the same type");
+  }
+  // Allocate memory
   std::array<double, 2> coordSum{0.0, 0.0};
-  // For every node
-  std::ranges::for_each(nodes, [&pairedNetwork, &coordSum, this](Node &node) {
+  // For every node in this network
+  std::ranges::for_each(this->nodes, [&dualNetwork, &coordSum,
+                                      this](Node &node) {
     // Reset coordSum to 0
-    std::ranges::fill(coordSum, 0.0);
-
+    coordSum = {0.0, 0.0};
     // Get a sum of the relative vectors to each dual node
-    std::ranges::for_each(node.dualConnections, [&pairedNetwork, &coordSum,
-                                                 &node, this](int dualCnx) {
-      std::array<double, 2> pbcCoords = pbcArray(
-          node.coord, pairedNetwork.nodes[dualCnx].coord, this->dimensions);
-      arrayAdd(coordSum, pbcCoords);
-    });
+    std::ranges::for_each(
+        node.dualConnections, [&dualNetwork, &coordSum, &node,
+                               this](const uint16_t dualConnectionID) {
+          std::array<double, 2> pbcCoords =
+              pbcArray(node.coord, dualNetwork.nodes[dualConnectionID].coord,
+                       this->dimensions);
+          arrayAdd(coordSum, pbcCoords);
+        });
 
     // Average the sum of the relative vectors
     divideArray(coordSum, static_cast<double>(node.numDualConnections()));
 
-    // Move the node to this new average coordinate
+    // Translate the relative average vector
     arrayAdd(node.coord, coordSum);
 
     // Wrap the new coordinates back into the box if they are outside
-    std::ranges::for_each(node.coord, [this](double &coord) {
-      while (coord < 0) {
-        // While the coordinate is less than 0, keep adding the dimension
-        coord += this->dimensions[0];
-      }
-      while (coord >= this->dimensions[0]) {
-        // While the coordinate is ge the dimension, keep subtracting
-        // the dimension
-        coord -= this->dimensions[0];
-      }
-    });
+    wrapArray(node.coord, this->dimensions);
   });
 }
 
@@ -637,4 +635,55 @@ bool Network::checkBondLengths(const std::unordered_set<uint16_t> &checkNodeIDs,
       checkNodeIDs, [this, maxBondLength](const uint16_t checkNodeID) {
         return this->checkBondLengths(checkNodeID, maxBondLength);
       });
+}
+
+std::array<double, 2> Network::getAverageCoordsPBC(
+    const std::unordered_set<uint16_t> &nodeIDs) const {
+  std::vector<std::array<double, 2>> pbcCoords(nodeIDs.size());
+  // Get a random coordinate to use as a reference
+  std::array<double, 2> relativeCoord = this->nodes[*nodeIDs.begin()].coord;
+  std::transform(nodeIDs.begin(), nodeIDs.end(), pbcCoords.begin(),
+                 [this, &relativeCoord](const uint16_t nodeID) {
+                   return pbcArray(relativeCoord, this->nodes[nodeID].coord,
+                                   this->dimensions);
+                 });
+  const std::array<double, 2> averagePBC = arrayAverage(pbcCoords);
+  return arrayAdd(relativeCoord, averagePBC);
+}
+
+/**
+ * @brief Calculates the new coordinates of a pair of atoms if they were rotated
+ * by 90 degrees in the given direction
+ * @param bond The bond to rotate
+ * @param direct Direction to rotate the bond
+ * @return Pair of vectors containing the new coordinates of the atoms
+ */
+std::array<std::array<double, 2>, 2>
+Network::getRotatedBond(const std::array<uint16_t, 2> &bond,
+                        const Direction &direction) const {
+  // Calculate the center point
+  const std::array<double, 2> centerCoord =
+      this->getAverageCoordsPBC({bond[0], bond[1]});
+
+  // Get relative coords to center
+  std::array<double, 2> relativeCoord1 =
+      pbcArray(centerCoord, this->nodes[bond[0]].coord, this->dimensions);
+  std::array<double, 2> relativeCoord2 =
+      pbcArray(centerCoord, this->nodes[bond[1]].coord, this->dimensions);
+
+  // Calculate the translation vectors
+  std::array<double, 2> translationVector1;
+  std::array<double, 2> translationVector2;
+  if (direction == Direction::ANTICLOCKWISE) {
+    translationVector1 = {-relativeCoord1[1], relativeCoord1[0]};
+    translationVector2 = {-relativeCoord2[1], relativeCoord2[0]};
+  } else {
+    translationVector1 = {relativeCoord1[1], -relativeCoord1[0]};
+    translationVector2 = {relativeCoord2[1], -relativeCoord2[0]};
+  }
+
+  // Add to the center coords and wrap to dimensions
+  return {
+      {wrapArray(arrayAdd(centerCoord, translationVector1), this->dimensions),
+       wrapArray(arrayAdd(centerCoord, translationVector2), this->dimensions)}};
 }
