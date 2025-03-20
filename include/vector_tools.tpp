@@ -64,8 +64,8 @@ std::string mapToString(const std::unordered_map<T, U> &map) {
 }
 
 /**
- * @brief Calculates the difference between two vectors with periodic boundary
- * conditions
+ * @brief Gets a vector corresponding to the shortest distance of
+ * vector1->vector2 using periodic boundary conditions
  * @param vector1 First array
  * @param vector2 Second array
  * @param dimensions Dimensions of the system xhi, yhi, (zhi if 3D)
@@ -77,11 +77,13 @@ template <size_t S>
 std::array<double, S> pbcArray(const std::array<double, S> &vector1,
                                const std::array<double, S> &vector2,
                                const std::array<double, S> &dimensions) {
+  // Preallocate memory
   std::array<double, S> differenceVector;
   double dimensionRange = 0.0;
   double halfDimensionRange = 0.0;
   double difference = 0.0;
   for (size_t i = 0; i < S; ++i) {
+    // Range is the same because the dimensions are zeroed
     dimensionRange = dimensions[i];
     halfDimensionRange = dimensionRange / 2;
     difference = vector2[i] - vector1[i];
@@ -92,23 +94,6 @@ std::array<double, S> pbcArray(const std::array<double, S> &vector1,
     }
   }
   return differenceVector;
-}
-
-/**
- * @brief Adds two arrays together element-wise
- * @tparam T The type of the arrays
- * @tparam S The size of the arrays
- * @param array1 The first array
- * @param array2 The second array
- * @return An array containing the sum of the two arrays
- */
-template <typename T, size_t S>
-  requires Addable<T>
-std::array<T, S> arrayAdd(const std::array<T, S> &array1,
-                          const std::array<T, S> &array2) {
-  std::array<T, S> result;
-  std::ranges::transform(array1, array2, result.begin(), std::plus<T>());
-  return result;
 }
 
 /**
@@ -129,6 +114,22 @@ std::array<T, S> arraySubtract(const std::array<T, S> &array1,
 }
 
 /**
+ * @brief Adds an array to another array element-wise
+ * @tparam T The type of the arrays
+ * @tparam S The size of the arrays
+ * @param array1 The first array
+ * @param array2 The second array
+ */
+template <typename T, size_t S>
+  requires Addable<T>
+std::array<T, S> arrayAdd(const std::array<T, S> &array1,
+                          const std::array<T, S> &array2) {
+  std::array<double, 2> result;
+  std::ranges::transform(array1, array2, result.begin(), std::plus<T>());
+  return result;
+}
+
+/**
  * @brief Adds an array to another array element-wise, IN PLACE
  * @tparam T The type of the arrays
  * @tparam S The size of the arrays
@@ -137,7 +138,7 @@ std::array<T, S> arraySubtract(const std::array<T, S> &array1,
  */
 template <typename T, size_t S>
   requires Addable<T>
-void arrayAdd(std::array<T, S> &array1, const std::array<T, S> &array2) {
+void arrayAddInPlace(std::array<T, S> &array1, const std::array<T, S> &array2) {
   std::ranges::transform(array1, array2, array1.begin(), std::plus<T>());
 }
 
@@ -174,7 +175,8 @@ std::array<T, S> arrayDivide(const std::array<T, S> &array1,
  */
 template <typename T, size_t S>
   requires Divisible<T>
-void arrayDivide(std::array<T, S> &array1, const std::array<T, S> &array2) {
+void arrayDivideInPlace(std::array<T, S> &array1,
+                        const std::array<T, S> &array2) {
   std::ranges::transform(array1, array2, array1.begin(),
                          [](const T &a, const T &b) {
                            if (b == 0) {
@@ -215,7 +217,7 @@ std::array<T, S> divideArray(const std::array<T, S> &array, const T divisor) {
  */
 template <typename T, size_t S>
   requires Divisible<T>
-void divideArray(std::array<T, S> &array, const T divisor) {
+void divideArrayInPlace(std::array<T, S> &array, const T divisor) {
   if (divisor == 0) {
     throw std::runtime_error("Division by zero");
   }
@@ -336,4 +338,67 @@ T arrayAbs(const std::array<T, S> &array) {
   return std::sqrt(
       std::transform_reduce(array.begin(), array.end(), T(0), std::plus<T>(),
                             [](T element) { return element * element; }));
+}
+
+/**
+ * @brief Wraps an array around the periodic boundary conditions
+ * @tparam T The type of the array
+ * @tparam S The size of the array
+ * @param array The array to be wrapped
+ * @param dimensions The dimensions of the periodic box
+ * @return The wrapped array
+ */
+template <typename T, size_t S>
+  requires Subtractable<T> && Addable<T> && Divisible<T>
+std::array<T, S> wrapArray(const std::array<T, S> &array,
+                           const std::array<T, S> &dimensions) {
+  std::array<T, S> wrappedArray;
+  std::transform(array.begin(), array.end(), dimensions.begin(),
+                 wrappedArray.begin(), [](const T value, const T dim) {
+                   // This is essentially a modulo operation
+                   T wrappedValue = value - std::floor(value / dim) * dim;
+                   if (wrappedValue < 0) {
+                     // If we took off too much, add the dimensions back
+                     wrappedValue += dim;
+                   }
+                   return wrappedValue;
+                 });
+  return wrappedArray;
+}
+
+/**
+ * @brief Wraps an array around the periodic boundary conditions IN PLACE
+ * @tparam T The type of the array
+ * @tparam S The size of the array
+ * @param array The array to be wrapped (in place)
+ * @param dimensions The dimensions of the periodic box
+ * @return The wrapped array
+ */
+template <typename T, size_t S>
+  requires Subtractable<T> && Addable<T> && Divisible<T>
+void wrapArray(std::array<T, S> &array, const std::array<T, S> &dimensions) {
+  std::transform(array.begin(), array.end(), dimensions.begin(), array.begin(),
+                 [](T value, const T dim) {
+                   // This is essentially a modulo operation
+                   T wrappedValue = value - std::floor(value / dim) * dim;
+                   if (wrappedValue < 0) {
+                     // If we took off too much, add the dimensions back
+                     wrappedValue += dim;
+                   }
+                   return wrappedValue;
+                 });
+}
+
+template <typename T, size_t S>
+  requires Addable<T> && Divisible<T>
+std::array<T, S> arrayAverage(const std::vector<std::array<T, S>> &arrays) {
+  std::array<T, S> averageArray = {}; // Initialize to zero
+  // Sum all the arrays
+  std::ranges::for_each(arrays, [&averageArray](const std::array<T, S> &array) {
+    std::ranges::transform(array.begin(), array.end(), averageArray.begin(),
+                           averageArray.end(), averageArray.begin(),
+                           std::plus<T>());
+  });
+  // Divide by the number of arrays
+  return divideArray(averageArray, static_cast<T>(arrays.size()));
 }

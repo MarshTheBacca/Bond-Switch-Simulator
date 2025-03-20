@@ -32,7 +32,7 @@ std::array<T, S> arrayAdd(const std::array<T, S> &array1,
 
 template <typename T, size_t S>
   requires Addable<T>
-void arrayAdd(std::array<T, S> &array1, const std::array<T, S> &array2);
+void arrayAddInPlace(std::array<T, S> &array1, const std::array<T, S> &array2);
 
 template <typename T, size_t S>
   requires Divisible<T>
@@ -41,7 +41,8 @@ std::array<T, S> arrayDivide(const std::array<T, S> &array1,
 
 template <typename T, size_t S>
   requires Divisible<T>
-void arrayDivide(std::array<T, S> &array1, const std::array<T, S> &array2);
+void arrayDivideInPlace(std::array<T, S> &array1,
+                        const std::array<T, S> &array2);
 
 template <typename T, size_t S>
   requires Divisible<T>
@@ -49,7 +50,7 @@ std::array<T, S> divideArray(const std::array<T, S> &array, const T divisor);
 
 template <typename T, size_t S>
   requires Divisible<T>
-void divideArray(std::array<T, S> &array, const T divisor);
+void divideArrayInPlace(std::array<T, S> &array, const T divisor);
 
 template <typename T, size_t S>
   requires Divisible<T>
@@ -83,6 +84,19 @@ T ndDistance(const std::array<T, S> &array1, const std::array<T, S> &array2);
 template <typename T, size_t S>
   requires Subtractable<T> && Multipliable<T>
 T arrayAbs(const std::array<T, S> &array);
+
+template <typename T, size_t S>
+  requires Subtractable<T> && Addable<T>
+std::array<T, S> wrapArray(const std::array<T, S> &array,
+                           const std::array<T, S> &dimensions);
+
+template <typename T, size_t S>
+  requires Subtractable<T> && Addable<T> && Divisible<T>
+void wrapArray(std::array<T, S> &array, const std::array<T, S> &dimensions);
+
+template <typename T, size_t S>
+  requires Addable<T> && Divisible<T>
+std::array<T, S> arrayAverage(const std::vector<std::array<T, S>> &arrays);
 
 // Regular functions
 void normaliseMap(std::map<int, double> &map);
