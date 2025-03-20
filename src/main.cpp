@@ -15,13 +15,13 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-// Global exit flag to cleanly exit when we use Cntrl + C
+// Global exit flag to cleanly exit when we use ctrl+c
 static std::atomic<bool> exitFlag(false);
 // Set start time so we can calculate the total run time
 const auto start = std::chrono::high_resolution_clock::now();
 
 /**
- * @brief Signal handler to set the exit flag to true when we use Cntrl + C
+ * @brief Signal handler to set the exit flag to true when we use ctrl+c
  * @param sig The signal
  */
 inline void exitFlagger([[maybe_unused]] const int sig) { exitFlag = true; }
@@ -60,9 +60,9 @@ void writeStatsFooter(const LinkedNetwork &linkedNetwork,
  * @param linkedNetwork The linked network to clean up
  */
 void cleanup(LinkedNetwork &linkedNetwork, OutputFile &allStatsFile) {
-  linkedNetwork.lammpsNetwork.stopMovie();
+  linkedNetwork.lammpsManager.stopMovie();
   linkedNetwork.write();
-  linkedNetwork.lammpsNetwork.writeData();
+  linkedNetwork.lammpsManager.writeData();
   std::filesystem::remove("./log.lammps");
   writeStatsFooter(linkedNetwork, allStatsFile,
                    linkedNetwork.checkConsistency());
@@ -133,7 +133,8 @@ void runSimulation(const std::vector<double> &expTemperatures,
                                linkedNetwork.networkB.nodeSizes);
     }
     double currentCompletion =
-        std::floor(static_cast<double>(i) / expTemperatures.size() / 0.1);
+        std::floor(static_cast<double>(i) /
+                   static_cast<double>(expTemperatures.size()) / 0.1);
     if (currentCompletion > completion) {
       completion = currentCompletion;
       logger->info("{:.0f}% Complete", completion * 10);
@@ -142,7 +143,7 @@ void runSimulation(const std::vector<double> &expTemperatures,
 }
 
 int main(int argc, char *argv[]) {
-  // Set up signal handler to cleanly exit when we use Cntrl + C
+  // Set up signal handler to cleanly exit when we use ctrl+c
   signal(SIGINT, exitFlagger);
   LoggerPtr logger;
   try {
@@ -220,11 +221,11 @@ int main(int argc, char *argv[]) {
     runSimulation(annealingTemperatures, linkedNetwork, allStatsFile,
                   inputData.analysisWriteInterval, logger);
     logger->info("Simulation complete!");
-    linkedNetwork.lammpsNetwork.stopMovie();
+    linkedNetwork.lammpsManager.stopMovie();
 
     logger->debug("Writing final network files...");
     linkedNetwork.write();
-    linkedNetwork.lammpsNetwork.writeData();
+    linkedNetwork.lammpsManager.writeData();
     bool networkConsistent = linkedNetwork.checkConsistency();
     logger->info("");
     logger->info("Number of attempted switches: {}", linkedNetwork.numSwitches);

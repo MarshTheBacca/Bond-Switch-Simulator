@@ -1,4 +1,4 @@
-#include "lammps_object.h"
+#include "lammps_manager.h"
 #include "library.h" // LAMMPS Library
 #include "switch_move.h"
 #include <filesystem>
@@ -8,18 +8,18 @@ const std::string LAMMPS_FILES_PATH =
     std::filesystem::path("./input_files") / "lammps_files";
 
 /**
- * @brief Default constructor for a blank Lammps Object
+ * @brief Default constructor for a blank LAMMPS Manager
  */
-LammpsObject::LammpsObject() = default;
+LAMMPSManager::LAMMPSManager() = default;
 
 /**
- * @brief Constructor for a Lammps Object
+ * @brief Constructor for a LAMMPS Manager
  * @param selector The selector for the structure to be created
  * @param inputFolder The folder containing the input files
  * @param loggerArg The logger object
  */
-LammpsObject::LammpsObject(const LoggerPtr &loggerArg) : logger(loggerArg) {
-  logger->debug("Creating Lammps Object");
+LAMMPSManager::LAMMPSManager(const LoggerPtr &loggerArg) : logger(loggerArg) {
+  logger->debug("Creating LAMMPS Manager");
   std::array<char *, 3> lammpsArguments = {"liblammps", "-screen", "none"};
   auto numLammpsArguments = static_cast<int>(lammpsArguments.size());
   handle =
@@ -37,7 +37,7 @@ LammpsObject::LammpsObject(const LoggerPtr &loggerArg) : logger(loggerArg) {
       std::filesystem::path(LAMMPS_FILES_PATH) / "lammps_script.txt";
   logger->debug("Executing LAMMPS Script: {}", inputFilePath);
   lammps_file(handle, inputFilePath.c_str());
-  natoms = (int)(lammps_get_natoms(handle) + 0.5);
+  numAtoms = (int)(lammps_get_natoms(handle) + 0.5);
   if (const auto nbonds_ptr =
           static_cast<const int *>(lammps_extract_global(handle, "nbonds"));
       nbonds_ptr) {
@@ -53,14 +53,14 @@ LammpsObject::LammpsObject(const LoggerPtr &loggerArg) : logger(loggerArg) {
   } else {
     logger->error("Failed to extract number of angles");
   }
-  logger->debug("LAMMPS #nodes: {} #bonds: {} #angles: {}", natoms, nbonds,
+  logger->debug("LAMMPS #nodes: {} #bonds: {} #angles: {}", numAtoms, nbonds,
                 nangles);
 }
 
 /**
  * @brief Exports the network to a file
  */
-void LammpsObject::writeData() {
+void LAMMPSManager::writeData() {
   std::string savePath =
       std::filesystem::path("./output_files") / "lammps_network_result.txt";
   std::string command = "write_data " + savePath;
@@ -74,7 +74,8 @@ void LammpsObject::writeData() {
  * @param type The type of the bond
  * @throws std::runtime_error if the bond count doesn't decrease
  */
-void LammpsObject::breakBond(const int atom1, const int atom2, const int type) {
+void LAMMPSManager::breakBond(const uint16_t atom1, const uint16_t atom2,
+                              const int type) {
   double initialBondCount = lammps_get_thermo(handle, "bonds");
   // Define a group of atoms called `switch`
   lammps_command(handle,
@@ -104,7 +105,8 @@ void LammpsObject::breakBond(const int atom1, const int atom2, const int type) {
  * @param type The type of the bond
  * @throws std::runtime_error if the bond count doesn't increase
  */
-void LammpsObject::formBond(const int atom1, const int atom2, const int type) {
+void LAMMPSManager::formBond(const uint16_t atom1, const uint16_t atom2,
+                             const int type) {
   double initialBondCount = lammps_get_thermo(handle, "bonds");
   std::string command =
       std::format("create_bonds single/bond {} {} {}", type, atom1, atom2);
@@ -125,8 +127,8 @@ void LammpsObject::formBond(const int atom1, const int atom2, const int type) {
  * @param atom3 The third atom in the angle
  * @throws std::runtime_error if the angle count doesn't decrease
  */
-void LammpsObject::breakAngle(const int atom1, const int atom2,
-                              const int atom3) {
+void LAMMPSManager::breakAngle(const uint16_t atom1, const uint16_t atom2,
+                               const uint16_t atom3) {
   // Get the initial number of angles
   const auto initialAngleCount =
       static_cast<int>(lammps_get_thermo(handle, "angles"));
@@ -204,8 +206,8 @@ void LammpsObject::breakAngle(const int atom1, const int atom2,
  * @param atom2 The second atom in the angle
  * @param atom3 The third atom in the angle
  */
-void LammpsObject::formAngle(const int atom1, const int atom2,
-                             const int atom3) {
+void LAMMPSManager::formAngle(const uint16_t atom1, const uint16_t atom2,
+                              const uint16_t atom3) {
   if (atom1 == atom2 || atom1 == atom3 || atom2 == atom3) {
     throw std::runtime_error(std::format("Angle has one or more members that "
                                          "are the same ID: {} {} {}",
@@ -228,9 +230,9 @@ void LammpsObject::formAngle(const int atom1, const int atom2,
 /**
  * @brief perform bond switch in the lattice using zero-indexed node IDs
  */
-void LammpsObject::switchGraphene(const SwitchMove &switchMove,
-                                  const std::vector<double> &rotatedCoord1,
-                                  const std::vector<double> &rotatedCoord2) {
+void LAMMPSManager::switchGraphene(const SwitchMove &switchMove,
+                                   const std::array<double, 2> &rotatedCoord1,
+                                   const std::array<double, 2> &rotatedCoord2) {
 
   std::ranges::for_each(switchMove.bondBreaks,
                         [this](const std::array<uint16_t, 2> &bond) {
@@ -253,14 +255,14 @@ void LammpsObject::switchGraphene(const SwitchMove &switchMove,
 
   int atom1ID = switchMove.bondBreaks[0][0] + 1;
   int atom2ID = switchMove.bondBreaks[1][0] + 1;
-  setAtomCoords(atom1ID, rotatedCoord1, 2);
-  setAtomCoords(atom2ID, rotatedCoord2, 2);
+  setAtomCoords(atom1ID, rotatedCoord1);
+  setAtomCoords(atom2ID, rotatedCoord2);
 }
 /**
  * @brief perform the opposite of a bond switch in the lattice using
  * zero-indexed node IDs
  */
-void LammpsObject::revertGraphene(const SwitchMove &switchMove) {
+void LAMMPSManager::revertGraphene(const SwitchMove &switchMove) {
   std::ranges::for_each(switchMove.bondBreaks,
                         [this](const std::array<uint16_t, 2> &bond) {
                           formBond(bond[0] + 1, bond[1] + 1, 1);
@@ -282,31 +284,36 @@ void LammpsObject::revertGraphene(const SwitchMove &switchMove) {
                         });
 }
 
-void LammpsObject::setCoords(std::vector<double> &newCoords, int dim) {
-  if (dim != 2 && dim != 3) {
-    throw std::runtime_error("Invalid dimension");
-  }
-  if (newCoords.size() != dim * natoms) {
+void LAMMPSManager::setCoords(
+    const std::vector<std::array<double, 2>> &newCoords) {
+  if (newCoords.size() != numAtoms) {
     throw std::runtime_error(std::format("Invalid size of newCoords, expected "
                                          "{} got {}",
-                                         dim * natoms, newCoords.size()));
+                                         numAtoms, newCoords.size()));
   }
-  lammps_scatter_atoms(handle, "x", 1, dim, newCoords.data());
+  // Flatten the 2D vector into a 1D vector, which LAMMPS expects
+  std::vector<double> coords1D(numAtoms * 2);
+  for (size_t i = 0; i < newCoords.size(); ++i) {
+    coords1D[2 * i] = newCoords[i][0];
+    coords1D[2 * i + 1] = newCoords[i][1];
+  }
+  lammps_scatter_atoms(
+      // The LAMMPS handle
+      handle,
+      // x means positions
+      "x",
+      // Atom of type 1
+      1,
+      // 2 values per atom (2D)
+      2,
+      // The coordinate values as a 1D array
+      coords1D.data());
 }
 
-void LammpsObject::setAtomCoords(const int atomID,
-                                 const std::vector<double> &newCoords,
-                                 const int dim) {
-  if (dim != 2 && dim != 3) {
-    throw std::runtime_error("Invalid dimension");
-  }
-  if (newCoords.size() != dim) {
-    throw std::runtime_error(std::format("Invalid size of newCoords, expected "
-                                         "{} got {}",
-                                         dim, newCoords.size()));
-  }
+void LAMMPSManager::setAtomCoords(const int atomID,
+                                  const std::array<double, 2> &newCoords) {
   auto x = (double **)lammps_extract_atom(handle, "x");
-  for (int i = 0; i < dim; i++) {
+  for (int i = 0; i < 2; i++) {
     x[atomID - 1][i] = newCoords[i];
   }
 }
@@ -314,7 +321,7 @@ void LammpsObject::setAtomCoords(const int atomID,
 /**
  * @brief Warns the user if the movie file already exists and starts the movie
  */
-void LammpsObject::startMovie() {
+void LAMMPSManager::startMovie() {
   std::string movieFilePath =
       (std::filesystem::path("./output_files") / "simulation_movie.mpg")
           .string();
@@ -327,14 +334,14 @@ void LammpsObject::startMovie() {
   lammps_command(handle, command.c_str());
 }
 
-void LammpsObject::writeMovie() { lammps_command(handle, "run 0 post no"); }
+void LAMMPSManager::writeMovie() { lammps_command(handle, "run 0 post no"); }
 
-void LammpsObject::stopMovie() { lammps_command(handle, "undump myMovie"); }
+void LAMMPSManager::stopMovie() { lammps_command(handle, "undump myMovie"); }
 
 /**
  * @brief Minimise the potential energy of the network by moving atoms
  */
-void LammpsObject::minimiseNetwork() {
+void LAMMPSManager::minimiseNetwork() {
   // Numbers are stopping tolerance for energy, stopping tolerance for force,
   // maximum number of iterations and maximum number of energy/force
   // evaluations
@@ -345,22 +352,17 @@ void LammpsObject::minimiseNetwork() {
  * @brief Get the potential energy of the network
  * @return The potential energy of the network
  */
-double LammpsObject::getPotentialEnergy() {
+double LAMMPSManager::getPotentialEnergy() {
   return lammps_get_thermo(handle, "pe");
 }
 
 /**
  * @brief Get the coordinates of the atoms in the network
- * @param dim the number of dimensions you want to receieve, 2 or 3
  * @return A 1D vector containing the coordinates of the atoms
  */
-std::vector<double> LammpsObject::getCoords(const int dim) const {
-  if (dim != 2 && dim != 3) {
-    throw std::runtime_error(
-        std::format("Cannot get coordinates for dimension: {}", dim));
-  }
+std::vector<std::array<double, 2>> LAMMPSManager::getCoords() const {
   // Get the coordinates of the atoms
-  std::vector<double> coords(dim * natoms);
+  std::vector<double> coords(2 * numAtoms);
   lammps_gather_atoms(
       // LAMMPS handle
       handle,
@@ -369,10 +371,19 @@ std::vector<double> LammpsObject::getCoords(const int dim) const {
       // 1 means doubles, 0 means integers
       1,
       // The number of values per atom
-      dim,
+      2,
       // The buffer to populate
       coords.data());
-  return coords;
+  if (coords.size() != numAtoms * 2) {
+    throw std::runtime_error(
+        std::format("LAMMPS returned coords of size {}, expected {}",
+                    coords.size(), numAtoms * 2));
+  }
+  std::vector<std::array<double, 2>> coords2D(numAtoms);
+  for (int i = 0; i < numAtoms; i++) {
+    coords2D[i] = {coords[i * 2], coords[i * 2 + 1]};
+  }
+  return coords2D;
 }
 
 /**
@@ -380,7 +391,7 @@ std::vector<double> LammpsObject::getCoords(const int dim) const {
  * @return A 1D vector containing all the angles in the system in the form
  * [a1atom1, a1atom2, a1atom3, a2atom1, a2atom2, a2atom3, ...]
  */
-std::vector<int> LammpsObject::getAngles() const {
+std::vector<int> LAMMPSManager::getAngles() const {
   const int *nangles_ptr =
       static_cast<int *>(lammps_extract_global(handle, "nangles"));
   int numAngles = *nangles_ptr;
@@ -403,9 +414,9 @@ std::vector<int> LammpsObject::getAngles() const {
  * @brief Logs the first numLines angles in the network
  * @param numLines The number of angles to log
  */
-void LammpsObject::showAngles(const int numLines) const {
+void LAMMPSManager::showAngles(const size_t numLines) const {
   std::vector<int> angles = getAngles();
-  for (int i = 0; i < numLines; ++i) {
+  for (size_t i = 0; i < numLines; ++i) {
     logger->info("Angle: {:03} {:03} {:03}", angles[i * 3], angles[i * 3 + 1],
                  angles[i * 3 + 2]);
   }
@@ -417,8 +428,8 @@ void LammpsObject::showAngles(const int numLines) const {
  * @param atom3 The third atom in the angle
  * @return True if the angle is unique, false otherwise
  */
-bool LammpsObject::checkAngleUnique(const int atom1, const int atom2,
-                                    const int atom3) const {
+bool LAMMPSManager::checkAngleUnique(const uint16_t atom1, const uint16_t atom2,
+                                     const uint16_t atom3) const {
   std::vector<int> angles = getAngles();
   for (int i = 0; i < angles.size(); i += 3) {
     if ((angles[i] == atom1 && angles[i + 1] == atom2 &&
