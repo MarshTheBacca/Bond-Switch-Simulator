@@ -2,10 +2,11 @@
 #define NL_LINKED_NETWORK_H
 
 #include "input_data.h"
-#include "lammps_object.h"
+#include "lammps_manager.h"
 #include "metropolis.h"
 #include "network.h"
 #include "switch_move.h"
+#include "types.h"
 #include <array>
 #include <cstdint>
 #include <optional>
@@ -15,8 +16,6 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
-
-enum class Direction { CLOCKWISE, ANTICLOCKWISE };
 
 struct LinkedNetwork {
   // Data members
@@ -30,10 +29,10 @@ struct LinkedNetwork {
                                     // 0, so dimensions = [xhi, yhi]
   std::array<double, 2> centreCoords; // Centre of network = [xhi / 2, yhi / 2]
 
-  LammpsObject lammpsNetwork; // LAMMPS object for network
-  double energy;              // The current energy of the system
+  LAMMPSManager lammpsManager; // LAMMPSManager for network
+  double energy;               // The current energy of the system
 
-  std::vector<double> currentCoords;
+  std::vector<std::array<double, 2>> currentCoords;
 
   bool isOpenMPIEnabled;          // Whether to use MPI
   SelectionType selectionType;    // Either 'weighted' or 'random'
@@ -86,8 +85,8 @@ struct LinkedNetwork {
 
   void write() const;
 
-  void pushCoords(const std::vector<double> &coords);
-  void showCoords(const std::vector<double> &coords) const;
+  void pushCoords(const std::vector<std::array<double, 2>> &coords);
+  void showCoords(const std::vector<std::array<double, 2>> &coords) const;
   void wrapCoords(std::vector<double> &coords) const;
 
   void
@@ -96,17 +95,13 @@ struct LinkedNetwork {
   void revertMove(const std::vector<Node> &initialInvolvedNodesA,
                   const std::vector<Node> &initialInvolvedNodesB);
 
-  std::tuple<std::vector<double>, std::vector<double>>
-  rotateBond(const std::array<uint16_t, 2> &bond,
-             const Direction &direct) const;
-  Direction getRingsDirection(const std::vector<uint16_t> &ringNodeIDs) const;
+  Direction getRingsDirection(const std::array<uint16_t, 4> &ringNodeIDs) const;
 
   bool checkBondLengths(const uint16_t nodeID,
-                        const std::vector<double> &coords) const;
+                        const std::vector<std::array<double, 2>> &coords) const;
   bool checkBondLengths(const std::unordered_set<uint16_t> &nodeIDs,
-                        const std::vector<double> &coords) const;
+                        const std::vector<std::array<double, 2>> &coords) const;
 
-  std::map<int, double> getRingSizes() const;
   std::vector<double> getRingAreas() const;
 
   bool checkConnectivityLimits(const uint16_t ringNode1,

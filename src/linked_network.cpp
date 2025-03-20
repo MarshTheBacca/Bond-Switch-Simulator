@@ -2,6 +2,7 @@
 #include "file_tools.h"
 #include "random_number_generator.h"
 #include "switch_move.h"
+#include "types.h"
 #include "vector_tools.h"
 #include <algorithm>
 #include <array>
@@ -55,14 +56,14 @@ LinkedNetwork::LinkedNetwork(const InputData &inputData,
   dimensions = networkA.dimensions;
   centreCoords = {dimensions[0] / 2, dimensions[1] / 2};
 
-  lammpsNetwork = LammpsObject(logger);
+  lammpsManager = LAMMPSManager(logger);
   if (writeMovie) {
-    lammpsNetwork.startMovie();
-    lammpsNetwork.writeMovie();
+    lammpsManager.startMovie();
+    lammpsManager.writeMovie();
   }
-  lammpsNetwork.minimiseNetwork();
-  currentCoords = lammpsNetwork.getCoords(2);
-  energy = lammpsNetwork.getPotentialEnergy();
+  lammpsManager.minimiseNetwork();
+  currentCoords = lammpsManager.getCoords();
+  energy = lammpsManager.getPotentialEnergy();
   pushCoords(currentCoords);
   weights.resize(networkA.nodes.size());
   updateWeights();
@@ -166,30 +167,31 @@ void LinkedNetwork::performBondSwitch(const double temperature) {
   // Switch and geometry optimise
   logger->debug("Switching BSS Network...");
   applyMove(switchMove.bondBreaks, switchMove.ringBondBreakMake);
-  std::vector<double> rotatedCoord1;
-  std::vector<double> rotatedCoord2;
-  std::vector<uint16_t> orderedRingNodes = {
+  std::array<double, 2> rotatedCoord1;
+  std::array<double, 2> rotatedCoord2;
+  std::array<uint16_t, 4> orderedRingNodes = {
       switchMove.ringBondBreakMake[0][1], switchMove.ringBondBreakMake[1][1],
       switchMove.ringBondBreakMake[0][0], switchMove.ringBondBreakMake[1][0]};
-  std::tie(rotatedCoord1, rotatedCoord2) = rotateBond(
+  std::tie(rotatedCoord1, rotatedCoord2) = this->networkA.getRotatedBond(
       switchMove.selectedBaseBond, getRingsDirection(orderedRingNodes));
 
   logger->debug("Switching LAMMPS Network...");
-  lammpsNetwork.switchGraphene(switchMove, rotatedCoord1, rotatedCoord2);
+  lammpsManager.switchGraphene(switchMove, rotatedCoord1, rotatedCoord2);
 
   logger->debug("Minimising network...");
-  lammpsNetwork.minimiseNetwork();
+  lammpsManager.minimiseNetwork();
 
   logger->debug("Accepting or rejecting...");
-  std::vector<double> lammpsCoords = lammpsNetwork.getCoords(2);
+  std::vector<std::array<double, 2>> potentialCoords =
+      lammpsManager.getCoords();
   // TODO - Check angles are within range
-  if (!checkBondLengths(switchMove.involvedBaseNodes, lammpsCoords)) {
+  if (!checkBondLengths(switchMove.involvedBaseNodes, potentialCoords)) {
     logger->debug("Rejected move: bond lengths are not within range");
     failedBondLengthChecks++;
     rejectMove(initialInvolvedNodesA, initialInvolvedNodesB, switchMove);
     return;
   }
-  double finalEnergy = lammpsNetwork.getPotentialEnergy();
+  double finalEnergy = lammpsManager.getPotentialEnergy();
   if (!metropolisCondition.acceptanceCriterion(finalEnergy, initialEnergy,
                                                temperature)) {
     logger->debug("Rejected move: failed Metropolis criterion: Ei = {:.3f} Eh, "
@@ -203,12 +205,12 @@ void LinkedNetwork::performBondSwitch(const double temperature) {
                 finalEnergy);
   numAcceptedSwitches++;
   logger->debug("Syncing LAMMPS coordinates to BSS coordinates...");
-  currentCoords = lammpsCoords;
+  currentCoords = potentialCoords;
   pushCoords(currentCoords);
   updateWeights();
   energy = finalEnergy;
   if (writeMovie) {
-    lammpsNetwork.writeMovie();
+    lammpsManager.writeMovie();
   }
 }
 
@@ -218,15 +220,16 @@ void LinkedNetwork::rejectMove(const std::vector<Node> &initialInvolvedNodesA,
   logger->debug("Reverting BSS Network...");
   revertMove(initialInvolvedNodesA, initialInvolvedNodesB);
   logger->debug("Reverting LAMMPS Network...");
-  lammpsNetwork.revertGraphene(switchMove);
+  lammpsManager.revertGraphene(switchMove);
   logger->debug("Syncing LAMMPS coordinates to BSS coordinates...");
-  lammpsNetwork.setCoords(currentCoords, 2);
+  lammpsManager.setCoords(currentCoords);
 }
 
-void LinkedNetwork::showCoords(const std::vector<double> &coords) const {
-  for (int i = 0; i < coords.size(); i += 2) {
-    logger->debug("{}) {} {}", i, coords[i], coords[i + 1]);
-  }
+void LinkedNetwork::showCoords(
+    const std::vector<std::array<double, 2>> &coords) const {
+  std::ranges::for_each(coords, [this](const std::array<double, 2> &coord) {
+    logger->debug("{} {}", coord[0], coord[1]);
+  });
 }
 
 /**
@@ -726,19 +729,19 @@ void LinkedNetwork::revertMove(const std::vector<Node> &initialInvolvedNodesA,
  * @throw std::invalid_argument if the number of coordinates does not match the
  * number of nodes in network A
  */
-void LinkedNetwork::pushCoords(const std::vector<double> &coords) {
-  if (coords.size() != 2 * networkA.nodes.size()) {
+void LinkedNetwork::pushCoords(
+    const std::vector<std::array<double, 2>> &coords) {
+  if (coords.size() != networkA.nodes.size()) {
     throw std::invalid_argument(
         "Number of coordinates does not match number of nodes in network A");
   }
 
   // Sync A coordinates
   for (int i = 0; i < networkA.nodes.size(); ++i) {
-    networkA.nodes[i].coord[0] = coords[2 * i];
-    networkA.nodes[i].coord[1] = coords[2 * i + 1];
+    networkA.nodes[i].coord = coords[i];
   }
   // Centre all the rings relative to their dual connections
-  networkB.centreRings(networkA);
+  networkB.centerByDual(networkA);
 }
 
 /**
@@ -845,14 +848,12 @@ void LinkedNetwork::write() const {
  * @param coords Coordinates of all nodes as a 1D vector of coordinate pairs
  * @return true if all bonds are within the maximum bond length, false otherwise
  */
-bool LinkedNetwork::checkBondLengths(const uint16_t nodeID,
-                                     const std::vector<double> &coords) const {
+bool LinkedNetwork::checkBondLengths(
+    const uint16_t nodeID,
+    const std::vector<std::array<double, 2>> &coords) const {
   for (const auto &neighbourID : networkA.nodes[nodeID].netConnections) {
-    std::array<double, 2> pbcVec = pbcArray(
-        std::array<double, 2>{coords[2 * nodeID], coords[2 * nodeID + 1]},
-        std::array<double, 2>{coords[2 * neighbourID],
-                              coords[2 * neighbourID + 1]},
-        dimensions);
+    std::array<double, 2> pbcVec =
+        pbcArray(coords[nodeID], coords[neighbourID], dimensions);
     if (std::sqrt(pbcVec[0] * pbcVec[0] + pbcVec[1] * pbcVec[1]) >
         maximumBondLength) {
       return false;
@@ -870,7 +871,7 @@ bool LinkedNetwork::checkBondLengths(const uint16_t nodeID,
  */
 bool LinkedNetwork::checkBondLengths(
     const std::unordered_set<uint16_t> &nodeIDs,
-    const std::vector<double> &coords) const {
+    const std::vector<std::array<double, 2>> &coords) const {
   return std::ranges::all_of(nodeIDs, [this, &coords](int nodeID) {
     return checkBondLengths(nodeID, coords);
   });
@@ -883,28 +884,20 @@ bool LinkedNetwork::checkBondLengths(
  * @return clockwise or anti-clockwise
  */
 Direction LinkedNetwork::getRingsDirection(
-    const std::vector<uint16_t> &ringNodeIDs) const {
-  if (ringNodeIDs.size() != 4) {
-    throw std::invalid_argument(
-        "Error getting ring direction, ringNodeIDs size is not 4");
-  }
+    const std::array<uint16_t, 4> &ringNodeIDs) const {
   std::array<double, 2> midCoords{0.0, 0.0};
-  for (int id : ringNodeIDs) {
-    midCoords[0] += currentCoords[id * 2];
-    midCoords[1] += currentCoords[id * 2 + 1];
-  }
-  midCoords[0] /= 4;
-  midCoords[1] /= 4;
+  std::ranges::for_each(
+      ringNodeIDs, [this, &midCoords](const uint16_t ringNodeID) {
+        arrayAdd(midCoords,
+                 pbcArray({0.0, 0.0}, this->networkB.nodes[ringNodeID].coord,
+                          this->dimensions));
+      });
+  divideArray(midCoords, 4.0);
   int timesDecreased = 0;
-  double prevAngle =
-      getClockwiseAngle(midCoords,
-                        {currentCoords[ringNodeIDs.back() * 2],
-                         currentCoords[ringNodeIDs.back() * 2 + 1]},
-                        dimensions);
+  double prevAngle = getClockwiseAngle(
+      midCoords, currentCoords[ringNodeIDs.back()], dimensions);
   for (int id : ringNodeIDs) {
-    double angle = getClockwiseAngle(
-        midCoords, {currentCoords[id * 2], currentCoords[id * 2 + 1]},
-        dimensions);
+    double angle = getClockwiseAngle(midCoords, currentCoords[id], dimensions);
     if (angle < prevAngle) {
       timesDecreased++;
       if (timesDecreased == 2) {
@@ -916,54 +909,6 @@ Direction LinkedNetwork::getRingsDirection(
   }
   logger->debug("Clockwise");
   return Direction::CLOCKWISE;
-}
-
-/**
- * @brief Calculates the new coordinates of a pair of atoms if they were rotated
- * by 90 degrees in the given direction
- * @param bond The bond to rotate
- * @param direct Direction to rotate the bond
- * @return Pair of vectors containing the new coordinates of the atoms
- */
-std::tuple<std::vector<double>, std::vector<double>>
-LinkedNetwork::rotateBond(const std::array<uint16_t, 2> &bond,
-                          const Direction &direct) const {
-  logger->debug("Rotating bond between atoms {} and {}", bond[0], bond[1]);
-  std::vector<double> atom1Coord = {currentCoords[bond[0] * 2],
-                                    currentCoords[bond[0] * 2 + 1]};
-  std::vector<double> atom2Coord = {currentCoords[bond[1] * 2],
-                                    currentCoords[bond[1] * 2 + 1]};
-
-  // Calculate the center point
-  double centerX = (atom1Coord[0] + atom2Coord[0]) / 2.0;
-  double centerY = (atom1Coord[1] + atom2Coord[1]) / 2.0;
-
-  // Translate the points to the origin
-  atom1Coord[0] -= centerX;
-  atom1Coord[1] -= centerY;
-  atom2Coord[0] -= centerX;
-  atom2Coord[1] -= centerY;
-
-  std::vector<double> rotatedAtom1Coord;
-  std::vector<double> rotatedAtom2Coord;
-  // Rotate the points by 90 degrees
-  if (direct == Direction::CLOCKWISE) {
-    rotatedAtom1Coord = {atom1Coord[1], -atom1Coord[0]};
-    rotatedAtom2Coord = {atom2Coord[1], -atom2Coord[0]};
-  } else {
-    rotatedAtom1Coord = {-atom1Coord[1], atom1Coord[0]};
-    rotatedAtom2Coord = {-atom2Coord[1], atom2Coord[0]};
-  }
-  // Translate the points back
-  rotatedAtom1Coord[0] += centerX;
-  rotatedAtom1Coord[1] += centerY;
-  rotatedAtom2Coord[0] += centerX;
-  rotatedAtom2Coord[1] += centerY;
-
-  wrapCoords(rotatedAtom1Coord);
-  wrapCoords(rotatedAtom2Coord);
-
-  return {rotatedAtom1Coord, rotatedAtom2Coord};
 }
 
 /**
@@ -979,9 +924,7 @@ std::vector<double> LinkedNetwork::getRingAreas() const {
     baseNodeCoords.reserve(networkB.nodes[ringNodeID].dualConnections.size());
     for (size_t baseNodeID : networkB.nodes[ringNodeID].dualConnections) {
       std::array<double, 2> pbcVec = pbcArray(
-          {currentCoords[baseNodeID * 2], currentCoords[baseNodeID * 2 + 1]},
-          {currentCoords[ringNodeID * 2], currentCoords[ringNodeID * 2 + 1]},
-          dimensions);
+          {currentCoords[baseNodeID]}, currentCoords[ringNodeID], dimensions);
       baseNodeCoords.push_back(pbcVec);
     }
     ringAreas.push_back(calculatePolygonArea(baseNodeCoords));
