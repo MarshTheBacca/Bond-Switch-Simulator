@@ -642,13 +642,14 @@ std::array<double, 2> Network::getAverageCoordsPBC(
   std::vector<std::array<double, 2>> pbcCoords(nodeIDs.size());
   // Get a random coordinate to use as a reference
   std::array<double, 2> relativeCoord = this->nodes[*nodeIDs.begin()].coord;
-  std::transform(nodeIDs.begin(), nodeIDs.end(), pbcCoords.begin(),
-                 [this, &relativeCoord](const uint16_t nodeID) {
-                   return pbcArray(relativeCoord, this->nodes[nodeID].coord,
-                                   this->dimensions);
-                 });
+  std::ranges::transform(nodeIDs, pbcCoords.begin(),
+                         [this, &relativeCoord](const uint16_t nodeID) {
+                           return pbcArray(relativeCoord,
+                                           this->nodes[nodeID].coord,
+                                           this->dimensions);
+                         });
   const std::array<double, 2> averagePBC = arrayAverage(pbcCoords);
-  return arrayAdd(relativeCoord, averagePBC);
+  return wrapArray(arrayAdd(relativeCoord, averagePBC), this->dimensions);
 }
 
 /**
@@ -687,3 +688,65 @@ Network::getRotatedBond(const std::array<uint16_t, 2> &bond,
       {wrapArray(arrayAdd(centerCoord, translationVector1), this->dimensions),
        wrapArray(arrayAdd(centerCoord, translationVector2), this->dimensions)}};
 }
+
+std::vector<std::array<double, 2>> Network::getCoords() const {
+  std::vector<std::array<double, 2>> coords(nodes.size());
+  std::ranges::transform(nodes, std::back_inserter(coords),
+                         [](const Node &node) { return node.coord; });
+  return coords;
+}
+
+bool Network::checkConnectionsReciprocated(const LoggerPtr logger) const {
+  bool consistent = true;
+  std::ranges::for_each(this->nodes, [this, &consistent,
+                                      &logger](const Node &node) {
+    std::ranges::for_each(
+        node.netConnections,
+        [this, &node, &consistent, &logger](const uint16_t connectionID) {
+          if (!this->nodes[connectionID].netConnections.contains(node.id)) {
+            logger->error("Node {} has connection to node {} but node {} does "
+                          "not have connection to node {}",
+                          node.id, connectionID, connectionID, node.id);
+            consistent = false;
+          }
+        });
+  });
+  return consistent;
+}
+
+bool Network::checkConnectionsReciprocated(const Network &pairedNetwork,
+                                           const LoggerPtr logger) const {
+  bool consistent = true;
+  std::ranges::for_each(this->nodes, [this, &consistent, &logger,
+                                      &pairedNetwork](const Node &node) {
+    std::ranges::for_each(
+        node.dualConnections,
+        [this, &node, &consistent, &logger,
+         &pairedNetwork](const uint16_t dualConnectionID) {
+          if (!pairedNetwork.nodes[dualConnectionID].dualConnections.contains(
+                  node.id)) {
+            logger->error(
+                "Node {} has dual connection to node {} but node {} does "
+                "not have dual connection to node {}",
+                node.id, dualConnectionID, dualConnectionID, node.id);
+            consistent = false;
+          }
+        });
+  });
+  return consistent;
+}
+
+bool Network::checkDegreeLimits(const size_t min, const size_t max,
+                                const LoggerPtr logger) const {
+  bool consistent = true;
+  std::ranges::for_each(
+      this->nodes, [this, &consistent, min, max, &logger](const Node &node) {
+        if (node.numConnections() < min || node.numConnections() > max) {
+          logger->error(
+              "Node {} has {} connections, which is outside the range [{}, {}]",
+              node.id, node.numConnections(), min, max);
+          consistent = false;
+        }
+      });
+  return consistent;
+};

@@ -32,8 +32,6 @@ struct LinkedNetwork {
   LAMMPSManager lammpsManager; // LAMMPSManager for network
   double energy;               // The current energy of the system
 
-  std::vector<std::array<double, 2>> currentCoords;
-
   bool isOpenMPIEnabled;          // Whether to use MPI
   SelectionType selectionType;    // Either 'weighted' or 'random'
   Metropolis metropolisCondition; // monte carlo metropolis condition
@@ -77,6 +75,8 @@ struct LinkedNetwork {
                           const uint16_t excludeNode) const;
 
   void performBondSwitch(const double temperature);
+  void acceptMove(const std::vector<std::array<double, 2>> &newCoords,
+                  const double initialEnergy, const double finalEnergy);
   void rejectMove(const std::vector<Node> &initialInvolvedNodesA,
                   const std::vector<Node> &initialInvolvedNodesB,
                   const SwitchMove &switchMove);

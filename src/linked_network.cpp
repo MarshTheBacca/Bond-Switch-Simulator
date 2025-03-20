@@ -62,9 +62,8 @@ LinkedNetwork::LinkedNetwork(const InputData &inputData,
     lammpsManager.writeMovie();
   }
   lammpsManager.minimiseNetwork();
-  currentCoords = lammpsManager.getCoords();
   energy = lammpsManager.getPotentialEnergy();
-  pushCoords(currentCoords);
+  pushCoords(lammpsManager.getCoords());
   weights.resize(networkA.nodes.size());
   updateWeights();
 }
@@ -201,16 +200,21 @@ void LinkedNetwork::performBondSwitch(const double temperature) {
     rejectMove(initialInvolvedNodesA, initialInvolvedNodesB, switchMove);
     return;
   }
+  this->acceptMove(potentialCoords, initialEnergy, finalEnergy);
+}
+
+void LinkedNetwork::acceptMove(
+    const std::vector<std::array<double, 2>> &newCoords,
+    const double initialEnergy, const double finalEnergy) {
   logger->debug("Accepted Move: Ei = {:.3f} Eh, Ef = {:.3f} Eh", initialEnergy,
                 finalEnergy);
-  numAcceptedSwitches++;
+  this->numAcceptedSwitches++;
   logger->debug("Syncing LAMMPS coordinates to BSS coordinates...");
-  currentCoords = potentialCoords;
-  pushCoords(currentCoords);
-  updateWeights();
-  energy = finalEnergy;
-  if (writeMovie) {
-    lammpsManager.writeMovie();
+  this->pushCoords(newCoords);
+  this->updateWeights();
+  this->energy = finalEnergy;
+  if (this->writeMovie) {
+    this->lammpsManager.writeMovie();
   }
 }
 
@@ -222,7 +226,7 @@ void LinkedNetwork::rejectMove(const std::vector<Node> &initialInvolvedNodesA,
   logger->debug("Reverting LAMMPS Network...");
   lammpsManager.revertGraphene(switchMove);
   logger->debug("Syncing LAMMPS coordinates to BSS coordinates...");
-  lammpsManager.setCoords(currentCoords);
+  lammpsManager.setCoords(networkA.getCoords());
 }
 
 void LinkedNetwork::showCoords(
@@ -745,79 +749,26 @@ void LinkedNetwork::pushCoords(
 }
 
 /**
- * @brief Checks if network is consistent and logs any inconsistencies
+ * @brief Checks if network is consistent
  * @return true if all connectivities are reciprocated and all base nodes have
  * clockwise neighbours and ring sizes that are not neighbours of fixedRings are
  * within range, false otherwise
  */
 bool LinkedNetwork::checkConsistency() {
   logger->info("Checking consistency...");
-  bool consistent = true;
-  std::ranges::for_each(networkA.nodes, [this, &consistent](const Node &node) {
-    std::ranges::for_each(
-        node.netConnections, [this, &node, &consistent](const int cnx) {
-          if (networkA.nodes[cnx].netConnections.contains(node.id)) {
-            return;
-          }
-          logger->error("Node {} base has neighbour {} but neighbour "
-                        "does not have node as neighbour",
-                        node.id, cnx);
-          consistent = false;
-        });
-  });
-  std::unordered_set<int> fixedRingNeighbours = {};
-  std::ranges::for_each(fixedRings, [this, &fixedRingNeighbours](
-                                        const std::pair<int, int> &ring) {
-    fixedRingNeighbours.insert(
-        networkB.nodes[ring.first].netConnections.begin(),
-        networkB.nodes[ring.first].netConnections.end());
-  });
-  std::ranges::for_each(
-      networkB.nodes,
-      [this, &consistent, &fixedRingNeighbours](const Node &node) {
-        std::ranges::for_each(
-            node.netConnections, [this, &node, &consistent](const int cnx) {
-              if (networkB.nodes[cnx].netConnections.contains(node.id)) {
-                return;
-              }
-              logger->error("Node {} ring has neighbour {} but neighbour "
-                            "does not have node as neighbour",
-                            node.id, cnx);
-              consistent = false;
-            });
-        if (fixedRingNeighbours.contains(node.id) &&
-            (node.numConnections() > maxRingSize ||
-             node.numConnections() < minRingSize)) {
-          logger->error("Node {} ring has {} neighbours, which is "
-                        "outside the allowed range",
-                        node.id, node.numConnections());
-          consistent = false;
-        }
-      });
-  std::ranges::for_each(networkA.nodes, [this, &consistent](Node &node) {
-    std::ranges::for_each(
-        node.dualConnections, [this, &node, &consistent](const int cnx) {
-          if (networkB.nodes[cnx].dualConnections.contains(node.id)) {
-            return;
-          }
-          logger->error("Node {} base has ring neighbour {} but ring "
-                        "neighbour does not have node as ring neighbour",
-                        node.id, cnx);
-          consistent = false;
-        });
-  });
-  std::ranges::for_each(networkB.nodes, [this, &consistent](const Node &node) {
-    std::ranges::for_each(
-        node.dualConnections, [this, &node, &consistent](const int cnx) {
-          if (networkA.nodes[cnx].dualConnections.contains(node.id)) {
-            return;
-          }
-          logger->error("Node {} ring has ring neighbour {} but ring "
-                        "neighbour does not have node as ring neighbour",
-                        node.id, cnx);
-          consistent = false;
-        });
-  });
+  logger->info("Checking base-base connections reciprocated...");
+  bool consistent = this->networkA.checkConnectionsReciprocated(this->logger);
+  logger->info("Checking ring-ring connections reciprocated...");
+  consistent = this->networkB.checkConnectionsReciprocated(this->logger);
+  logger->info("Checking base-ring connections reciprocated...");
+  consistent =
+      this->networkA.checkConnectionsReciprocated(this->networkB, this->logger);
+  logger->info("Checking ring-base connections reciprocated...");
+  consistent =
+      this->networkB.checkConnectionsReciprocated(this->networkA, this->logger);
+  logger->info("Checking ring sizes...");
+  consistent = this->networkB.checkDegreeLimits(
+      this->minRingSize, this->maxRingSize, this->logger);
   return consistent;
 }
 
@@ -885,29 +836,22 @@ bool LinkedNetwork::checkBondLengths(
  */
 Direction LinkedNetwork::getRingsDirection(
     const std::array<uint16_t, 4> &ringNodeIDs) const {
-  std::array<double, 2> midCoords{0.0, 0.0};
-  std::ranges::for_each(
-      ringNodeIDs, [this, &midCoords](const uint16_t ringNodeID) {
-        arrayAdd(midCoords,
-                 pbcArray({0.0, 0.0}, this->networkB.nodes[ringNodeID].coord,
-                          this->dimensions));
-      });
-  divideArray(midCoords, 4.0);
-  int timesDecreased = 0;
+  const std::array<double, 2> midCoord = this->networkB.getAverageCoordsPBC(
+      {ringNodeIDs[0], ringNodeIDs[1], ringNodeIDs[2], ringNodeIDs[3]});
+  uint8_t timesDecreased = 0;
   double prevAngle = getClockwiseAngle(
-      midCoords, currentCoords[ringNodeIDs.back()], dimensions);
-  for (int id : ringNodeIDs) {
-    double angle = getClockwiseAngle(midCoords, currentCoords[id], dimensions);
+      midCoord, networkB.nodes[ringNodeIDs.back()].coord, dimensions);
+  for (uint16_t ringNodeID : ringNodeIDs) {
+    double angle = getClockwiseAngle(
+        midCoord, this->networkB.nodes[ringNodeID].coord, dimensions);
     if (angle < prevAngle) {
       timesDecreased++;
       if (timesDecreased == 2) {
-        logger->debug("Anticlockwise");
         return Direction::ANTICLOCKWISE;
       }
     }
     prevAngle = angle;
   }
-  logger->debug("Clockwise");
   return Direction::CLOCKWISE;
 }
 
@@ -916,18 +860,24 @@ Direction LinkedNetwork::getRingsDirection(
  * @return Vector of areas of all rings
  */
 std::vector<double> LinkedNetwork::getRingAreas() const {
-  std::vector<double> ringAreas;
-  ringAreas.reserve(networkB.nodes.size());
-  for (size_t ringNodeID = 0; ringNodeID < networkB.nodes.size();
-       ringNodeID++) {
-    std::vector<std::array<double, 2>> baseNodeCoords;
-    baseNodeCoords.reserve(networkB.nodes[ringNodeID].dualConnections.size());
-    for (size_t baseNodeID : networkB.nodes[ringNodeID].dualConnections) {
-      std::array<double, 2> pbcVec = pbcArray(
-          {currentCoords[baseNodeID]}, currentCoords[ringNodeID], dimensions);
-      baseNodeCoords.push_back(pbcVec);
-    }
-    ringAreas.push_back(calculatePolygonArea(baseNodeCoords));
-  }
+  std::vector<std::array<double, 2>> currentCoords = this->networkA.getCoords();
+  std::vector<double> ringAreas(networkB.nodes.size());
+
+  std::ranges::transform(
+      networkB.nodes, ringAreas.begin(),
+      [this, &currentCoords](const Node &ringNode) {
+        // For each ring node, get the relative coordinates of the connected
+        // base nodes
+        std::vector<std::array<double, 2>> baseNodeCoords(
+            ringNode.dualConnections.size());
+        std::ranges::transform(
+            ringNode.dualConnections, std::back_inserter(baseNodeCoords),
+            [this, &currentCoords, &ringNode](int baseNodeID) {
+              return pbcArray(ringNode.coord, currentCoords[baseNodeID],
+                              dimensions);
+            });
+        // Calculate the polygon area of these relative coordinates
+        return calculatePolygonArea(baseNodeCoords);
+      });
   return ringAreas;
 }
