@@ -38,11 +38,11 @@ struct LAMMPSManager {
   void formAngle(const uint16_t atom1, const uint16_t atom2,
                  const uint16_t atom3);
 
-  void switchGraphene(const SwitchMove &switchMove,
-                      const std::array<double, 2> &rotatedCoord1,
-                      const std::array<double, 2> &rotatedCoord2);
+  void performSwitch(const SwitchMove &switchMove,
+                     const std::array<double, 2> &rotatedCoord1,
+                     const std::array<double, 2> &rotatedCoord2);
 
-  void revertGraphene(const SwitchMove &switchMove);
+  void revertSwitch(const SwitchMove &switchMove);
   std::vector<int> getAngles() const;
 
   void writeData();
@@ -53,6 +53,8 @@ struct LAMMPSManager {
   void showAngles(const size_t numLines) const;
   bool checkAngleUnique(const uint16_t atom1, const uint16_t atom2,
                         const uint16_t atom3) const;
+  size_t getBondCount() const;
+  size_t getAngleCount() const;
 };
 
 #endif // LAMMPS_MANAGER_H
