@@ -3,9 +3,12 @@
         {
             "name": "Linux",
             "includePath": [
-                "${workspaceFolder}/include"
+                "${workspaceFolder}/include",
+                "/usr/local/include",
+                "/usr/include"
             ],
             "defines": [],
+            "compilerPath": "/usr/bin/clang++",
             "cppStandard": "c++23",
             "intelliSenseMode": "linux-clang-x64"
         }
