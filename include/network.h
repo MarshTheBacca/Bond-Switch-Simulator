@@ -92,7 +92,7 @@ struct Network {
 
   std::array<std::array<double, 2>, 2>
   getRotatedBond(const std::array<uint16_t, 2> &bond,
-                 const Direction &direction) const;
+                 const Direction &direction, const LoggerPtr logger) const;
 
   std::vector<std::array<double, 2>> getCoords() const;
   bool checkConnectionsReciprocated(const LoggerPtr logger) const;

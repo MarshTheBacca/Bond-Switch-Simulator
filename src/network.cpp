@@ -661,16 +661,25 @@ std::array<double, 2> Network::getAverageCoordsPBC(
  */
 std::array<std::array<double, 2>, 2>
 Network::getRotatedBond(const std::array<uint16_t, 2> &bond,
-                        const Direction &direction) const {
+                        const Direction &direction,
+                        const LoggerPtr logger) const {
+  logger->debug("Starting coordinates: ({}, {}) ({}, {})",
+                this->nodes[bond[0]].coord[0], this->nodes[bond[0]].coord[1],
+                this->nodes[bond[1]].coord[0], this->nodes[bond[1]].coord[1]);
   // Calculate the center point
   const std::array<double, 2> centerCoord =
       this->getAverageCoordsPBC({bond[0], bond[1]});
+  logger->debug("Center coord: ({}, {})", centerCoord[0], centerCoord[1]);
 
   // Get relative coords to center
   std::array<double, 2> relativeCoord1 =
       pbcArray(centerCoord, this->nodes[bond[0]].coord, this->dimensions);
   std::array<double, 2> relativeCoord2 =
       pbcArray(centerCoord, this->nodes[bond[1]].coord, this->dimensions);
+  logger->debug("Relative coord 1: ({}, {})", relativeCoord1[0],
+                relativeCoord1[1]);
+  logger->debug("Relative coord 2: ({}, {})", relativeCoord2[0],
+                relativeCoord2[1]);
 
   // Calculate the translation vectors
   std::array<double, 2> translationVector1;
@@ -691,7 +700,7 @@ Network::getRotatedBond(const std::array<uint16_t, 2> &bond,
 
 std::vector<std::array<double, 2>> Network::getCoords() const {
   std::vector<std::array<double, 2>> coords(nodes.size());
-  std::ranges::transform(nodes, std::back_inserter(coords),
+  std::ranges::transform(nodes, coords.begin(),
                          [](const Node &node) { return node.coord; });
   return coords;
 }
