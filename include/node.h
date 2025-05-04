@@ -1,6 +1,7 @@
 #ifndef NL_NODE_H
 #define NL_NODE_H
 
+#include "types.h"
 #include <array>
 #include <cmath>
 #include <cstdint>
@@ -61,6 +62,8 @@ struct Node {
 
   uint16_t getRandomNetConnectionID() const;
   uint16_t getRandomDualConnectionID() const;
+  void showNetConnections(const LoggerPtr logger) const;
+  void showDualConnections(const LoggerPtr logger) const;
 };
 
 #endif // NL_NODE_H
