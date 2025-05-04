@@ -14,12 +14,6 @@
 
 // template functions
 
-template <typename T> T vectorSum(const std::vector<T> &vector);
-
-template <typename T> std::string vectorToString(const std::vector<T> &vector);
-
-template <typename T> std::string setToString(const std::unordered_set<T> &set);
-
 template <size_t S>
 std::array<double, S> pbcArray(const std::array<double, S> &vector1,
                                const std::array<double, S> &vector2,
@@ -27,12 +21,13 @@ std::array<double, S> pbcArray(const std::array<double, S> &vector1,
 
 template <typename T, size_t S>
   requires Addable<T>
-std::array<T, S> arrayAdd(const std::array<T, S> &array1,
-                          const std::array<T, S> &array2);
+constexpr std::array<T, S> arrayAdd(const std::array<T, S> &array1,
+                                    const std::array<T, S> &array2);
 
 template <typename T, size_t S>
   requires Addable<T>
-void arrayAddInPlace(std::array<T, S> &array1, const std::array<T, S> &array2);
+constexpr void arrayAddInPlace(std::array<T, S> &array1,
+                               const std::array<T, S> &array2);
 
 template <typename T, size_t S>
   requires Divisible<T>
@@ -54,15 +49,17 @@ void divideArrayInPlace(std::array<T, S> &array, const T divisor);
 
 template <typename T, size_t S>
   requires Divisible<T>
-std::array<T, S> addArray(const std::array<T, S> &array, const T addition);
+constexpr std::array<T, S> addArray(const std::array<T, S> &array,
+                                    const T addition);
 
 template <typename T, size_t S>
   requires Divisible<T>
-void addArray(std::array<T, S> &array, const T addition);
+constexpr void addArray(std::array<T, S> &array, const T addition);
 
 template <typename T>
-std::unordered_set<T> intersectSets(const std::unordered_set<T> &set1,
-                                    const std::unordered_set<T> &set2);
+constexpr std::unordered_set<T>
+intersectSets(const std::unordered_set<T> &set1,
+              const std::unordered_set<T> &set2);
 
 template <typename Container>
   requires std::ranges::range<Container>
@@ -70,8 +67,9 @@ std::string containerToString(const Container &container);
 
 template <typename Container>
   requires Multipliable<typename Container::value_type>
-void containerMultiply(Container &container,
-                       const typename Container::value_type &multiplyBy);
+constexpr void
+containerMultiply(Container &container,
+                  const typename Container::value_type &multiplyBy);
 
 template <typename T>
 void setReplace(std::unordered_set<T> &set, const T &oldValue,
