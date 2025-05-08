@@ -94,5 +94,5 @@
     "C_Cpp.default.cStandard": "c23",
     "C_Cpp.default.intelliSenseMode": "linux-clang-x64",
     "C_Cpp.clang_format_sortIncludes": true,
-    "C_Cpp.default.compilerPath": "/usr/bin/clang++"
+    "C_Cpp.default.compilerPath": "/usr/bin/clang++-19"
 }

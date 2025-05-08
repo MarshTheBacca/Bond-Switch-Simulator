@@ -8,7 +8,7 @@
                 "/usr/include"
             ],
             "defines": [],
-            "compilerPath": "/usr/bin/clang++",
+            "compilerPath": "/usr/bin/clang++-19",
             "cppStandard": "c++23",
             "intelliSenseMode": "linux-clang-x64"
         }

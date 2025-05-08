@@ -176,9 +176,8 @@ int main(int argc, char *argv[]) {
     // Initialise linkedNetwork
     logger->debug("Initialising linkedNetwork...");
 
-    LinkedNetwork linkedNetwork;
     logger->debug("Loading linkedNetwork from files...");
-    linkedNetwork = LinkedNetwork(inputData, logger);
+    auto linkedNetwork = LinkedNetwork(inputData, logger);
 
     logger->debug("Network initialised!");
     logger->info("Initial energy: {:.3f} Hartrees", linkedNetwork.energy);
