@@ -76,7 +76,7 @@ void LAMMPSManager::writeData() {
  */
 void LAMMPSManager::breakBond(const uint16_t atom1, const uint16_t atom2,
                               const int type) {
-  double initialBondCount = lammps_get_thermo(handle, "bonds");
+  size_t initialBondCount = this->getBondCount();
   // Define a group of atoms called `switch`
   lammps_command(handle,
                  std::format("group switch id {} {}", atom1, atom2).c_str());
@@ -87,8 +87,7 @@ void LAMMPSManager::breakBond(const uint16_t atom1, const uint16_t atom2,
 
   // Remove the group definition
   lammps_command(handle, "group switch delete");
-
-  double finalBondCount = lammps_get_thermo(handle, "bonds");
+  size_t finalBondCount = this->getBondCount();
   if (finalBondCount != initialBondCount - 1) {
     throw std::runtime_error(std::format("Error in Bond Counts while breaking "
                                          "bond between {} and {}, initial: {} "
@@ -107,11 +106,11 @@ void LAMMPSManager::breakBond(const uint16_t atom1, const uint16_t atom2,
  */
 void LAMMPSManager::formBond(const uint16_t atom1, const uint16_t atom2,
                              const int type) {
-  double initialBondCount = lammps_get_thermo(handle, "bonds");
+  size_t initialBondCount = this->getBondCount();
   std::string command =
       std::format("create_bonds single/bond {} {} {}", type, atom1, atom2);
   lammps_command(handle, command.c_str());
-  double finalBondCount = lammps_get_thermo(handle, "bonds");
+  size_t finalBondCount = this->getBondCount();
   if (finalBondCount != initialBondCount + 1) {
     throw std::runtime_error(
         std::format("Error in Bond Counts while forming bond between {} and "
@@ -130,8 +129,7 @@ void LAMMPSManager::formBond(const uint16_t atom1, const uint16_t atom2,
 void LAMMPSManager::breakAngle(const uint16_t atom1, const uint16_t atom2,
                                const uint16_t atom3) {
   // Get the initial number of angles
-  const auto initialAngleCount =
-      static_cast<int>(lammps_get_thermo(handle, "angles"));
+  const size_t initialAngleCount = this->getAngleCount();
   // Define a group `switch` describing the atoms in the angle
   lammps_command(
       handle,
@@ -143,8 +141,7 @@ void LAMMPSManager::breakAngle(const uint16_t atom1, const uint16_t atom2,
   lammps_command(handle, "group switch delete");
 
   // Check if the number of angles has decreased
-  const auto finalAngleCount =
-      static_cast<int>(lammps_get_thermo(handle, "angles"));
+  const size_t finalAngleCount = this->getAngleCount();
   if (finalAngleCount == initialAngleCount - 1) {
     // The angle was successfully broken
     return;
@@ -213,11 +210,11 @@ void LAMMPSManager::formAngle(const uint16_t atom1, const uint16_t atom2,
                                          "are the same ID: {} {} {}",
                                          atom1, atom2, atom3));
   }
-  double initialAngleCount = lammps_get_thermo(handle, "angles");
+  size_t initialAngleCount = this->getAngleCount();
   lammps_command(handle, std::format("create_bonds single/angle 1 {} {} {}",
                                      atom1, atom2, atom3)
                              .c_str());
-  double finalAngleCount = lammps_get_thermo(handle, "angles");
+  size_t finalAngleCount = this->getAngleCount();
   if (finalAngleCount != initialAngleCount + 1) {
     throw std::runtime_error(std::format("Error in Angle Counts while forming "
                                          "angle between {} and {} and {}, "
@@ -230,10 +227,9 @@ void LAMMPSManager::formAngle(const uint16_t atom1, const uint16_t atom2,
 /**
  * @brief perform bond switch in the lattice using zero-indexed node IDs
  */
-void LAMMPSManager::switchGraphene(const SwitchMove &switchMove,
-                                   const std::array<double, 2> &rotatedCoord1,
-                                   const std::array<double, 2> &rotatedCoord2) {
-
+void LAMMPSManager::performSwitch(const SwitchMove &switchMove,
+                                  const std::array<double, 2> &rotatedCoord1,
+                                  const std::array<double, 2> &rotatedCoord2) {
   std::ranges::for_each(switchMove.bondBreaks,
                         [this](const std::array<uint16_t, 2> &bond) {
                           breakBond(bond[0] + 1, bond[1] + 1, 1);
@@ -242,12 +238,10 @@ void LAMMPSManager::switchGraphene(const SwitchMove &switchMove,
                         [this](const std::array<uint16_t, 2> &bond) {
                           formBond(bond[0] + 1, bond[1] + 1, 1);
                         });
-
   std::ranges::for_each(switchMove.angleBreaks,
                         [this](const std::array<uint16_t, 3> &angle) {
                           breakAngle(angle[0] + 1, angle[1] + 1, angle[2] + 1);
                         });
-
   std::ranges::for_each(switchMove.angleMakes,
                         [this](const std::array<uint16_t, 3> &angle) {
                           formAngle(angle[0] + 1, angle[1] + 1, angle[2] + 1);
@@ -258,29 +252,27 @@ void LAMMPSManager::switchGraphene(const SwitchMove &switchMove,
   setAtomCoords(atom1ID, rotatedCoord1);
   setAtomCoords(atom2ID, rotatedCoord2);
 }
+
 /**
  * @brief perform the opposite of a bond switch in the lattice using
  * zero-indexed node IDs
  */
-void LAMMPSManager::revertGraphene(const SwitchMove &switchMove) {
-  std::ranges::for_each(switchMove.bondBreaks,
-                        [this](const std::array<uint16_t, 2> &bond) {
-                          formBond(bond[0] + 1, bond[1] + 1, 1);
-                        });
-
+void LAMMPSManager::revertSwitch(const SwitchMove &switchMove) {
   std::ranges::for_each(switchMove.bondMakes,
                         [this](const std::array<uint16_t, 2> &bond) {
                           breakBond(bond[0] + 1, bond[1] + 1, 1);
                         });
-
-  std::ranges::for_each(switchMove.angleBreaks,
-                        [this](const std::array<uint16_t, 3> &angle) {
-                          formAngle(angle[0] + 1, angle[1] + 1, angle[2] + 1);
+  std::ranges::for_each(switchMove.bondBreaks,
+                        [this](const std::array<uint16_t, 2> &bond) {
+                          formBond(bond[0] + 1, bond[1] + 1, 1);
                         });
-
   std::ranges::for_each(switchMove.angleMakes,
                         [this](const std::array<uint16_t, 3> &angle) {
                           breakAngle(angle[0] + 1, angle[1] + 1, angle[2] + 1);
+                        });
+  std::ranges::for_each(switchMove.angleBreaks,
+                        [this](const std::array<uint16_t, 3> &angle) {
+                          formAngle(angle[0] + 1, angle[1] + 1, angle[2] + 1);
                         });
 }
 
@@ -440,4 +432,12 @@ bool LAMMPSManager::checkAngleUnique(const uint16_t atom1, const uint16_t atom2,
     }
   }
   return true;
+}
+
+size_t LAMMPSManager::getBondCount() const {
+  return static_cast<size_t>(lammps_get_thermo(handle, "bonds"));
+}
+
+size_t LAMMPSManager::getAngleCount() const {
+  return static_cast<size_t>(lammps_get_thermo(handle, "angles"));
 }

@@ -72,6 +72,27 @@
         "ranges": "cpp",
         "span": "cpp",
         "text_encoding": "cpp",
-        "variant": "cpp"
-    }
+        "variant": "cpp",
+        "expected": "cpp",
+        "__locale": "cpp",
+        "__bit_reference": "cpp",
+        "__hash_table": "cpp",
+        "__node_handle": "cpp",
+        "__split_buffer": "cpp",
+        "__tree": "cpp",
+        "__verbose_abort": "cpp",
+        "execution": "cpp",
+        "ios": "cpp",
+        "locale": "cpp",
+        "queue": "cpp",
+        "stack": "cpp",
+        "bitset": "cpp",
+        "forward_list": "cpp",
+        "print": "cpp"
+    },
+    "C_Cpp.default.cppStandard": "c++23",
+    "C_Cpp.default.cStandard": "c23",
+    "C_Cpp.default.intelliSenseMode": "linux-clang-x64",
+    "C_Cpp.clang_format_sortIncludes": true,
+    "C_Cpp.default.compilerPath": "/usr/bin/clang++-19"
 }

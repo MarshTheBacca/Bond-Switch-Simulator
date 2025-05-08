@@ -22,8 +22,12 @@ if (CMAKE_GENERATOR STREQUAL "Ninja")
 endif()
 
 # Make directory for executable to be saved
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin CACHE PATH "Directory to put executable")
 file(MAKE_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
 
 # Add include directories
 add_subdirectory(src)
+
+# Add the tests directory
+enable_testing()
+add_subdirectory(tests)

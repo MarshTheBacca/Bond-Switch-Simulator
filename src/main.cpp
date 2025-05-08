@@ -72,7 +72,7 @@ void cleanup(LinkedNetwork &linkedNetwork, OutputFile &allStatsFile) {
 /**
  * @brief Initialises the logger by creating a file sink and a console sink
  */
-LoggerPtr initialiseLogger(int argc, char *argv[]) {
+LoggerPtr initialiseLogger(int argsLength, char *argsData[]) {
   // Create a file sink and a console sink with different names for clarity
   auto file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(
       std::filesystem::path("./output_files") / "bond_switch_simulator.log",
@@ -89,11 +89,11 @@ LoggerPtr initialiseLogger(int argc, char *argv[]) {
   logger->set_level(spdlog::level::info);
 
   // Check command line arguments for --debug flag
-  while (char opt = getopt(argc, argv, "d") != -1) {
+  int opt;
+  while ((opt = getopt(argsLength, argsData, "d")) != -1) {
     if (opt == 'd') {
       logger->set_level(spdlog::level::debug);
       logger->debug("Debug messages enabled");
-      break;
     }
   }
   return logger;
@@ -176,9 +176,8 @@ int main(int argc, char *argv[]) {
     // Initialise linkedNetwork
     logger->debug("Initialising linkedNetwork...");
 
-    LinkedNetwork linkedNetwork;
     logger->debug("Loading linkedNetwork from files...");
-    linkedNetwork = LinkedNetwork(inputData, logger);
+    auto linkedNetwork = LinkedNetwork(inputData, logger);
 
     logger->debug("Network initialised!");
     logger->info("Initial energy: {:.3f} Hartrees", linkedNetwork.energy);

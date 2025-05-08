@@ -172,10 +172,13 @@ void LinkedNetwork::performBondSwitch(const double temperature) {
       switchMove.ringBondBreakMake[0][1], switchMove.ringBondBreakMake[1][1],
       switchMove.ringBondBreakMake[0][0], switchMove.ringBondBreakMake[1][0]};
   std::tie(rotatedCoord1, rotatedCoord2) = this->networkA.getRotatedBond(
-      switchMove.selectedBaseBond, getRingsDirection(orderedRingNodes));
+      switchMove.selectedBaseBond, getRingsDirection(orderedRingNodes),
+      this->logger);
+  logger->debug("Rotated coords: ({}, {}) ({}, {})", rotatedCoord1[0],
+                rotatedCoord1[1], rotatedCoord2[0], rotatedCoord2[1]);
 
   logger->debug("Switching LAMMPS Network...");
-  lammpsManager.switchGraphene(switchMove, rotatedCoord1, rotatedCoord2);
+  lammpsManager.performSwitch(switchMove, rotatedCoord1, rotatedCoord2);
 
   logger->debug("Minimising network...");
   lammpsManager.minimiseNetwork();
@@ -191,6 +194,9 @@ void LinkedNetwork::performBondSwitch(const double temperature) {
     return;
   }
   double finalEnergy = lammpsManager.getPotentialEnergy();
+  if (std::isnan(finalEnergy)) {
+    throw std::runtime_error("Final energy is NaN");
+  }
   if (!metropolisCondition.acceptanceCriterion(finalEnergy, initialEnergy,
                                                temperature)) {
     logger->debug("Rejected move: failed Metropolis criterion: Ei = {:.3f} Eh, "
@@ -222,11 +228,11 @@ void LinkedNetwork::rejectMove(const std::vector<Node> &initialInvolvedNodesA,
                                const std::vector<Node> &initialInvolvedNodesB,
                                const SwitchMove &switchMove) {
   logger->debug("Reverting BSS Network...");
-  revertMove(initialInvolvedNodesA, initialInvolvedNodesB);
+  this->revertMove(initialInvolvedNodesA, initialInvolvedNodesB);
   logger->debug("Reverting LAMMPS Network...");
-  lammpsManager.revertGraphene(switchMove);
+  this->lammpsManager.revertSwitch(switchMove);
   logger->debug("Syncing LAMMPS coordinates to BSS coordinates...");
-  lammpsManager.setCoords(networkA.getCoords());
+  this->lammpsManager.setCoords(networkA.getCoords());
 }
 
 void LinkedNetwork::showCoords(
@@ -661,10 +667,6 @@ uint16_t LinkedNetwork::findCommonRing(const uint16_t baseNode1,
 void LinkedNetwork::applyMove(
     const std::array<std::array<uint16_t, 2>, 2> &bondBreaks,
     const std::array<std::array<uint16_t, 2>, 2> &ringBondBreakMake) {
-  if (bondBreaks.size() != 4 || ringBondBreakMake.size() != 4) {
-    throw std::invalid_argument("Invalid input sizes for applyMove");
-  }
-
   uint16_t atom1 = bondBreaks[0][0];
   uint16_t atom2 = bondBreaks[1][0];
   uint16_t atom4 = bondBreaks[1][1];
