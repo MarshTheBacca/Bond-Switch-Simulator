@@ -1,5 +1,7 @@
 #include "node.h"
 #include "random_number_generator.h"
+#include "types.h"
+#include "vector_tools.h"
 #include <algorithm>
 #include <array>
 #include <ranges>
@@ -67,4 +69,11 @@ Node &Node::operator=(const Node &other) {
     this->dualConnections = other.dualConnections;
   }
   return *this;
+}
+
+void Node::showNetConnections(const LoggerPtr logger) const {
+  logger->debug(containerToString(this->netConnections));
+}
+void Node::showDualConnections(const LoggerPtr logger) const {
+  logger->debug(containerToString(this->dualConnections));
 }

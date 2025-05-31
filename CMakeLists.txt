@@ -27,3 +27,7 @@ file(MAKE_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
 
 # Add include directories
 add_subdirectory(src)
+
+# Add the tests directory
+enable_testing()
+add_subdirectory(tests)

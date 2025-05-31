@@ -9,45 +9,6 @@
 #include <vector>
 
 /**
- * @brief Sums all the values in a vector
- * @tparam T The type of the vector
- * @param vector The vector to be summed
- * @return The sum of the vector values
- */
-template <typename T> T vectorSum(const std::vector<T> &vector) {
-  return std::accumulate(vector.begin(), vector.end(), static_cast<T>(0));
-}
-
-/**
- * @brief Converts a vector to a string
- * @tparam T The type of the vector
- * @param vector The vector to be converted
- * @return A string representation of the vector
- */
-template <typename T> std::string vectorToString(const std::vector<T> &vector) {
-  std::ostringstream oss;
-  for (const auto &value : vector) {
-    oss << value << " ";
-  }
-  return oss.str();
-}
-
-/**
- * @brief Converts a set to a string
- * @tparam T The type of the set
- * @param set The set to be converted
- * @return A string representation of the set
- */
-template <typename T>
-std::string setToString(const std::unordered_set<T> &set) {
-  std::ostringstream oss;
-  for (const auto &value : set) {
-    oss << value << " ";
-  }
-  return oss.str();
-}
-
-/**
  * @brief Converts a map to a string
  * @tparam T The type of the keys
  * @tparam U The type of the values
@@ -69,8 +30,7 @@ std::string mapToString(const std::unordered_map<T, U> &map) {
  * @param vector1 First array
  * @param vector2 Second array
  * @param dimensions Dimensions of the system xhi, yhi, (zhi if 3D)
- * @throw std::invalid_argument if the sizes of the arrays do not match the
- * dimensions
+ * @note Vectors must be within the period boundary, as no wrapping is applied
  * @return The difference array
  */
 template <size_t S>
@@ -78,19 +38,17 @@ std::array<double, S> pbcArray(const std::array<double, S> &vector1,
                                const std::array<double, S> &vector2,
                                const std::array<double, S> &dimensions) {
   // Preallocate memory
-  std::array<double, S> differenceVector;
-  double dimensionRange = 0.0;
-  double halfDimensionRange = 0.0;
+  std::array<double, S> differenceVector{0.0, 0.0};
+  std::array<double, S> halfDimensionRange = divideArray(dimensions, 2.0);
   double difference = 0.0;
   for (size_t i = 0; i < S; ++i) {
-    // Range is the same because the dimensions are zeroed
-    dimensionRange = dimensions[i];
-    halfDimensionRange = dimensionRange / 2;
     difference = vector2[i] - vector1[i];
-    if (difference > halfDimensionRange) {
-      differenceVector[i] = difference - dimensionRange;
-    } else if (difference < -halfDimensionRange) {
-      differenceVector[i] = difference + dimensionRange;
+    if (difference > halfDimensionRange[i]) {
+      differenceVector[i] = difference - dimensions[i];
+    } else if (difference < -halfDimensionRange[i]) {
+      differenceVector[i] = difference + dimensions[i];
+    } else {
+      differenceVector[i] = difference;
     }
   }
   return differenceVector;
@@ -106,8 +64,8 @@ std::array<double, S> pbcArray(const std::array<double, S> &vector1,
  */
 template <typename T, size_t S>
   requires Subtractable<T>
-std::array<T, S> arraySubtract(const std::array<T, S> &array1,
-                               const std::array<T, S> &array2) {
+constexpr std::array<T, S> arraySubtract(const std::array<T, S> &array1,
+                                         const std::array<T, S> &array2) {
   std::array<T, S> result;
   std::ranges::transform(array2, array1, result.begin(), std::minus<T>());
   return result;
@@ -122,8 +80,8 @@ std::array<T, S> arraySubtract(const std::array<T, S> &array1,
  */
 template <typename T, size_t S>
   requires Addable<T>
-std::array<T, S> arrayAdd(const std::array<T, S> &array1,
-                          const std::array<T, S> &array2) {
+constexpr std::array<T, S> arrayAdd(const std::array<T, S> &array1,
+                                    const std::array<T, S> &array2) {
   std::array<double, 2> result;
   std::ranges::transform(array1, array2, result.begin(), std::plus<T>());
   return result;
@@ -138,7 +96,8 @@ std::array<T, S> arrayAdd(const std::array<T, S> &array1,
  */
 template <typename T, size_t S>
   requires Addable<T>
-void arrayAddInPlace(std::array<T, S> &array1, const std::array<T, S> &array2) {
+constexpr void arrayAddInPlace(std::array<T, S> &array1,
+                               const std::array<T, S> &array2) {
   std::ranges::transform(array1, array2, array1.begin(), std::plus<T>());
 }
 
@@ -233,7 +192,8 @@ void divideArrayInPlace(std::array<T, S> &array, const T divisor) {
  */
 template <typename T, size_t S>
   requires Divisible<T>
-std::array<T, S> addArray(const std::array<T, S> &array, const T addition) {
+constexpr std::array<T, S> addArray(const std::array<T, S> &array,
+                                    const T addition) {
   std::array<T, S> result;
   std::ranges::transform(array, result.begin(), [&addition](const T &element) {
     return element + addition;
@@ -250,7 +210,7 @@ std::array<T, S> addArray(const std::array<T, S> &array, const T addition) {
  */
 template <typename T, size_t S>
   requires Divisible<T>
-void addArray(std::array<T, S> &array, const T addition) {
+constexpr void addArray(std::array<T, S> &array, const T addition) {
   std::ranges::for_each(array,
                         [&addition](T &element) { element += addition; });
 }
@@ -263,11 +223,15 @@ void addArray(std::array<T, S> &array, const T addition) {
  * @return A set containing the common values
  */
 template <typename T>
-std::unordered_set<T> intersectSets(const std::unordered_set<T> &set1,
-                                    const std::unordered_set<T> &set2) {
+constexpr std::unordered_set<T>
+intersectSets(const std::unordered_set<T> &set1,
+              const std::unordered_set<T> &set2) {
   std::unordered_set<T> intersection;
-  std::ranges::set_intersection(
-      set1, set2, std::inserter(intersection, intersection.begin()));
+  for (const auto &value : set1 | std::views::filter([&set2](const T &v) {
+                             return set2.contains(v);
+                           })) {
+    intersection.insert(value);
+  }
   return intersection;
 }
 
@@ -294,8 +258,9 @@ std::string containerToString(const Container &container) {
  */
 template <typename Container>
   requires Multipliable<typename Container::value_type>
-void containerMultiply(Container &container,
-                       const typename Container::value_type &multiplyBy) {
+constexpr void
+containerMultiply(Container &container,
+                  const typename Container::value_type &multiplyBy) {
   std::ranges::for_each(container,
                         [&multiplyBy](auto &value) { value *= multiplyBy; });
 }
@@ -379,6 +344,9 @@ template <typename T, size_t S>
 void wrapArray(std::array<T, S> &array, const std::array<T, S> &dimensions) {
   std::transform(array.begin(), array.end(), dimensions.begin(), array.begin(),
                  [](T value, const T dim) {
+                   if (dim == 0) {
+                     throw std::domain_error("Zero dimension");
+                   }
                    // This is essentially a modulo operation
                    T wrappedValue = value - std::floor(value / dim) * dim;
                    if (wrappedValue < 0) {
@@ -392,6 +360,9 @@ void wrapArray(std::array<T, S> &array, const std::array<T, S> &dimensions) {
 template <typename T, size_t S>
   requires Addable<T> && Divisible<T>
 std::array<T, S> arrayAverage(const std::vector<std::array<T, S>> &arrays) {
+  if (arrays.empty()) {
+    throw std::runtime_error("Cannot average an empty vector of arrays");
+  }
   std::array<T, S> averageArray = {}; // Initialize to zero
   // Sum all the arrays
   std::ranges::for_each(arrays, [&averageArray](const std::array<T, S> &array) {
