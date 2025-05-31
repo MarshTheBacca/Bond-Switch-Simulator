@@ -1,2 +1,0 @@
-set(CMAKE_C_COMPILER mpicc CACHE STRING "C compiler" FORCE)
-set(CMAKE_CXX_COMPILER mpicxx CACHE STRING "C++ compiler" FORCE)

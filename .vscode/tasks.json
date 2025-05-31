@@ -32,6 +32,7 @@
                 "Ninja",
                 "-DCMAKE_CXX_COMPILER=clang++",
                 "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
+                "-DCMAKE_RUNTIME_OUTPUT_DIRECTORY=${workspaceFolder}/run",
                 "-S",
                 "${workspaceFolder}",
                 "-B",
@@ -52,8 +53,11 @@
         {
             "label": "run",
             "type": "shell",
-            "command": "${workspaceFolder}/build/bin/bond_switch_simulator",
-            "problemMatcher": []
+            "command": "${workspaceFolder}/run/bond_switch_simulator",
+            "problemMatcher": [],
+            "options": {
+                "cwd": "${workspaceFolder}/run"
+            }
         },
         {
             "label": "clean-configure-build-run",
