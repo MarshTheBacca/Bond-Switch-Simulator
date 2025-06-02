@@ -7,6 +7,7 @@
 #include "spdlog/spdlog.h"
 #include <atomic>
 #include <ctime>
+#include <expected>
 #include <filesystem>
 #include <iomanip>
 #include <iostream>
@@ -54,6 +55,12 @@ void writeStatsFooter(const LinkedNetwork &linkedNetwork,
   allStatsFile.file.close();
 }
 
+void baseCleanup(const LoggerPtr &logger) {
+  logger->flush();
+  spdlog::shutdown();
+  std::filesystem::remove("./log.lammps");
+}
+
 /**
  * @brief Cleans up the simulation by writing the network files and stopping the
  * LAMMPS movie
@@ -66,13 +73,13 @@ void cleanup(LinkedNetwork &linkedNetwork, OutputFile &allStatsFile) {
   std::filesystem::remove("./log.lammps");
   writeStatsFooter(linkedNetwork, allStatsFile,
                    linkedNetwork.checkConsistency());
-  spdlog::shutdown();
+  baseCleanup(linkedNetwork.logger);
 }
 
 /**
  * @brief Initialises the logger by creating a file sink and a console sink
  */
-LoggerPtr initialiseLogger(int argsLength, char *argsData[]) {
+LoggerPtr initialiseLogger(int argc, char *argv[]) {
   // Create a file sink and a console sink with different names for clarity
   auto file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(
       std::filesystem::path("./output_files") / "bond_switch_simulator.log",
@@ -90,7 +97,7 @@ LoggerPtr initialiseLogger(int argsLength, char *argsData[]) {
 
   // Check command line arguments for --debug flag
   int opt;
-  while ((opt = getopt(argsLength, argsData, "d")) != -1) {
+  while ((opt = getopt(argc, argv, "d")) != -1) {
     if (opt == 'd') {
       logger->set_level(spdlog::level::debug);
       logger->debug("Debug messages enabled");
@@ -142,6 +149,58 @@ void runSimulation(const std::vector<double> &expTemperatures,
   }
 }
 
+std::expected<InputData, std::string> loadInputData(const LoggerPtr &logger) {
+  // Read input file
+  InputData inputData(
+      std::filesystem::path("./input_files") / "bss_parameters.txt", logger);
+  // Check if output folder already exists
+  if (std::filesystem::exists("./output_files")) {
+    logger->warn("Output folder already exists, files will be overwritten!");
+  } else {
+    // Try to create output folder
+    if (!std::filesystem::create_directory("./output_files")) {
+      return std::unexpected(
+          std::format("Failed to create output directory: {}",
+                      std::filesystem::current_path().string()));
+    }
+  }
+  // Initialise Random Number Generator
+  RandomNumberGenerator::initialize(inputData.randomSeed);
+  return inputData;
+}
+
+std::expected<LinkedNetwork, std::string>
+initialiseLinkedNetwork(const LoggerPtr &logger, const InputData &inputData) {
+  // Initialise linkedNetwork
+  logger->debug("Initialising linkedNetwork...");
+  try {
+    logger->debug("Loading linkedNetwork from files...");
+    return LinkedNetwork(inputData, logger);
+  } catch (const std::exception &e) {
+    return std::unexpected(
+        std::format("Failed to load linked network: {}", e.what()));
+  }
+}
+
+std::expected<OutputFile, std::string>
+initialiseOutputFile(const std::filesystem::path &path) {
+  try {
+    auto allStatsFile = OutputFile(path);
+    allStatsFile.writeDatetime("Written by Bond-Switch-Simulator by Marshall "
+                               "Hunt, Wilson Group, 2024");
+    allStatsFile.writeLine(
+        "The data is structured as follows: Each value is comma separated, "
+        "with inner vectors having their elements separated by semi-colons");
+    allStatsFile.writeLine(
+        "Step, Temperature, Energy, Entropy, Pearson's Coefficient, Aboave "
+        "Weaire, Ring Size Distribution (vector), Ring Areas (vector)");
+    return allStatsFile;
+  } catch (const std::exception &e) {
+    return std::unexpected(
+        std::format("Failed to initialise output file: {}", e.what()));
+  }
+}
+
 int main(int argc, char *argv[]) {
   // Set up signal handler to cleanly exit when we use ctrl+c
   signal(SIGINT, exitFlagger);
@@ -153,48 +212,46 @@ int main(int argc, char *argv[]) {
               << std::endl;
     return 1;
   }
+  logger->info("Bond Switch Simulator");
+  logger->info("Written by Marshall Hunt (Part II), Wilson Group, 2024");
+  // Load input data
+  logger->debug("Loading input data...");
+  std::expected<InputData, std::string> inputDataResult = loadInputData(logger);
+  if (!inputDataResult) {
+    logger->error("Failed to load input data: {}", inputDataResult.error());
+    baseCleanup(logger);
+    return 1;
+  }
+  InputData inputData = std::move(inputDataResult.value());
+  logger->info("Input data loaded successfully");
+
+  logger->debug("Initialising linkedNetwork...");
+  std::expected<LinkedNetwork, std::string> linkedNetworkResult =
+      initialiseLinkedNetwork(logger, inputData);
+  if (!linkedNetworkResult) {
+    logger->error("Failed to initialise linked network: {}",
+                  linkedNetworkResult.error());
+    baseCleanup(logger);
+    return 1;
+  }
+  LinkedNetwork linkedNetwork = std::move(linkedNetworkResult.value());
+  logger->debug("Network initialised successfully");
+  logger->info("Initial energy: {:.3f} Hartrees", linkedNetwork.energy);
+
+  logger->debug("Initialising output file...");
+  std::expected<OutputFile, std::string> outputFileResult =
+      initialiseOutputFile(std::filesystem::path("./output_files") /
+                           "bss_stats.csv");
+  if (!outputFileResult) {
+    logger->error("Failed to initialise output file: {}",
+                  outputFileResult.error());
+    baseCleanup(logger);
+    return 1;
+  }
+  OutputFile allStatsFile = std::move(outputFileResult.value());
+  logger->debug("Output file initialised successfully");
+
   try {
-    logger->info("Bond Switch Simulator");
-    logger->info("Written by Marshall Hunt (Part II), Wilson Group, 2024");
-
-    // Read input file
-    InputData inputData(
-        std::filesystem::path("./input_files") / "bss_parameters.txt", logger);
-    // Check if output folder already exists
-    if (std::filesystem::exists("./output_files")) {
-      logger->warn("Output folder already exists, files will be overwritten!");
-    } else {
-      // Try to create output folder
-      if (!std::filesystem::create_directory("./output_files")) {
-        logger->error("Error creating output folder");
-        return 1;
-      }
-    }
-    // Initialise Random Number Generator
-    RandomNumberGenerator::initialize(inputData.randomSeed);
-
-    // Initialise linkedNetwork
-    logger->debug("Initialising linkedNetwork...");
-
-    logger->debug("Loading linkedNetwork from files...");
-    auto linkedNetwork = LinkedNetwork(inputData, logger);
-
-    logger->debug("Network initialised!");
-    logger->info("Initial energy: {:.3f} Hartrees", linkedNetwork.energy);
-
-    // Initialise output files
-    logger->debug("Initialising analysis output file...");
-
-    OutputFile allStatsFile(std::filesystem::path("./output_files") /
-                            "bss_stats.csv");
-    allStatsFile.writeDatetime("Written by Bond-Switch-Simulator by Marshall "
-                               "Hunt, Wilson Group, 2024)");
-    allStatsFile.writeLine(
-        "The data is structured as follows: Each value is comma separated, "
-        "with inner vectors having their elements separated by semi-colons");
-    allStatsFile.writeLine(
-        "Step, Temperature, Energy, Entropy, Pearson's Coefficient, Aboave "
-        "Weaire, Ring Size Distribution (vector), Ring Areas (vector)");
 
     // Run monte carlo thermalisation
     std::vector<double> thermalisationTemperatures(
@@ -256,16 +313,13 @@ int main(int argc, char *argv[]) {
     std::filesystem::remove("./log.lammps");
     logger->flush();
     spdlog::shutdown();
-
   } catch (std::exception &e) {
     logger->error("Exception: {}", e.what());
-    logger->flush();
-    spdlog::shutdown();
+    cleanup(linkedNetwork, allStatsFile);
     return 1;
   } catch (...) {
     logger->error("Unknown exception");
-    logger->flush();
-    spdlog::shutdown();
+    cleanup(linkedNetwork, allStatsFile);
     return 1;
   }
   return 0;

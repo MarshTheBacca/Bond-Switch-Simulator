@@ -18,7 +18,10 @@ struct OutputFile {
   // Constructors
   explicit OutputFile(const std::string &name);
   explicit OutputFile(const std::string &path, const int spaceArg);
-
+  // Move constructor
+  OutputFile(OutputFile &&) noexcept = default;
+  // Move assignment operator
+  OutputFile &operator=(OutputFile &&) noexcept = default;
   // Destructor
   ~OutputFile() {
     if (file.is_open()) {
