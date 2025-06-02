@@ -26,8 +26,8 @@ struct Network {
   double pearsonsCoeff;
   double entropy;
   // Map of node degree to probability
-  std::map<int, double> nodeSizes;
-  std::map<int, std::map<int, double>> assortativityDistribution;
+  std::map<size_t, double> nodeSizes;
+  std::map<size_t, std::map<size_t, double>> assortativityDistribution;
 
   // Constructors
   Network();
@@ -72,6 +72,8 @@ struct Network {
   size_t
   getMinDualConnections(const std::unordered_set<uint16_t> &excludeNodes) const;
 
+  std::vector<std::array<double, 2>>
+  getCoordsByIDs(const std::unordered_set<uint16_t> &nodeIDs) const;
   void centerByDual(const Network &dualNetwork);
 
   int findNumberOfUniqueDualNodes();
@@ -92,7 +94,7 @@ struct Network {
 
   std::array<std::array<double, 2>, 2>
   getRotatedBond(const std::array<uint16_t, 2> &bond,
-                 const Direction &direction, const LoggerPtr logger) const;
+                 const Direction direction) const;
 
   std::vector<std::array<double, 2>> getCoords() const;
   bool checkConnectionsReciprocated(const LoggerPtr logger) const;
@@ -100,6 +102,11 @@ struct Network {
                                     const LoggerPtr logger) const;
   bool checkDegreeLimits(const size_t min, const size_t max,
                          const LoggerPtr logger) const;
+  bool checkSelectedAngles(const std::unordered_set<uint16_t> &nodeIDs,
+                           const double minAngle, const double maxAngle,
+                           const LoggerPtr logger) const;
+  bool checkAllAngles(const double minAngle, const double maxAngle,
+                      const LoggerPtr logger) const;
 };
 
 #endif // NL_NETWORK_H
