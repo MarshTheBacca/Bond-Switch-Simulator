@@ -73,13 +73,15 @@ void LAMMPSManager::writeData() {
  * @param atom2 The second atom in the bond
  * @param type The type of the bond
  * @throws std::runtime_error if the bond count doesn't decrease
+ * @note Uses zero-based indexing for atom IDs
  */
 void LAMMPSManager::breakBond(const uint16_t atom1, const uint16_t atom2,
                               const int type) {
   size_t initialBondCount = this->getBondCount();
   // Define a group of atoms called `switch`
-  lammps_command(handle,
-                 std::format("group switch id {} {}", atom1, atom2).c_str());
+  lammps_command(
+      handle,
+      std::format("group switch id {} {}", atom1 + 1, atom2 + 1).c_str());
 
   // Delete the bond described by the group `switch`
   lammps_command(
@@ -103,12 +105,13 @@ void LAMMPSManager::breakBond(const uint16_t atom1, const uint16_t atom2,
  * @param atom2 The second atom in the bond
  * @param type The type of the bond
  * @throws std::runtime_error if the bond count doesn't increase
+ * @note Uses zero-based indexing for atom IDs
  */
 void LAMMPSManager::formBond(const uint16_t atom1, const uint16_t atom2,
                              const int type) {
   size_t initialBondCount = this->getBondCount();
-  std::string command =
-      std::format("create_bonds single/bond {} {} {}", type, atom1, atom2);
+  std::string command = std::format("create_bonds single/bond {} {} {}", type,
+                                    atom1 + 1, atom2 + 1);
   lammps_command(handle, command.c_str());
   size_t finalBondCount = this->getBondCount();
   if (finalBondCount != initialBondCount + 1) {
@@ -125,15 +128,16 @@ void LAMMPSManager::formBond(const uint16_t atom1, const uint16_t atom2,
  * @param atom2 The second atom in the angle
  * @param atom3 The third atom in the angle
  * @throws std::runtime_error if the angle count doesn't decrease
+ * @note Uses zero-based indexing for atom IDs
  */
 void LAMMPSManager::breakAngle(const uint16_t atom1, const uint16_t atom2,
                                const uint16_t atom3) {
   // Get the initial number of angles
   const size_t initialAngleCount = this->getAngleCount();
   // Define a group `switch` describing the atoms in the angle
-  lammps_command(
-      handle,
-      std::format("group switch id {} {} {}", atom1, atom2, atom3).c_str());
+  lammps_command(handle, std::format("group switch id {} {} {}", atom1 + 1,
+                                     atom2 + 1, atom3 + 1)
+                             .c_str());
   // Delete the angle described by the group `switch`
   lammps_command(handle, "delete_bonds switch angle 1 remove");
 
@@ -202,6 +206,7 @@ void LAMMPSManager::breakAngle(const uint16_t atom1, const uint16_t atom2,
  * @param atom1 The first atom in the angle
  * @param atom2 The second atom in the angle
  * @param atom3 The third atom in the angle
+ * @mpte Uses zero-based indexing for atom IDs
  */
 void LAMMPSManager::formAngle(const uint16_t atom1, const uint16_t atom2,
                               const uint16_t atom3) {
@@ -212,7 +217,7 @@ void LAMMPSManager::formAngle(const uint16_t atom1, const uint16_t atom2,
   }
   size_t initialAngleCount = this->getAngleCount();
   lammps_command(handle, std::format("create_bonds single/angle 1 {} {} {}",
-                                     atom1, atom2, atom3)
+                                     atom1 + 1, atom2 + 1, atom3 + 1)
                              .c_str());
   size_t finalAngleCount = this->getAngleCount();
   if (finalAngleCount != initialAngleCount + 1) {
@@ -232,23 +237,23 @@ void LAMMPSManager::performSwitch(const SwitchMove &switchMove,
                                   const std::array<double, 2> &rotatedCoord2) {
   std::ranges::for_each(switchMove.bondBreaks,
                         [this](const std::array<uint16_t, 2> &bond) {
-                          breakBond(bond[0] + 1, bond[1] + 1, 1);
+                          breakBond(bond[0], bond[1], 1);
                         });
   std::ranges::for_each(switchMove.bondMakes,
                         [this](const std::array<uint16_t, 2> &bond) {
-                          formBond(bond[0] + 1, bond[1] + 1, 1);
+                          formBond(bond[0], bond[1], 1);
                         });
   std::ranges::for_each(switchMove.angleBreaks,
                         [this](const std::array<uint16_t, 3> &angle) {
-                          breakAngle(angle[0] + 1, angle[1] + 1, angle[2] + 1);
+                          breakAngle(angle[0], angle[1], angle[2]);
                         });
   std::ranges::for_each(switchMove.angleMakes,
                         [this](const std::array<uint16_t, 3> &angle) {
-                          formAngle(angle[0] + 1, angle[1] + 1, angle[2] + 1);
+                          formAngle(angle[0], angle[1], angle[2]);
                         });
 
-  int atom1ID = switchMove.bondBreaks[0][0] + 1;
-  int atom2ID = switchMove.bondBreaks[1][0] + 1;
+  int atom1ID = switchMove.bondBreaks[0][0];
+  int atom2ID = switchMove.bondBreaks[1][0];
   setAtomCoords(atom1ID, rotatedCoord1);
   setAtomCoords(atom2ID, rotatedCoord2);
 }
@@ -260,38 +265,38 @@ void LAMMPSManager::performSwitch(const SwitchMove &switchMove,
 void LAMMPSManager::revertSwitch(const SwitchMove &switchMove) {
   std::ranges::for_each(switchMove.bondMakes,
                         [this](const std::array<uint16_t, 2> &bond) {
-                          breakBond(bond[0] + 1, bond[1] + 1, 1);
+                          breakBond(bond[0], bond[1], 1);
                         });
   std::ranges::for_each(switchMove.bondBreaks,
                         [this](const std::array<uint16_t, 2> &bond) {
-                          formBond(bond[0] + 1, bond[1] + 1, 1);
+                          formBond(bond[0], bond[1], 1);
                         });
   std::ranges::for_each(switchMove.angleMakes,
                         [this](const std::array<uint16_t, 3> &angle) {
-                          breakAngle(angle[0] + 1, angle[1] + 1, angle[2] + 1);
+                          breakAngle(angle[0], angle[1], angle[2]);
                         });
   std::ranges::for_each(switchMove.angleBreaks,
                         [this](const std::array<uint16_t, 3> &angle) {
-                          formAngle(angle[0] + 1, angle[1] + 1, angle[2] + 1);
+                          formAngle(angle[0], angle[1], angle[2]);
                         });
 }
 
 void LAMMPSManager::setCoords(
     const std::vector<std::array<double, 2>> &newCoords) {
-  if (newCoords.size() != numAtoms) {
+  if (newCoords.size() != this->numAtoms) {
     throw std::runtime_error(std::format("Invalid size of newCoords, expected "
                                          "{} got {}",
-                                         numAtoms, newCoords.size()));
+                                         this->numAtoms, newCoords.size()));
   }
   // Flatten the 2D vector into a 1D vector, which LAMMPS expects
-  std::vector<double> coords1D(numAtoms * 2);
+  std::vector<double> coords1D(this->numAtoms * 2);
   for (size_t i = 0; i < newCoords.size(); ++i) {
     coords1D[2 * i] = newCoords[i][0];
     coords1D[2 * i + 1] = newCoords[i][1];
   }
   lammps_scatter_atoms(
       // The LAMMPS handle
-      handle,
+      this->handle,
       // x means positions
       "x",
       // Atom of type 1
@@ -302,11 +307,16 @@ void LAMMPSManager::setCoords(
       coords1D.data());
 }
 
+/**
+ * @brief Set the coordinates of a single atom in the network
+ * @param atomID The ID of the atom to set the coordinates for (0-indexed)
+ * @param newCoords The new coordinates for the atom as a 2D array
+ */
 void LAMMPSManager::setAtomCoords(const int atomID,
                                   const std::array<double, 2> &newCoords) {
   auto x = (double **)lammps_extract_atom(handle, "x");
   for (int i = 0; i < 2; i++) {
-    x[atomID - 1][i] = newCoords[i];
+    x[atomID][i] = newCoords[i];
   }
 }
 
