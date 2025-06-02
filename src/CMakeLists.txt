@@ -35,15 +35,23 @@ endif()
 message(STATUS "LAMMPS library: ${LAMMPS_LIBRARY}")
 message(STATUS "LAMMPS include directory: ${LAMMPS_INCLUDE_DIR}")
 
+message(STATUS "Finding spdlog and MPI...")
 find_package(spdlog REQUIRED)
+find_package(MPI REQUIRED)
 
 # Add all source files to the executable
 file(GLOB SOURCES "*.cpp")
 target_sources(bond_switch_simulator PRIVATE ${SOURCES})
 
 # Add include directories
-target_include_directories(bond_switch_simulator BEFORE PRIVATE ${CMAKE_SOURCE_DIR}/include)
-target_include_directories(bond_switch_simulator PRIVATE ${LAMMPS_INCLUDE_DIR})
-
-# Link the LAMMPS and spdlog libraries
-target_link_libraries(bond_switch_simulator PRIVATE ${LAMMPS_LIBRARY} spdlog::spdlog_header_only)
+target_include_directories(bond_switch_simulator
+    BEFORE PRIVATE ${CMAKE_SOURCE_DIR}/include
+    PRIVATE ${LAMMPS_INCLUDE_DIR}
+    PRIVATE ${MPI_CXX_INCLUDE_DIRS}
+)
+# Link the LAMMPS, spdlog, and MPI libraries
+target_link_libraries(bond_switch_simulator
+    PRIVATE ${LAMMPS_LIBRARY}
+    PRIVATE spdlog::spdlog_header_only
+    PRIVATE MPI::MPI_CXX
+)

@@ -1,15 +1,33 @@
 #include "network.h"
+#include "output_file.h"
+#include "random_number_generator.h"
+#include "types.h"
+#include "vector_tools.h"
+#include <algorithm>
+#include <cmath>
+#include <cstdint>
 #include <filesystem>
+#include <fstream>
+#include <iomanip>
+#include <iostream>
+#include <memory>
+#include <ranges>
+#include <set>
+#include <sstream>
+#include <stdexcept>
+#include <string>
+#include <unordered_set>
 
-const std::string BSS_NETWORK_PATH = std::filesystem::path("./input_files") / "bss_network";
+const std::string BSS_NETWORK_PATH =
+    std::filesystem::path("./input_files") / "bss_network";
 
 /**
  * @brief Calculate the rounded square root of a number
  * @param num Number to calculate the rounded square root of
  * @return Rounded square root of the number
  */
-inline int roundedSqrt(const int &num) {
-    return std::round(std::sqrt(num));
+inline int roundedSqrt(const int num) {
+  return static_cast<int>(std::round(std::sqrt(num)));
 }
 
 /**
@@ -17,40 +35,39 @@ inline int roundedSqrt(const int &num) {
  * @param networkType NetworkType to convert
  * @return networkString string
  * @throw std::invalid_argument if networkType is not valid
-*/
-std::string NetworkTypeToString(NetworkType networkType){
-    switch(networkType){
-        case NetworkType::BASE_NETWORK:
-            return "base_network";
-        case NetworkType::DUAL_NETWORK:
-            return "dual_network";
-        default:
-            throw std::invalid_argument("Invalid network type");
-    }
+ */
+std::string NetworkTypeToString(NetworkType networkType) {
+  switch (networkType) {
+  case NetworkType::BASE_NETWORK:
+    return "base_network";
+  case NetworkType::DUAL_NETWORK:
+    return "dual_network";
+  default:
+    throw std::invalid_argument("Invalid network type");
+  }
 }
 
 /**
- * @brief Read a value from a file after a colon, used for reading the info file
+ * @brief Read a value from a file after a colon, used for reading the info
+ * file
  * @param infoFile File to read from
  * @return Value after the colon
-*/
-double readValueAfterColon(std::ifstream& infoFile) {
-    std::string line;
-    std::getline(infoFile, line);
-    std::istringstream iss(line);
-    std::string label;
-    std::getline(iss, label, ':');  // Read until the colon
-    double value;
-    iss >> value;  // Read the number after the colon
-    return value;
+ */
+double readValueAfterColon(std::ifstream &infoFile) {
+  std::string line;
+  std::getline(infoFile, line);
+  std::istringstream iss(line);
+  std::string label;
+  std::getline(iss, label, ':'); // Read until the colon
+  double value;
+  iss >> value; // Read the number after the colon
+  return value;
 }
-
 
 /**
  * @brief default constructor
  */
 Network::Network() = default;
-
 
 /**
  * @brief Construct a network from files
@@ -58,24 +75,30 @@ Network::Network() = default;
  * @param maxBaseCoordinationArg Maximum base coordination of nodes
  * @param maxDualCoordinationArg Maximum dual coordination of nodes
  * @param logger Logger to log to
- * @throw std::runtime_error if cannot open info file, crds file, net file or dual file
+ * @throw std::runtime_error if cannot open info file, crds file, net file or
+ * dual file
  */
-Network::Network(const NetworkType networkType, const LoggerPtr &logger) : type(networkType), networkString(NetworkTypeToString(networkType)) {
-    logger->debug("Reading file: " + networkString + "_info.txt");
-    readInfo(std::filesystem::path(BSS_NETWORK_PATH) / (networkString + "_info.txt"));
-    nodes.reserve(numNodes);
-    for (int i = 0; i < numNodes; ++i) {
-        Node node(i);
-        nodes.push_back(node);
-    }
-    logger->debug("Reading file: " + networkString + "_coords.txt");
-    readCoords(std::filesystem::path(BSS_NETWORK_PATH) / (networkString + "_coords.txt"));
-    logger->debug("Reading file: " + networkString + "_connections.txt");
-    readConnections(std::filesystem::path(BSS_NETWORK_PATH) / (networkString + "_connections.txt"), false);
-    logger->debug("Reading file: " + networkString + "_dual_connections.txt");
-    readConnections(std::filesystem::path(BSS_NETWORK_PATH) / (networkString + "_dual_connections.txt"), true);
+Network::Network(const NetworkType networkType, const LoggerPtr &logger)
+    : type(networkType), networkString(NetworkTypeToString(networkType)) {
+  logger->debug("Reading file: " + networkString + "_info.txt");
+  readInfo(std::filesystem::path(BSS_NETWORK_PATH) /
+           (networkString + "_info.txt"));
+  nodes.reserve(this->numNodes);
+  for (uint16_t i = 0; i < this->numNodes; ++i) {
+    nodes.emplace_back(i);
+  }
+  logger->debug("Reading file: " + networkString + "_coords.txt");
+  readCoords(std::filesystem::path(BSS_NETWORK_PATH) /
+             (networkString + "_coords.txt"));
+  logger->debug("Reading file: " + networkString + "_connections.txt");
+  readConnections(std::filesystem::path(BSS_NETWORK_PATH) /
+                      (networkString + "_connections.txt"),
+                  false);
+  logger->debug("Reading file: " + networkString + "_dual_connections.txt");
+  readConnections(std::filesystem::path(BSS_NETWORK_PATH) /
+                      (networkString + "_dual_connections.txt"),
+                  true);
 }
-
 
 /**
  * @Brief Read the number of nodes and dimensions from the info file
@@ -83,102 +106,103 @@ Network::Network(const NetworkType networkType, const LoggerPtr &logger) : type(
  * @param numNodes Number of nodes
  * @param dimensions Dimensions of the network
  * @throw std::runtime_error if info file not found
-*/
-void Network::readInfo(const std::string& filePath) {
-    std::ifstream infoFile(filePath, std::ios::in);
-    if (!infoFile.is_open()) {
-        throw std::runtime_error("Cannot open info file: " + filePath);
-    }
-    // Read number of nodes
-    numNodes = static_cast<int>(readValueAfterColon(infoFile));
-    // Read dimensions
-    dimensions = std::vector<double>(2);
-    dimensions[0] = readValueAfterColon(infoFile);
-    dimensions[1] = readValueAfterColon(infoFile);
+ */
+void Network::readInfo(const std::string &filePath) {
+  std::ifstream infoFile(filePath, std::ios::in);
+  if (!infoFile.is_open()) {
+    throw std::runtime_error("Cannot open info file: " + filePath);
+  }
+  // Read number of nodes
+  this->numNodes = static_cast<uint16_t>(readValueAfterColon(infoFile));
+  // Read dimensions
+  this->dimensions[0] = readValueAfterColon(infoFile);
+  this->dimensions[1] = readValueAfterColon(infoFile);
 }
 
 void Network::readCoords(const std::string &filePath) {
-    std::ifstream coordsFile(filePath, std::ios::in);
-    if (!coordsFile.is_open()) {
-        throw std::runtime_error("Cannot coords open file: " + filePath);
-    }
-    std::vector<double> crd(2);
-    std::string line;
-    std::for_each(nodes.begin(), nodes.end(), [&coordsFile, &crd, &line](Node &node) {
-        std::getline(coordsFile, line);
-        std::istringstream ss(line);
-        ss >> crd[0];
-        ss >> crd[1];
-        node.crd = crd;
-    });
+  std::ifstream coordsFile(filePath, std::ios::in);
+  if (!coordsFile.is_open()) {
+    throw std::runtime_error("Cannot coords open file: " + filePath);
+  }
+  std::array<double, 2> coord{0.0, 0.0};
+  std::string line;
+  std::ranges::for_each(this->nodes, [&coordsFile, &coord, &line](Node &node) {
+    std::getline(coordsFile, line);
+    std::istringstream ss(line);
+    ss >> coord[0];
+    ss >> coord[1];
+    node.coord = coord;
+  });
+  std::cout << "Read " << this->nodes.size()
+            << " nodes from coords file: " << filePath << std::endl;
+  if (this->nodes.size() != this->numNodes) {
+    throw std::runtime_error(
+        "Number of nodes in coords file does not match number of nodes in "
+        "info file");
+  }
 }
 
 void Network::readConnections(const std::string &filePath, const bool &isDual) {
-    std::ifstream connectionsFile(filePath, std::ios::in);
-    if (!connectionsFile.is_open()) {
-        throw std::runtime_error("Cannot open connections file: " + filePath);
+  std::ifstream connectionsFile(filePath, std::ios::in);
+  if (!connectionsFile.is_open()) {
+    throw std::runtime_error("Cannot open connections file: " + filePath);
+  }
+  uint16_t connectedNodeID;
+  std::string line;
+  std::ranges::for_each(this->nodes, [&connectionsFile, &connectedNodeID, &line,
+                                      isDual](Node &node) {
+    std::getline(connectionsFile, line);
+    std::istringstream ss(line);
+    while (ss >> connectedNodeID) {
+      if (!isDual)
+        node.netConnections.insert(connectedNodeID);
+      else
+        node.dualConnections.insert(connectedNodeID);
     }
-    int cnx;
-    std::string line;
-    std::for_each(nodes.begin(), nodes.end(), [&connectionsFile, &cnx, &line, isDual](Node &node) {
-        std::getline(connectionsFile, line);
-        std::istringstream ss(line);
-        while (ss >> cnx) {
-            if (!isDual)
-                node.netConnections.push_back(cnx);
-            else
-                node.dualConnections.push_back(cnx);
-        }
-    });
+  });
 }
 
 /**
- * @brief Find the number of unique dual nodes in all the node's dualConnections
+ * @brief Find the number of unique dual nodes in all the node's
+ * dualConnections
  * @return Number of unique dual nodes
  */
 int Network::findNumberOfUniqueDualNodes() {
-    int numberOfUniqueDualNodes = -1;
-    std::for_each(nodes.begin(), nodes.end(), [&numberOfUniqueDualNodes](Node &node) {
-        std::for_each(node.dualConnections.begin(), node.dualConnections.end(), [&numberOfUniqueDualNodes](int dualCnx) {
-            if (dualCnx > numberOfUniqueDualNodes)
-                numberOfUniqueDualNodes = dualCnx;
-        });
-    });
-    return numberOfUniqueDualNodes + 1;
+  int numberOfUniqueDualNodes = -1;
+  std::ranges::for_each(this->nodes, [&numberOfUniqueDualNodes](Node &node) {
+    std::ranges::for_each(node.dualConnections,
+                          [&numberOfUniqueDualNodes](int dualConnectionID) {
+                            if (dualConnectionID > numberOfUniqueDualNodes)
+                              numberOfUniqueDualNodes = dualConnectionID;
+                          });
+  });
+  return numberOfUniqueDualNodes + 1;
+}
+
+std::vector<std::array<double, 2>>
+Network::getCoordsByIDs(const std::unordered_set<uint16_t> &nodeIDs) const {
+  std::vector<std::array<double, 2>> coords;
+  coords.reserve(nodeIDs.size());
+  std::ranges::for_each(this->nodes, [&nodeIDs, &coords](const Node &node) {
+    if (nodeIDs.contains(node.id)) {
+      coords.push_back(node.coord);
+    }
+  });
+  return coords;
 }
 
 /**
  * @brief Centres all nodes relative to their dual connections
- * @param baseNetwork Base network to provide dual node IDs
+ * @param dualNetwork Dual network relative to this network
  */
-void Network::centreRings(const Network &baseNetwork) {
-    std::vector<double> total(2, 0.0);
-    for (int ringNode = 0; ringNode < nodes.size(); ++ringNode) {
-        Node &selectedRingNode = nodes[ringNode];
-        total[0] = total[1] = 0.0;
-        for (int neighbour = 0; neighbour < selectedRingNode.dualConnections.size(); ++neighbour) {
-            std::vector<double> pbcCoords = pbcVector(selectedRingNode.crd,
-                                                      baseNetwork.nodes[selectedRingNode.dualConnections[neighbour]].crd,
-                                                      dimensions);
-            total[0] += pbcCoords[0];
-            total[1] += pbcCoords[1];
-        }
-        total[0] /= selectedRingNode.dualConnections.size();
-        total[1] /= selectedRingNode.dualConnections.size();
-
-        selectedRingNode.crd[0] += total[0];
-        selectedRingNode.crd[1] += total[1];
-
-        // Wrap the new coordinates back into the box
-        for (size_t i = 0; i < selectedRingNode.crd.size(); ++i) {
-            while (selectedRingNode.crd[i] < 0) {
-                selectedRingNode.crd[i] += dimensions[i];
-            }
-            while (selectedRingNode.crd[i] >= dimensions[i]) {
-                selectedRingNode.crd[i] -= dimensions[i];
-            }
-        }
-    }
+void Network::centerByDual(const Network &dualNetwork) {
+  if (this->type == dualNetwork.type) {
+    throw std::invalid_argument(
+        "Cannot a network with a dual network of the same type");
+  }
+  std::ranges::for_each(this->nodes, [&dualNetwork, this](Node &node) {
+    node.coord = dualNetwork.getAverageCoordsPBC(node.dualConnections);
+  });
 }
 
 /**
@@ -186,41 +210,45 @@ void Network::centreRings(const Network &baseNetwork) {
  * @param scaleFactor Factor to rescale by
  */
 void Network::rescale(const double &scaleFactor) {
-    vectorMultiply(dimensions, scaleFactor);
-    std::for_each(nodes.begin(), nodes.end(), [&scaleFactor](Node &node) {
-        vectorMultiply(node.crd, scaleFactor);
-    });
+  containerMultiply(this->dimensions, scaleFactor);
+  std::ranges::for_each(this->nodes, [&scaleFactor](Node &node) {
+    containerMultiply(node.coord, scaleFactor);
+  });
 }
 
 /**
  * @brief Refresh the entropy of node sizes
  */
 void Network::refreshEntropy() {
-    entropy = 0.0;
-    std::for_each(nodeSizes.begin(), nodeSizes.end(), [this](const std::pair<int, double> &pair) {
-        entropy -= pair.second * std::log(pair.second);
-    });
+  entropy = 0.0;
+  std::ranges::for_each(this->nodeSizes,
+                        [this](const std::pair<int, double> &pair) {
+                          entropy -= pair.second * std::log(pair.second);
+                        });
 }
 
 /**
- * @brief Refresh the assortativity distribution of the network, which is a map of maps
+ * @brief Refresh the assortativity distribution of the network, which is a map
+ * of maps
  */
 void Network::refreshAssortativityDistribution() {
-    assortativityDistribution.clear();
-    std::for_each(nodes.begin(), nodes.end(), [this](const Node &node) {
-        std::for_each(node.netConnections.begin(), node.netConnections.end(), [&node, this](const int &cnx) {
-            int cnxRingSize = nodes[cnx].netConnections.size();
-            auto &outerMap = assortativityDistribution[node.netConnections.size()];
-            if (outerMap.find(cnxRingSize) == outerMap.end()) {
-                outerMap[cnxRingSize] = 1;
-            } else {
-                ++outerMap[cnxRingSize];
-            }
-        });
+  this->assortativityDistribution.clear();
+  std::ranges::for_each(this->nodes, [this](const Node &node) {
+    std::ranges::for_each(node.netConnections, [&node, this](const int cnx) {
+      size_t cnxRingSize = this->nodes[cnx].numConnections();
+      auto &outerMap = this->assortativityDistribution[node.numConnections()];
+      if (!outerMap.contains(cnxRingSize)) {
+        outerMap[cnxRingSize] = 1;
+        return;
+      }
+      ++outerMap[cnxRingSize];
     });
-    std::for_each(assortativityDistribution.begin(), assortativityDistribution.end(), [](std::pair<const int, std::map<int, double>> &pair) {
+  });
+  std::ranges::for_each(
+      this->assortativityDistribution,
+      [](std::pair<const size_t, std::map<size_t, double>> &pair) {
         normaliseMap(pair.second);
-    });
+      });
 }
 
 /**
@@ -228,24 +256,27 @@ void Network::refreshAssortativityDistribution() {
  * @return Average coordination
  */
 double Network::getAverageCoordination() const {
-    double totalCoordination = 0.0;
-    std::for_each(nodes.begin(), nodes.end(), [&totalCoordination](const Node &node) {
-        totalCoordination += node.netConnections.size();
-    });
-    return totalCoordination / nodes.size();
+  size_t totalCoordination = 0;
+  std::ranges::for_each(this->nodes, [&totalCoordination](const Node &node) {
+    totalCoordination += node.numConnections();
+  });
+  return static_cast<double>(totalCoordination) /
+         static_cast<double>(this->nodes.size());
 }
 
 /**
- * @brief Get the average coordination of the network to the power of a given power, ie, <k^n>
+ * @brief Get the average coordination of the network to the power of a given
+ * power, ie, <k^n>
  * @param power Power to raise the coordination to
  * @return Average coordination to the power of the given power
  */
-double Network::getAverageCoordination(const int &power) const {
-    double totalCoordination = 0.0;
-    std::for_each(nodes.begin(), nodes.end(), [&totalCoordination, power](const Node &node) {
-        totalCoordination += std::pow(node.netConnections.size(), power);
-    });
-    return totalCoordination / nodes.size();
+double Network::getAverageCoordination(const int power) const {
+  double totalCoordination = 0.0;
+  std::ranges::for_each(
+      this->nodes, [&totalCoordination, power](const Node &node) {
+        totalCoordination += std::pow(node.numConnections(), power);
+      });
+  return totalCoordination / static_cast<double>(this->nodes.size());
 }
 
 /**
@@ -255,15 +286,17 @@ void Network::refreshPearsonsCoeff() {
     // r = <k>^2 / (<k><k^3> - <k^2>^2)  * sum_(j,k) ( jkP(j,k) - <k^2>^2)
     double avK = getAverageCoordination();                             // <k>
     double avKSquared = std::pow(avK, 2);                              // <k>^2
-    double avKSquaredSquared = std::pow(getAverageCoordination(2), 2); // <k^2>^2
-    double avKCubed = getAverageCoordination(3);                       // <k^3>
-    showNestedMap(assortativityDistribution);
-    std::cout << "avK: " << avK << " avKSquared: " << avKSquared << std::endl;
-    std::cout << "avKSquaredSquared: " << avKSquaredSquared << " avKCubed: " << avKCubed << std::endl;
-    double sum = 0.0;
-    std::for_each(assortativityDistribution.begin(), assortativityDistribution.end(), [&sum, avKSquaredSquared](const std::pair<int, std::map<int, double>> &pair) {
-        std::for_each(pair.second.begin(), pair.second.end(), [&sum, avKSquaredSquared, &pair](const std::pair<int, double> &innerPair) {
-            sum += innerPair.first * pair.first * innerPair.second - avKSquaredSquared;
+    double avKSquaredSquared = std::pow(getAverageCoordination(2), 2); //
+<k^2>^2 double avKCubed = getAverageCoordination(3);                       //
+<k^3> showNestedMap(assortativityDistribution); std::cout << "avK: " << avK << "
+avKSquared: " << avKSquared << std::endl; std::cout << "avKSquaredSquared: " <<
+avKSquaredSquared << " avKCubed: " << avKCubed << std::endl; double sum = 0.0;
+    std::for_each(assortativityDistribution.begin(),
+assortativityDistribution.end(), [&sum, avKSquaredSquared](const std::pair<int,
+std::map<int, double>> &pair) { std::for_each(pair.second.begin(),
+pair.second.end(), [&sum, avKSquaredSquared, &pair](const std::pair<int, double>
+&innerPair) { sum += innerPair.first * pair.first * innerPair.second -
+avKSquaredSquared;
         });
     });
 
@@ -273,50 +306,50 @@ void Network::refreshPearsonsCoeff() {
 */
 
 void Network::refreshPearsonsCoeff() {
-    double sum_x = 0;
-    double sum_y = 0;
-    double sum_xy = 0;
-    double sum_x2 = 0;
-    double sum_y2 = 0;
-    int n = 0;
 
-    for (const auto &outerPair : assortativityDistribution) {
-        for (const auto &innerPair : outerPair.second) {
-            double x = outerPair.first;
-            double y = innerPair.first;
-            double p = innerPair.second;
+  double sum_x = 0;
+  double sum_y = 0;
+  double sum_xy = 0;
+  double sum_x2 = 0;
+  double sum_y2 = 0;
+  int n = 0;
 
-            sum_x += x * p;
-            sum_y += y * p;
-            sum_xy += x * y * p;
-            sum_x2 += x * x * p;
-            sum_y2 += y * y * p;
-            n++;
-        }
+  for (const auto &[x, innerMap] : this->assortativityDistribution) {
+    for (const auto &[y, p] : innerMap) {
+      sum_x += static_cast<double>(x) * p;
+      sum_y += static_cast<double>(y) * p;
+      sum_xy += static_cast<double>(x) * static_cast<double>(y) * p;
+      sum_x2 += static_cast<double>(x) * static_cast<double>(x) * p;
+      sum_y2 += static_cast<double>(y) * static_cast<double>(y) * p;
+      n++;
     }
+  }
+  if (n == 0) {
+    this->pearsonsCoeff = 0.0;
+    return; // Avoid division by zero
+  }
+  double mean_x = sum_x / n;
+  double mean_y = sum_y / n;
+  double cov_xy = sum_xy / n - mean_x * mean_y;
+  double var_x = sum_x2 / n - mean_x * mean_x;
+  double var_y = sum_y2 / n - mean_y * mean_y;
 
-    double mean_x = sum_x / n;
-    double mean_y = sum_y / n;
-    double cov_xy = sum_xy / n - mean_x * mean_y;
-    double var_x = sum_x2 / n - mean_x * mean_x;
-    double var_y = sum_y2 / n - mean_y * mean_y;
-
-    pearsonsCoeff = cov_xy / (std::sqrt(var_x) * std::sqrt(var_y));
+  this->pearsonsCoeff = cov_xy / (std::sqrt(var_x) * std::sqrt(var_y));
 }
 
 /**
  * @brief Refresh the probabilities of each node size
  */
 void Network::refreshCoordinationDistribution() {
-    nodeSizes.clear();
-    std::for_each(nodes.begin(), nodes.end(), [this](const Node &node) {
-        try {
-            ++nodeSizes.at(node.netConnections.size());
-        } catch (std::out_of_range &e) {
-            nodeSizes[node.netConnections.size()] = 1;
-        }
-    });
-    normaliseMap(nodeSizes);
+  this->nodeSizes.clear();
+  std::ranges::for_each(this->nodes, [this](const Node &node) {
+    try {
+      ++this->nodeSizes.at(node.numConnections());
+    } catch (const std::out_of_range &) {
+      this->nodeSizes[node.numConnections()] = 1;
+    }
+  });
+  normaliseMap(this->nodeSizes);
 }
 
 /**
@@ -324,12 +357,12 @@ void Network::refreshCoordinationDistribution() {
  * @param infoFile File to write to
  */
 void Network::writeInfo(std::ofstream &infoFile) const {
-    infoFile << "Number of atoms: " << nodes.size() << "\n";
-    if (!dimensions.empty()) {
-        infoFile << "xhi: " << *dimensions.begin() << "\n";
-        infoFile << "yhi: " << *(--dimensions.end()) << "\n";
-    }
-    infoFile.close();
+  infoFile << "Number of atoms: " << this->nodes.size() << "\n";
+  if (!this->dimensions.empty()) {
+    infoFile << "xhi: " << this->dimensions[0] << "\n";
+    infoFile << "yhi: " << this->dimensions[1] << "\n";
+  }
+  infoFile.close();
 }
 
 /**
@@ -337,199 +370,426 @@ void Network::writeInfo(std::ofstream &infoFile) const {
  * @param crdFile File to write to
  */
 void Network::writeCoords(std::ofstream &crdFile) const {
-    crdFile << std::fixed << std::showpoint << std::setprecision(6);
-    std::for_each(nodes.begin(), nodes.end(), [&crdFile](const Node &node) {
-        std::for_each(node.crd.begin(), node.crd.end(), [&crdFile](const double &crd) {
-            crdFile << std::setw(20) << std::left << crd;
-        });
-        crdFile << std::endl;
+  crdFile << std::fixed << std::showpoint << std::setprecision(6);
+  std::ranges::for_each(this->nodes, [&crdFile](const Node &node) {
+    std::ranges::for_each(node.coord, [&crdFile](const double &coord) {
+      crdFile << std::format("{:<30}", coord);
     });
-    crdFile.close();
+    crdFile << std::endl;
+  });
+
+  crdFile.close();
 }
 
 /**
  * @brief Write connections to a file
- * @param cnxFile File to write to
- * @param cnxs Connections to write
+ * @param connectionsFile File to write to
+ * @param connections Connections to write
  */
-void Network::writeConnections(std::ofstream &cnxFile, const std::vector<std::vector<int>> &cnxs) const {
-    cnxFile << std::fixed << std::showpoint << std::setprecision(1);
-    for (int i = 0; i < nodes.size(); ++i) {
-        std::for_each(cnxs[i].begin(), cnxs[i].end(), [&cnxFile](const int &cnx) {
-            cnxFile << std::setw(20) << std::left << cnx;
+void Network::writeConnections(
+    std::ofstream &connectionsFile,
+    const std::vector<std::unordered_set<uint16_t>> &connections) const {
+  connectionsFile << std::fixed << std::showpoint << std::setprecision(1);
+  for (int i = 0; i < this->nodes.size(); ++i) {
+    std::ranges::for_each(
+        connections[i], [&connectionsFile](const int connection) {
+          connectionsFile << std::format("{:<20}", connection);
         });
-        cnxFile << std::endl;
-    }
-    cnxFile.close();
+    connectionsFile << std::endl;
+  }
+  connectionsFile.close();
 }
 
 /**
  * @brief Get the net connections of the network
  * @return 2D vector of net connections
  */
-std::vector<std::vector<int>> Network::getConnections() const {
-    std::vector<std::vector<int>> netConnections(nodes.size());
-    for (int i = 0; i < nodes.size(); ++i) {
-        netConnections[i] = nodes[i].netConnections;
-    }
-    return netConnections;
+std::vector<std::unordered_set<uint16_t>> Network::getConnections() const {
+  std::vector<std::unordered_set<uint16_t>> netConnections(this->nodes.size());
+  for (int i = 0; i < this->nodes.size(); ++i) {
+    netConnections[i] = this->nodes[i].netConnections;
+  }
+  return netConnections;
 }
 
 /**
  * @brief Get the dual connections of the network
  * @return 2D vector of dual connections
  */
-std::vector<std::vector<int>> Network::getDualConnections() const {
-    std::vector<std::vector<int>> dualConnections(nodes.size());
-    for (int i = 0; i < nodes.size(); ++i) {
-        dualConnections[i] = nodes[i].dualConnections;
-    }
-    return dualConnections;
+std::vector<std::unordered_set<uint16_t>> Network::getDualConnections() const {
+  std::vector<std::unordered_set<uint16_t>> dualConnections{};
+  std::ranges::for_each(this->nodes, [&dualConnections](const Node &node) {
+    dualConnections.push_back(node.dualConnections);
+  });
+  return dualConnections;
 }
 
 /**
  * @brief Write network to files
  */
 void Network::write() const {
-    std::ofstream infoFile(std::filesystem::path("./output_files") / (networkString + "_info.txt"), std::ios::in | std::ios::trunc);
-    writeInfo(infoFile);
-    std::ofstream crdFile(std::filesystem::path("./output_files") / (networkString + "_coords.txt"), std::ios::in | std::ios::trunc);
-    writeCoords(crdFile);
-    std::ofstream netFile(std::filesystem::path("./output_files") / (networkString + "_connections.txt"), std::ios::in | std::ios::trunc);
-    writeConnections(netFile, getConnections());
-    std::ofstream dualFile(std::filesystem::path("./output_files") / (networkString + "_dual_connections.txt"), std::ios::in | std::ios::trunc);
-    writeConnections(dualFile, getDualConnections());
+  std::ofstream infoFile(std::filesystem::path("./output_files") /
+                             (networkString + "_info.txt"),
+                         std::ios::in | std::ios::trunc);
+  writeInfo(infoFile);
+  std::ofstream crdFile(std::filesystem::path("./output_files") /
+                            (networkString + "_coords.txt"),
+                        std::ios::in | std::ios::trunc);
+  writeCoords(crdFile);
+  std::ofstream netFile(std::filesystem::path("./output_files") /
+                            (networkString + "_connections.txt"),
+                        std::ios::in | std::ios::trunc);
+  writeConnections(netFile, getConnections());
+  std::ofstream dualFile(std::filesystem::path("./output_files") /
+                             (networkString + "_dual_connections.txt"),
+                         std::ios::in | std::ios::trunc);
+  writeConnections(dualFile, getDualConnections());
 }
+
 /**
  * @brief Get the maximum coordination number for all nodes in the network
  * @return Maximum number of connections
  */
-int Network::getMaxConnections() const {
-    if (nodes.empty()) {
-        throw std::runtime_error("Cannot get max connections of " + networkString + ": no nodes");
-    }
-    auto maxNode = std::max_element(nodes.begin(), nodes.end(), [](const Node &a, const Node &b) {
-        return a.netConnections.size() < b.netConnections.size();
-    });
-    return maxNode->netConnections.size();
+size_t Network::getMaxConnections() const {
+  if (nodes.empty()) {
+    throw std::runtime_error("Cannot get max connections of " + networkString +
+                             ": no nodes");
+  }
+  auto maxNode = std::ranges::max_element(
+      this->nodes, [](const Node &node1, const Node &node2) {
+        return node1.numConnections() < node2.numConnections();
+      });
+  return maxNode->numConnections();
 }
 
 /**
- * @brief Get the maximum coordination number for all nodes in the network, excluding those in excludeNodes
+ * @brief Get the maximum coordination number for all nodes in the network,
+ * excluding those in excludeNodes
  * @param excludeNodes The IDs of all the nodes to exclude
  * @return Maximum number of connections
  */
-int Network::getMaxConnections(const std::unordered_set<int> &excludeNodes) const {
-    int maxConnections = 0;
-    for (const auto &node : nodes) {
-        if (excludeNodes.find(node.id) != excludeNodes.end())
-            continue;
-        if (node.netConnections.size() > maxConnections)
-            maxConnections = node.netConnections.size();
+size_t Network::getMaxConnections(
+    const std::unordered_set<uint16_t> &excludeNodes) const {
+  size_t maxConnections = 0;
+  for (const auto &node : this->nodes) {
+    if (excludeNodes.contains(node.id)) {
+      continue;
     }
-    return maxConnections;
+    if (node.numConnections() > maxConnections) {
+      maxConnections = node.numConnections();
+    }
+  }
+  return maxConnections;
 }
 
 /**
  * @brief Get the minimum number of connections of all nodes in the network
  * @return Minimum number of connections
  */
-int Network::getMinConnections() const {
-    auto minNode = std::min_element(nodes.begin(), nodes.end(), [](const Node &a, const Node &b) {
-        return a.netConnections.size() < b.netConnections.size();
-    });
-    return minNode->netConnections.size();
+size_t Network::getMinConnections() const {
+  auto minNode = std::ranges::min_element(
+      this->nodes, [](const Node &node1, const Node &node2) {
+        return node1.netConnections.size() < node2.netConnections.size();
+      });
+  return minNode->numConnections();
 }
 
 /**
- * @brief Get the minimum number of connections of all nodes in the network, excluding those in excludeNodes
- * @param fixedNodes The IDs of all the fixed nodes
+ * @brief Get the minimum number of connections of all nodes in the network,
+ * excluding those in excludeNodes
+ * @param excludeNodes Node IDs to ignore
  * @return Minimum number of connections
  */
-int Network::getMinConnections(const std::unordered_set<int> &excludeNodes) const {
-    int minConnections = std::numeric_limits<int>::max();
-    for (const auto &node : nodes) {
-        if (excludeNodes.find(node.id) != excludeNodes.end())
-            continue;
-        if (node.netConnections.size() < minConnections)
-            minConnections = node.netConnections.size();
-    }
-    return minConnections;
+size_t Network::getMinConnections(
+    const std::unordered_set<uint16_t> &excludeNodes) const {
+  size_t minConnections = std::numeric_limits<int>::max();
+  for (const auto &node : this->nodes) {
+    if (excludeNodes.contains(node.id))
+      continue;
+    if (node.numConnections() < minConnections)
+      minConnections = node.numConnections();
+  }
+  return minConnections;
 }
 
 /**
- * @brief Get the maximum dual coordination number for all nodes in the network
+ * @brief Get the maximum dual coordination number for all nodes in the
+ * network
  * @return Maximum number of connections
  */
-int Network::getMaxDualConnections() const {
-    auto maxNode = std::max_element(nodes.begin(), nodes.end(), [](const Node &a, const Node &b) {
-        return a.dualConnections.size() < b.dualConnections.size();
-    });
-    return maxNode->dualConnections.size();
+size_t Network::getMaxDualConnections() const {
+  auto maxNode = std::ranges::max_element(
+      this->nodes, [](const Node &node1, const Node &node2) {
+        return node1.numDualConnections() < node2.numDualConnections();
+      });
+  return maxNode->numDualConnections();
 }
 
 /**
- * @brief Get the maximum dual coordination number for all nodes in the network, excluding those in excludeNodes
+ * @brief Get the maximum dual coordination number for all nodes in the network,
+ * excluding those in excludeNodes
  * @param excludeNodes The IDs of all the nodes to exclude
  * @return Maximum number of connections
  */
-int Network::getMinDualConnections(const std::unordered_set<int> &excludeNodes) const {
-    int minConnections = std::numeric_limits<int>::max();
-    for (const auto &node : nodes) {
-        if (excludeNodes.find(node.id) != excludeNodes.end())
-            continue;
-        if (node.dualConnections.size() < minConnections)
-            minConnections = node.dualConnections.size();
+size_t Network::getMinDualConnections(
+    const std::unordered_set<uint16_t> &excludeNodes) const {
+  size_t minConnections = std::numeric_limits<int>::max();
+  for (const auto &node : this->nodes) {
+    if (excludeNodes.contains(node.id)) {
+      continue;
     }
-    return minConnections;
+    if (node.numDualConnections() < minConnections) {
+      minConnections = node.numDualConnections();
+    }
+  }
+  return minConnections;
 }
 
 /**
- * @brief Get the minimum dual coordination number for all nodes in the network
+ * @brief Get the minimum dual coordination number for all nodes in the
+ * network
  * @return Minimum number of connections
  */
-int Network::getMinDualConnections() const {
-    auto minNode = std::min_element(nodes.begin(), nodes.end(), [](const Node &a, const Node &b) {
-        return a.dualConnections.size() < b.dualConnections.size();
-    });
-    return minNode->dualConnections.size();
+size_t Network::getMinDualConnections() const {
+  // min_element returns an iterator, so we have to use -> operator
+  return std::ranges::min_element(this->nodes,
+                                  [](const Node &node1, const Node &node2) {
+                                    return node1.numDualConnections() <
+                                           node2.numDualConnections();
+                                  })
+      ->numDualConnections();
 }
 
-/**
- * @brief Get the coordinates of the network in pairs
- * @return 1D vector of node coordinates
- */
-std::vector<double> Network::getCoords() {
-    std::vector<double> returnCoords;
-    returnCoords.reserve(nodes.size() * 2);
-    for (int i = 0; i < nodes.size(); i++) {
-        returnCoords[i * 2] = nodes[i].crd[0];
-        returnCoords[i * 2 + 1] = nodes[i].crd[1];
-    }
-    return returnCoords;
-}
-
-double Network::getAboavWeaire() const {
-    return 0.0;
-}
+double Network::getAboavWeaire() const { return 0.0; }
 
 void Network::refreshStatistics() {
-    refreshCoordinationDistribution();
-    refreshAssortativityDistribution();
-    refreshPearsonsCoeff();
-    refreshEntropy();
+  refreshCoordinationDistribution();
+  refreshAssortativityDistribution();
+  refreshPearsonsCoeff();
+  refreshEntropy();
 }
 
 /**
  * @brief Display the network to the logger for debugging purposes
  * @param logger Logger to log to
-*/
-void Network::display(const LoggerPtr &logger) const{
-    logger->info("Network type: {}", networkString);
-    logger->info("Number of nodes: {}", numNodes);
-    logger->info("Dimensions: [{}, {}]", dimensions[0], dimensions[1]);
-    logger->info("Nodes:");
-    std::for_each(nodes.begin(), nodes.end(), [&logger](const Node &node) {
-        logger->info(node.toString());
-    });
+ */
+void Network::display(const LoggerPtr &logger) const {
+  logger->info("Network type: {}", this->networkString);
+  logger->info("Number of nodes: {}", this->numNodes);
+  logger->info("Dimensions: [{}, {}]", this->dimensions[0],
+               this->dimensions[1]);
+  logger->info("Nodes:");
+  std::ranges::for_each(this->nodes, [&logger](const Node &node) {
+    logger->info(node.toString());
+  });
+}
+
+/**
+ * @brief Get a random node from the network
+ * @return Random node
+ */
+Node &Network::getRandomNode() {
+  return *RandomNumberGenerator::getInstance().getRandomElement(
+      this->nodes.begin(), this->nodes.end());
+}
+/**
+ * @brief Get a random connected node of a given node
+ * @param node Node to get a random connected node of
+ * @return Random connected node
+ */
+Node &Network::getRandomNodeConnection(const Node &node) {
+  return this->nodes[node.getRandomNetConnectionID()];
+}
+
+/**
+ * @brief Check if all bonds in the network are within a given maximum length
+ * @param maxBondLength Maximum bond length
+ * @return true if all bonds are within the maximum bond length, false
+ * otherwise
+ * @note All bonds are checked twice, this could be optimised in future
+ */
+bool Network::checkBondLengths(const double &maxBondLength) const {
+  return std::ranges::all_of(
+      this->nodes, [this, maxBondLength](const Node &node) {
+        return this->checkBondLengths(node.id, maxBondLength);
+      });
+}
+
+/**
+ * @brief Check if the given set of nodeIDs bonds in the network are within
+ * a given maximum length
+ * @param maxBondLength Maximum bond length
+ * @return true if all bonds are within the maximum bond length, false
+ * otherwise
+ */
+bool Network::checkBondLengths(const uint16_t checkNodeID,
+                               const double maxBondLength) const {
+  const Node &checkNode = this->nodes[checkNodeID];
+  return std::ranges::all_of(
+      checkNode.netConnections,
+      [this, maxBondLength, &checkNode](const uint16_t connectionID) {
+        return arrayAbs(pbcArray(checkNode.coord,
+                                 this->nodes[connectionID].coord,
+                                 this->dimensions)) <= maxBondLength;
+      });
+}
+
+/**
+ * @brief Check if a given nodeID's bonds in the network are within a given
+ * maximum length
+ * @param maxBondLength Maximum bond length
+ * @return true if all bonds are within the maximum bond length, false
+ * otherwise
+ */
+bool Network::checkBondLengths(const std::unordered_set<uint16_t> &checkNodeIDs,
+                               const double maxBondLength) const {
+  return std::ranges::all_of(
+      checkNodeIDs, [this, maxBondLength](const uint16_t checkNodeID) {
+        return this->checkBondLengths(checkNodeID, maxBondLength);
+      });
+}
+
+std::array<double, 2> Network::getAverageCoordsPBC(
+    const std::unordered_set<uint16_t> &nodeIDs) const {
+  std::vector<std::array<double, 2>> pbcCoords(nodeIDs.size());
+  // Get a random coordinate to use as a reference
+  std::array<double, 2> relativeCoord = this->nodes[*nodeIDs.begin()].coord;
+  std::ranges::transform(nodeIDs, pbcCoords.begin(),
+                         [this, &relativeCoord](const uint16_t nodeID) {
+                           return pbcArray(relativeCoord,
+                                           this->nodes[nodeID].coord,
+                                           this->dimensions);
+                         });
+  const std::array<double, 2> averagePBC = arrayAverage(pbcCoords);
+  return wrapArray(arrayAdd(relativeCoord, averagePBC), this->dimensions);
+}
+
+/**
+ * @brief Calculates the new coordinates of a pair of atoms if they were
+ * rotated by 90 degrees in the given direction
+ * @param bond The bond to rotate
+ * @param direct Direction to rotate the bond
+ * @return Pair of vectors containing the new coordinates of the atoms
+ */
+std::array<std::array<double, 2>, 2>
+Network::getRotatedBond(const std::array<uint16_t, 2> &bond,
+                        const Direction direction) const {
+  // Calculate the center point
+  const std::array<double, 2> centerCoord =
+      this->getAverageCoordsPBC({bond[0], bond[1]});
+
+  // Get relative coords to center
+  std::array<double, 2> relativeCoord1 =
+      pbcArray(centerCoord, this->nodes[bond[0]].coord, this->dimensions);
+  std::array<double, 2> relativeCoord2 =
+      pbcArray(centerCoord, this->nodes[bond[1]].coord, this->dimensions);
+
+  // Calculate the translation vectors
+  std::array<double, 2> translationVector1;
+  std::array<double, 2> translationVector2;
+  if (direction == Direction::ANTICLOCKWISE) {
+    translationVector1 = {-relativeCoord1[1], relativeCoord1[0]};
+    translationVector2 = {-relativeCoord2[1], relativeCoord2[0]};
+  } else {
+    translationVector1 = {relativeCoord1[1], -relativeCoord1[0]};
+    translationVector2 = {relativeCoord2[1], -relativeCoord2[0]};
+  }
+
+  // Add to the center coords and wrap to dimensions
+  return {
+      {wrapArray(arrayAdd(centerCoord, translationVector1), this->dimensions),
+       wrapArray(arrayAdd(centerCoord, translationVector2), this->dimensions)}};
+}
+
+std::vector<std::array<double, 2>> Network::getCoords() const {
+  std::vector<std::array<double, 2>> coords(this->nodes.size());
+  std::ranges::transform(this->nodes, coords.begin(),
+                         [](const Node &node) { return node.coord; });
+  return coords;
+}
+
+bool Network::checkConnectionsReciprocated(const LoggerPtr logger) const {
+  bool consistent = true;
+  std::ranges::for_each(this->nodes, [this, &consistent,
+                                      &logger](const Node &node) {
+    std::ranges::for_each(
+        node.netConnections,
+        [this, &node, &consistent, &logger](const uint16_t connectionID) {
+          if (!this->nodes[connectionID].netConnections.contains(node.id)) {
+            logger->error("Node {} has connection to node {} but node {} does "
+                          "not have connection to node {}",
+                          node.id, connectionID, connectionID, node.id);
+            consistent = false;
+          }
+        });
+  });
+  return consistent;
+}
+
+bool Network::checkConnectionsReciprocated(const Network &pairedNetwork,
+                                           const LoggerPtr logger) const {
+  bool consistent = true;
+  std::ranges::for_each(this->nodes, [&consistent, &logger,
+                                      &pairedNetwork](const Node &node) {
+    std::ranges::for_each(
+        node.dualConnections, [&node, &consistent, &logger, &pairedNetwork](
+                                  const uint16_t dualConnectionID) {
+          if (!pairedNetwork.nodes[dualConnectionID].dualConnections.contains(
+                  node.id)) {
+            logger->error(
+                "Node {} has dual connection to node {} but node {} does "
+                "not have dual connection to node {}",
+                node.id, dualConnectionID, dualConnectionID, node.id);
+            consistent = false;
+          }
+        });
+  });
+  return consistent;
+}
+
+bool Network::checkDegreeLimits(const size_t min, const size_t max,
+                                const LoggerPtr logger) const {
+  bool consistent = true;
+  std::ranges::for_each(
+      this->nodes, [&consistent, min, max, &logger](const Node &node) {
+        if (node.numConnections() < min || node.numConnections() > max) {
+          logger->error(
+              "Node {} has {} connections, which is outside the range [{}, {}]",
+              node.id, node.numConnections(), min, max);
+          consistent = false;
+        }
+      });
+  return consistent;
+};
+
+bool Network::checkSelectedAngles(const std::unordered_set<uint16_t> &nodeIDs,
+                                  const double minAngle, const double maxAngle,
+                                  const LoggerPtr logger) const {
+  for (const uint16_t nodeID : nodeIDs) {
+    const Node &node = this->nodes[nodeID];
+    if (checkAnglesPBC(node.coord, this->getCoordsByIDs(node.netConnections),
+                       this->dimensions, minAngle, maxAngle)) {
+      continue;
+    }
+    logger->debug("Node {} has angles outside the range "
+                  "[{}, {}]",
+                  node.id, minAngle, maxAngle);
+    return false;
+  }
+  return true;
+}
+
+bool Network::checkAllAngles(const double minAngle, const double maxAngle,
+                             const LoggerPtr logger) const {
+  for (const Node &node : this->nodes) {
+    if (checkAnglesPBC(node.coord, this->getCoordsByIDs(node.netConnections),
+                       this->dimensions, minAngle, maxAngle)) {
+      continue;
+    }
+    logger->debug("Node {} has angles outside the range "
+                  "[{}, {}]",
+                  node.id, minAngle, maxAngle);
+    return false;
+  }
+  return true;
 }

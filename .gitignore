@@ -1,18 +1,5 @@
-/build/
-/run/output_files/
-/run/movies/
-/run/input_files_pore/
-/run/log.lammps
-/run/lammps_netmc.log
-/run/Si.log
-/run/bond_switch_simulator.exe
-/run/bond.dump
-/run/*.mpg
-/run/time_stats.txt
-/run/images/*
-/run/gmon.out
-/run/input_files/bss_network/
-/run/input_files/lammps_files/lammps_network.txt
+build/
+run/
 
 
 python_scripts/chech_marsh.py

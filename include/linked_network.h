@@ -1,56 +1,48 @@
-// Linked reciprocal networks - network and dual pair
-
 #ifndef NL_LINKED_NETWORK_H
 #define NL_LINKED_NETWORK_H
+
 #include "input_data.h"
-#include "lammps_object.h"
+#include "lammps_manager.h"
 #include "metropolis.h"
 #include "network.h"
-#include <algorithm>
-#include <chrono>
-#include <ctime>
-#include <fstream>
-#include <iomanip>
-#include <iostream>
+#include "switch_move.h"
+#include "types.h"
+#include <array>
+#include <cstdint>
+#include <optional>
 #include <random>
 #include <spdlog/spdlog.h>
-#include <sstream>
-#include <string_view>
-#include <unistd.h>
-
-using LoggerPtr = std::shared_ptr<spdlog::logger>;
-
-enum class Direction { CLOCKWISE, ANTICLOCKWISE };
+#include <tuple>
+#include <unordered_map>
+#include <unordered_set>
+#include <vector>
 
 struct LinkedNetwork {
   // Data members
-
   Network networkB; // Ring network
   int minRingSize;  // Minimum coordination number of ring network
   int maxRingSize;  // Maximum coordination number of ring network
 
   Network networkA; // Base network
 
-  std::vector<double> dimensions;   // Periodic boundary of network, xlo = ylo =
+  std::array<double, 2> dimensions; // Periodic boundary of network, xlo = ylo =
                                     // 0, so dimensions = [xhi, yhi]
-  std::vector<double> centreCoords; // Centre of network = [xhi / 2, yhi / 2]
+  std::array<double, 2> centreCoords; // Centre of network = [xhi / 2, yhi / 2]
 
-  LammpsObject lammpsNetwork; // LAMMPS object for network
-  double energy;              // The current energy of the system
-
-  std::vector<double> currentCoords;
+  LAMMPSManager lammpsManager; // LAMMPSManager for network
+  double energy;               // The current energy of the system
 
   bool isOpenMPIEnabled;          // Whether to use MPI
   SelectionType selectionType;    // Either 'weighted' or 'random'
-  std::mt19937 randomNumGen;      // mersenne twister random number generator
   Metropolis metropolisCondition; // monte carlo metropolis condition
   double weightedDecay;           // decay factor for weighted monte carlo
   double maximumBondLength;       // Maximum bond length
   double maximumAngle;            // Maximum angle between atoms
   bool writeMovie;                // Write movie file or not
 
-  std::unordered_map<int, int> fixedRings; // IDs of the fixed rings
-  std::unordered_set<int> fixedNodes;      // IDs of the fixed nodes
+  // Map of Fixed Ring IDs to their size
+  std::unordered_map<uint16_t, size_t> fixedRings;
+  std::unordered_set<uint16_t> fixedNodes; // IDs of the fixed nodes
 
   int numSwitches = 0;            // Number of switches performed
   int numAcceptedSwitches = 0;    // Number of switches accepted
@@ -62,8 +54,10 @@ struct LinkedNetwork {
   std::vector<double> weights;
 
   // Constructors
-  LinkedNetwork();
-  LinkedNetwork(const int &numRing, const LoggerPtr &logger);
+  /**
+   * @brief Default constructor
+   */
+  LinkedNetwork() = default;
   LinkedNetwork(const InputData &inputData, const LoggerPtr &logger);
 
   void findFixedRings(const std::string &flePath);
@@ -71,68 +65,57 @@ struct LinkedNetwork {
 
   void rescale(double scaleFactor);
   void updateWeights();
-  std::tuple<int, int, int, int> pickRandomConnection();
-  int assignValues(int randNodeCoordination,
-                   int randNodeConnectionCoordination) const;
 
-  int findCommonConnection(const int &baseNode, const int &ringNode,
-                           const int &excludeNode) const;
-  int findCommonRing(const int &baseNode1, const int &baseNode2,
-                     const int &excludeNode) const;
+  std::array<std::array<uint16_t, 2>, 2> pickRandomConnection();
 
-  void monteCarloSwitchMoveLAMMPS(const double &temperature);
+  uint16_t findCommonConnection(const uint16_t baseNode,
+                                const uint16_t ringNode,
+                                const uint16_t excludeNode) const;
+  uint16_t findCommonRing(const uint16_t baseNode1, const uint16_t baseNode2,
+                          const uint16_t excludeNode) const;
+
+  void performBondSwitch(const double temperature);
+  void acceptMove(const std::vector<std::array<double, 2>> &newCoords,
+                  const double initialEnergy, const double finalEnergy);
   void rejectMove(const std::vector<Node> &initialInvolvedNodesA,
                   const std::vector<Node> &initialInvolvedNodesB,
-                  const std::vector<int> &bondBreaks,
-                  const std::vector<int> &bondMakes,
-                  const std::vector<int> &angleBreaks,
-                  const std::vector<int> &angleMakes);
+                  const SwitchMove &switchMove);
 
   bool checkConsistency();
 
   void write() const;
 
-  void pushCoords(const std::vector<double> &coords);
-  void showCoords(const std::vector<double> &coords) const;
+  void pushCoords(const std::vector<std::array<double, 2>> &coords);
+  void showCoords(const std::vector<std::array<double, 2>> &coords) const;
   void wrapCoords(std::vector<double> &coords) const;
 
-  bool genSwitchOperations(int baseNode1, int baseNode2, int ringNode1,
-                           int ringNode2, std::vector<int> &bondBreaks,
-                           std::vector<int> &bondMakes,
-                           std::vector<int> &angleBreaks,
-                           std::vector<int> &angleMakes,
-                           std::vector<int> &ringBondBreakMake,
-                           std::unordered_set<int> &convexCheckIDs);
+  void
+  applyMove(const std::array<std::array<uint16_t, 2>, 2> &bondBreaks,
+            const std::array<std::array<uint16_t, 2>, 2> &ringBondBreakMake);
+  void revertMove(const std::vector<Node> &initialInvolvedNodesA,
+                  const std::vector<Node> &initialInvolvedNodesB);
 
-  void switchNetMCGraphene(const std::vector<int> &bondBreaks,
-                           const std::vector<int> &ringBondBreakMake);
-  void revertNetMCGraphene(const std::vector<Node> &initialInvolvedNodesA,
-                           const std::vector<Node> &initialInvolvedNodesB);
+  Direction getRingsDirection(const std::array<uint16_t, 4> &ringNodeIDs) const;
 
-  std::tuple<std::vector<double>, std::vector<double>>
-  rotateBond(const int &atomID1, const int &atomID2,
-             const Direction &direct) const;
-  Direction getRingsDirection(const std::vector<int> &ringNodeIDs) const;
+  bool checkBondLengths(const uint16_t nodeID,
+                        const std::vector<std::array<double, 2>> &coords) const;
+  bool checkBondLengths(const std::unordered_set<uint16_t> &nodeIDs,
+                        const std::vector<std::array<double, 2>> &coords) const;
 
-  bool checkClockwiseNeighbours(const int &nodeID) const;
-  bool checkClockwiseNeighbours(const int &nodeID,
-                                const std::vector<double> &coords) const;
-  bool checkAllClockwiseNeighbours() const;
-  void arrangeNeighboursClockwise(const int &nodeID,
-                                  const std::vector<double> &coords);
-  void arrangeNeighboursClockwise(const std::unordered_set<int> &nodeIDs,
-                                  const std::vector<double> &coords);
-
-  bool checkAnglesWithinRange(const std::vector<double> &coords);
-  bool checkAnglesWithinRange(const std::unordered_set<int> &nodeIDs,
-                              const std::vector<double> &coords);
-  bool checkBondLengths(const int &nodeID,
-                        const std::vector<double> &coords) const;
-  bool checkBondLengths(const std::unordered_set<int> &nodeIDs,
-                        const std::vector<double> &coords) const;
-
-  std::map<int, double> getRingSizes() const;
   std::vector<double> getRingAreas() const;
+
+  bool checkConnectivityLimits(const uint16_t ringNode1,
+                               const uint16_t ringNode2,
+                               const uint16_t ringNode3,
+                               const uint16_t ringNode4) const;
+
+  std::optional<SwitchMove> getSwitchMove();
+  SwitchMove genSwitchMove(const uint16_t baseNode1, const uint16_t baseNode2,
+                           const uint16_t ringNode1,
+                           const uint16_t ringNode2) const;
+  bool
+  checkAngles(const std::unordered_set<uint16_t> &nodeIDs,
+              const std::vector<std::array<double, 2>> &potentialCoords) const;
 };
 
 #endif // NL_LINKED_NETWORK_H

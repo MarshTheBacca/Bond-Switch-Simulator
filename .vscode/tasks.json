@@ -19,7 +19,10 @@
             "command": "rm",
             "args": [
                 "-rf",
-                "${workspaceFolder}/build"
+                "${workspaceFolder}/build",
+                "&&",
+                "mkdir",
+                "${workspaceFolder}/build",
             ],
             "problemMatcher": []
         },
@@ -32,12 +35,13 @@
                 "Ninja",
                 "-DCMAKE_CXX_COMPILER=clang++",
                 "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
+                "-DCMAKE_RUNTIME_OUTPUT_DIRECTORY=${workspaceFolder}/run",
                 "-S",
                 "${workspaceFolder}",
                 "-B",
                 "${workspaceFolder}/build"
             ],
-            "problemMatcher": [],
+            "problemMatcher": []
         },
         {
             "label": "build",
@@ -52,17 +56,30 @@
         {
             "label": "run",
             "type": "shell",
-            "command": "${workspaceFolder}/build/bin/bond_switch_simulator",
+            "command": "./bond_switch_simulator",
+            "options": {
+                "cwd": "${workspaceFolder}/run"
+            },
             "problemMatcher": []
         },
         {
-            "label": "clean-configure-build-run",
+            "label": "test",
+            "type": "shell",
+            "command": "./run_tests",
+            "options": {
+                "cwd": "${workspaceFolder}/run"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "clean-configure-build-test-run",
             "type": "shell",
             "dependsOrder": "sequence",
             "dependsOn": [
                 "clean",
                 "configure",
                 "build",
+                "test",
                 "run"
             ],
             "problemMatcher": [],
