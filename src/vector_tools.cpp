@@ -5,10 +5,10 @@
  * @brief Normalises the values of a map in place
  * @tparam T The type of the map
  */
-void normaliseMap(std::map<int, double> &map) {
+void normaliseMap(std::map<size_t, double> &map) {
   double sum =
       std::accumulate(map.begin(), map.end(), 0.0,
-                      [](const double &a, const std::pair<int, double> &b) {
+                      [](const double &a, const std::pair<size_t, double> &b) {
                         return a + b.second;
                       });
   for (auto &[key, value] : map) {
@@ -62,11 +62,11 @@ double getClockwiseAngleBetweenVectors(const std::array<double, 2> &vector1,
  * @return Angle of the vector between the two nodes relative to the x axis in
  * radians
  */
-double getClockwiseAngle(const std::array<double, 2> &coord1,
-                         const std::array<double, 2> &coord2,
-                         const std::array<double, 2> &dimensions) {
-  std::array<double, 2> periodicVector = pbcArray(coord1, coord2, dimensions);
-  double angle = std::atan2(periodicVector[1], periodicVector[0]);
+double getClockwiseAnglePBC(const std::array<double, 2> &coord1,
+                            const std::array<double, 2> &coord2,
+                            const std::array<double, 2> &dimensions) {
+  std::array<double, 2> relativeCoord = pbcArray(coord1, coord2, dimensions);
+  double angle = std::atan2(relativeCoord[1], relativeCoord[0]);
   if (angle < 0) {
     angle += 2 * M_PI;
   }

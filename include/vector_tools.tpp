@@ -341,7 +341,8 @@ std::array<T, S> wrapArray(const std::array<T, S> &array,
  */
 template <typename T, size_t S>
   requires Subtractable<T> && Addable<T> && Divisible<T>
-void wrapArray(std::array<T, S> &array, const std::array<T, S> &dimensions) {
+void wrapArrayInPlace(std::array<T, S> &array,
+                      const std::array<T, S> &dimensions) {
   std::transform(array.begin(), array.end(), dimensions.begin(), array.begin(),
                  [](T value, const T dim) {
                    if (dim == 0) {
@@ -372,4 +373,36 @@ std::array<T, S> arrayAverage(const std::vector<std::array<T, S>> &arrays) {
   });
   // Divide by the number of arrays
   return divideArray(averageArray, static_cast<T>(arrays.size()));
+}
+
+template <typename T>
+  requires Addable<T> && Subtractable<T> && Multipliable<T>
+bool checkAnglesPBC(const std::array<T, 2> &coord,
+                    const std::vector<std::array<T, 2>> &connectionCoords,
+                    const std::array<T, 2> &dimensions, const double minAngle,
+                    const double maxAngle) {
+  if (connectionCoords.size() < 2) {
+    throw std::runtime_error(
+        std::format("Cannot check angles with only {} connections",
+                    connectionCoords.size()));
+  }
+  std::vector<T> clockwiseAngles(connectionCoords.size());
+  std::transform(
+      connectionCoords.begin(), connectionCoords.end(), clockwiseAngles.begin(),
+      [&coord, &dimensions](const std::array<T, 2> &connectionCoord) {
+        return getClockwiseAnglePBC(coord, connectionCoord, dimensions);
+      });
+  // Sort angles by smallest to largest
+  std::sort(clockwiseAngles.begin(), clockwiseAngles.end());
+  // Subtract angle i -1 from angle i
+  std::vector<T> angles(clockwiseAngles.size());
+  std::transform(clockwiseAngles.begin() + 1, clockwiseAngles.end(),
+                 clockwiseAngles.begin(), angles.begin(), std::minus<T>());
+  // Angle n is 2 pi - angle n + angle 1
+  angles.back() = 2 * M_PI - clockwiseAngles.back() + clockwiseAngles.front();
+  // Check if all angles are within the range
+  return std::all_of(angles.begin(), angles.end(),
+                     [minAngle, maxAngle](const T &angle) {
+                       return angle >= minAngle && angle <= maxAngle;
+                     });
 }

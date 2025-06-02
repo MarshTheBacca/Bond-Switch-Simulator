@@ -12,8 +12,20 @@
 #include <unordered_set>
 #include <vector>
 
-// template functions
+// Regular functions
+void normaliseMap(std::map<size_t, double> &map);
+void showNestedMap(const std::map<int, std::map<int, double>> &map);
+double getClockwiseAngleBetweenVectors(const std::array<double, 2> &vector1,
+                                       const std::array<double, 2> &vector2);
+double getClockwiseAnglePBC(const std::array<double, 2> &coord1,
+                            const std::array<double, 2> &coord2,
+                            const std::array<double, 2> &dimensions);
+double getClockwiseAngle(const std::array<double, 2> &point);
 
+void sortCoordinatesClockwise(std::vector<std::array<double, 2>> &coords);
+double calculatePolygonArea(std::vector<std::array<double, 2>> &vertices);
+
+// template functions
 template <size_t S>
 std::array<double, S> pbcArray(const std::array<double, S> &vector1,
                                const std::array<double, S> &vector2,
@@ -90,24 +102,19 @@ std::array<T, S> wrapArray(const std::array<T, S> &array,
 
 template <typename T, size_t S>
   requires Subtractable<T> && Addable<T> && Divisible<T>
-void wrapArray(std::array<T, S> &array, const std::array<T, S> &dimensions);
+void wrapArrayInPlace(std::array<T, S> &array,
+                      const std::array<T, S> &dimensions);
 
 template <typename T, size_t S>
   requires Addable<T> && Divisible<T>
 std::array<T, S> arrayAverage(const std::vector<std::array<T, S>> &arrays);
 
-// Regular functions
-void normaliseMap(std::map<int, double> &map);
-void showNestedMap(const std::map<int, std::map<int, double>> &map);
-double getClockwiseAngleBetweenVectors(const std::array<double, 2> &vector1,
-                                       const std::array<double, 2> &vector2);
-double getClockwiseAngle(const std::array<double, 2> &coord1,
-                         const std::array<double, 2> &coord2,
-                         const std::array<double, 2> &dimensions);
-double getClockwiseAngle(const std::array<double, 2> &point);
-
-void sortCoordinatesClockwise(std::vector<std::array<double, 2>> &coords);
-double calculatePolygonArea(std::vector<std::array<double, 2>> &vertices);
+template <typename T>
+  requires Addable<T>
+bool checkAnglesPBC(const std::array<T, 2> &coord,
+                    const std::vector<std::array<T, 2>> &connectionCoords,
+                    const std::array<T, 2> &dimensions, const double minAngle,
+                    const double maxAngle);
 
 #include "vector_tools.tpp"
 #endif // VEC_TOOLS_H
