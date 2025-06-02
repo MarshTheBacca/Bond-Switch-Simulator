@@ -72,7 +72,7 @@
             "problemMatcher": []
         },
         {
-            "label": "clean-configure-build--test-run",
+            "label": "clean-configure-build-test-run",
             "type": "shell",
             "dependsOrder": "sequence",
             "dependsOn": [

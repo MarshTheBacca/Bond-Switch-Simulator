@@ -18,6 +18,7 @@ FetchContent_MakeAvailable(googletest)
 # Add the test executable
 add_executable(run_tests
     test_vector_tools.cpp # Add your test files here
+    ${CMAKE_SOURCE_DIR}/src/vector_tools.cpp
 )
 
 # Add the include directory to the include paths
