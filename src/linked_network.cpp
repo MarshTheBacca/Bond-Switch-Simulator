@@ -172,11 +172,7 @@ void LinkedNetwork::performBondSwitch(const double temperature) {
       switchMove.ringBondBreakMake[0][1], switchMove.ringBondBreakMake[1][1],
       switchMove.ringBondBreakMake[0][0], switchMove.ringBondBreakMake[1][0]};
   std::tie(rotatedCoord1, rotatedCoord2) = this->networkA.getRotatedBond(
-      switchMove.selectedBaseBond, getRingsDirection(orderedRingNodes),
-      this->logger);
-  logger->debug("Rotated coords: ({}, {}) ({}, {})", rotatedCoord1[0],
-                rotatedCoord1[1], rotatedCoord2[0], rotatedCoord2[1]);
-
+      switchMove.selectedBaseBond, getRingsDirection(orderedRingNodes));
   logger->debug("Switching LAMMPS Network...");
   lammpsManager.performSwitch(switchMove, rotatedCoord1, rotatedCoord2);
 
@@ -193,6 +189,12 @@ void LinkedNetwork::performBondSwitch(const double temperature) {
     rejectMove(initialInvolvedNodesA, initialInvolvedNodesB, switchMove);
     return;
   }
+  if (!this->checkAngles(switchMove.involvedBaseNodes, potentialCoords)) {
+    logger->debug("Rejected move: angles are not within range");
+    failedAngleChecks++;
+    rejectMove(initialInvolvedNodesA, initialInvolvedNodesB, switchMove);
+    return;
+  }
   double finalEnergy = lammpsManager.getPotentialEnergy();
   if (std::isnan(finalEnergy)) {
     throw std::runtime_error("Final energy is NaN");
@@ -206,6 +208,7 @@ void LinkedNetwork::performBondSwitch(const double temperature) {
     rejectMove(initialInvolvedNodesA, initialInvolvedNodesB, switchMove);
     return;
   }
+
   this->acceptMove(potentialCoords, initialEnergy, finalEnergy);
 }
 
@@ -625,7 +628,7 @@ uint16_t LinkedNetwork::findCommonConnection(const uint16_t baseNode,
       intersectSets(networkA.nodes[baseNode].netConnections,
                     networkB.nodes[ringNode].dualConnections);
   commonConnections.erase(excludeNode);
-  if (commonConnections.size() != 1) {
+  if (commonConnections.empty()) {
     throw std::runtime_error(
         std::format("Could not find common base node for base node {} and ring "
                     "node {} excluding node {}",
@@ -650,11 +653,16 @@ uint16_t LinkedNetwork::findCommonRing(const uint16_t baseNode1,
       intersectSets(networkA.nodes[baseNode1].dualConnections,
                     networkA.nodes[baseNode2].dualConnections);
   commonRings.erase(excludeNode);
-  if (commonRings.size() != 1) {
-    throw std::runtime_error(
-        std::format("Could not find common ring node for base node {} and base "
-                    "node {} excluding ring node {}",
-                    baseNode1, baseNode2, excludeNode));
+  if (commonRings.empty()) {
+    std::string dualConnectionsString1 =
+        containerToString(networkA.nodes[baseNode1].dualConnections);
+    std::string dualConnectionsString2 =
+        containerToString(networkA.nodes[baseNode2].dualConnections);
+    throw std::runtime_error(std::format(
+        "Could not find common ring node for base node {} and base "
+        "node {} excluding ring node {}. Sets: {}\t{} Intersection: {}",
+        baseNode1, baseNode2, excludeNode, dualConnectionsString1,
+        dualConnectionsString2, containerToString(commonRings)));
   }
   return *commonRings.begin();
 }
@@ -841,10 +849,10 @@ Direction LinkedNetwork::getRingsDirection(
   const std::array<double, 2> midCoord = this->networkB.getAverageCoordsPBC(
       {ringNodeIDs[0], ringNodeIDs[1], ringNodeIDs[2], ringNodeIDs[3]});
   uint8_t timesDecreased = 0;
-  double prevAngle = getClockwiseAngle(
+  double prevAngle = getClockwiseAnglePBC(
       midCoord, networkB.nodes[ringNodeIDs.back()].coord, dimensions);
   for (uint16_t ringNodeID : ringNodeIDs) {
-    double angle = getClockwiseAngle(
+    double angle = getClockwiseAnglePBC(
         midCoord, this->networkB.nodes[ringNodeID].coord, dimensions);
     if (angle < prevAngle) {
       timesDecreased++;
@@ -882,4 +890,28 @@ std::vector<double> LinkedNetwork::getRingAreas() const {
         return calculatePolygonArea(baseNodeCoords);
       });
   return ringAreas;
+}
+
+bool LinkedNetwork::checkAngles(
+    const std::unordered_set<uint16_t> &nodeIDs,
+    const std::vector<std::array<double, 2>> &potentialCoords) const {
+  for (const uint16_t nodeID : nodeIDs) {
+    const Node &node = this->networkA.nodes[nodeID];
+    // Construct connection coordinates
+    std::vector<std::array<double, 2>> connectionCoords(
+        node.netConnections.size());
+    for (const uint16_t connectionID : node.netConnections) {
+      connectionCoords.push_back(potentialCoords[connectionID]);
+    }
+    // Check angles with periodic boundary conditions
+    if (checkAnglesPBC(node.coord, connectionCoords, this->dimensions, 0,
+                       this->maximumAngle)) {
+      continue;
+    }
+    // Check failed
+    logger->debug("Angle check failed for node {} with connections: {}", nodeID,
+                  containerToString(node.netConnections));
+    return false;
+  }
+  return true;
 }

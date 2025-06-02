@@ -113,6 +113,9 @@ struct LinkedNetwork {
   SwitchMove genSwitchMove(const uint16_t baseNode1, const uint16_t baseNode2,
                            const uint16_t ringNode1,
                            const uint16_t ringNode2) const;
+  bool
+  checkAngles(const std::unordered_set<uint16_t> &nodeIDs,
+              const std::vector<std::array<double, 2>> &potentialCoords) const;
 };
 
 #endif // NL_LINKED_NETWORK_H
