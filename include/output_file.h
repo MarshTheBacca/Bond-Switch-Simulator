@@ -1,12 +1,11 @@
 #ifndef OUTPUT_FILE_H
 #define OUTPUT_FILE_H
 
+#include "stats.h"
 #include <chrono>
 #include <ctime>
 #include <fstream>
-#include <iomanip>
 #include <map>
-#include <sstream>
 #include <string>
 #include <type_traits>
 #include <vector>
@@ -34,6 +33,9 @@ struct OutputFile {
   void writeLine(const std::string &string);
   void writeDatetime();
   void writeDatetime(const std::string &message);
+  void writeFooter(
+      const Stats &stats, const bool networkConsistent,
+      const std::chrono::time_point<std::chrono::high_resolution_clock> &start);
 
   // Template functions
   template <typename T> struct is_vector : std::false_type {};

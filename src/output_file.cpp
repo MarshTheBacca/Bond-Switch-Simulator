@@ -1,4 +1,5 @@
 #include "output_file.h"
+#include <chrono>
 
 /**
  * @brief Constructor that wipes file if it exists and creates file if it
@@ -64,3 +65,26 @@ void OutputFile::writeLine(const std::string &string) {
  * @param string The string to be written
  */
 void OutputFile::write(const std::string &string) { file << string; }
+
+void OutputFile::writeFooter(
+    const Stats &stats, const bool networkConsistent,
+    const std::chrono::time_point<std::chrono::high_resolution_clock> &start) {
+  auto end = std::chrono::high_resolution_clock::now();
+  auto duration =
+      std::chrono::duration_cast<std::chrono::milliseconds>(end - start) /
+      1000.0;
+  this->writeLine(
+      "The following line is a few statistics about the simulation");
+  this->writeLine(
+      "Number of attempted switches, Number of accepted switches, Number of "
+      "failed angle checks, Number of failed bond length checks, Number of "
+      "failed energy checks, Monte Carlo acceptance, Total run time (s), "
+      "Average time per step (us), Network Consistent");
+  this->writeValues(
+      stats.getSwitches(), stats.getAcceptedSwitches(),
+      stats.getFailedAngleChecks(), stats.getFailedBondLengthChecks(),
+      stats.getFailedEnergyChecks(),
+      (double)stats.getAcceptedSwitches() / stats.getSwitches(),
+      duration.count(), duration.count() / stats.getSwitches() * 1000.0,
+      networkConsistent ? "true" : "false");
+}
