@@ -3,16 +3,14 @@
 
 #include "input_data.h"
 #include "lammps_manager.h"
-#include "metropolis.h"
 #include "network.h"
+#include "stats.h"
 #include "switch_move.h"
 #include "types.h"
 #include <array>
 #include <cstdint>
 #include <optional>
-#include <random>
 #include <spdlog/spdlog.h>
-#include <tuple>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -32,23 +30,18 @@ struct LinkedNetwork {
   LAMMPSManager lammpsManager; // LAMMPSManager for network
   double energy;               // The current energy of the system
 
-  bool isOpenMPIEnabled;          // Whether to use MPI
-  SelectionType selectionType;    // Either 'weighted' or 'random'
-  Metropolis metropolisCondition; // monte carlo metropolis condition
-  double weightedDecay;           // decay factor for weighted monte carlo
-  double maximumBondLength;       // Maximum bond length
-  double maximumAngle;            // Maximum angle between atoms
-  bool writeMovie;                // Write movie file or not
+  SelectionType selectionType; // Either 'weighted' or 'random'
+  double weightedDecay;        // decay factor for weighted monte carlo
+  double maximumBondLength;    // Maximum bond length
+  double maximumAngle;         // Maximum angle between atoms
+  bool writeMovie;             // Write movie file or not
 
   // Map of Fixed Ring IDs to their size
   std::unordered_map<uint16_t, size_t> fixedRings;
   std::unordered_set<uint16_t> fixedNodes; // IDs of the fixed nodes
 
-  int numSwitches = 0;            // Number of switches performed
-  int numAcceptedSwitches = 0;    // Number of switches accepted
-  int failedBondLengthChecks = 0; // Number of failed bond length checks
-  int failedAngleChecks = 0;      // Number of failed angle checks
-  int failedEnergyChecks = 0;     // Number of failed energy checks
+  // Statistics
+  Stats stats;
 
   LoggerPtr logger; // Logger
   std::vector<double> weights;

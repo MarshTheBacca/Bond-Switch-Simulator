@@ -1,7 +1,6 @@
 #ifndef SWITCH_MOVE_H
 #define SWITCH_MOVE_H
 
-#include "types.h"
 #include <array>
 #include <cstdint>
 #include <exception>

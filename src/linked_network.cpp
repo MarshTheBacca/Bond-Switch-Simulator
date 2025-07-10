@@ -3,21 +3,16 @@
 #include "random_number_generator.h"
 #include "switch_move.h"
 #include "types.h"
+#include "utils.h"
 #include "vector_tools.h"
 #include <algorithm>
 #include <array>
-#include <chrono>
 #include <cstdint>
 #include <ctime>
 #include <filesystem>
 #include <format>
-#include <fstream>
-#include <iomanip>
-#include <iostream>
-#include <random>
 #include <ranges>
 #include <spdlog/spdlog.h>
-#include <sstream>
 
 /**
  * @brief Construct by loading networks from files
@@ -28,7 +23,7 @@ LinkedNetwork::LinkedNetwork(const InputData &inputData,
                              const LoggerPtr &loggerArg)
     : minRingSize(inputData.minRingSize), maxRingSize(inputData.maxRingSize),
       selectionType(inputData.randomOrWeighted),
-      metropolisCondition(Metropolis()), weightedDecay(inputData.weightedDecay),
+      weightedDecay(inputData.weightedDecay),
       maximumBondLength(inputData.maximumBondLength),
       maximumAngle(inputData.maximumAngle * M_PI / 180),
       writeMovie(inputData.writeMovie), logger(loggerArg) {
@@ -146,8 +141,8 @@ void LinkedNetwork::performBondSwitch(const double temperature) {
   }
   const SwitchMove &switchMove = switchMoveOpt.value();
 
-  numSwitches++;
-  logger->debug("Switch number: {}", numSwitches);
+  this->stats.incrementSwitches();
+  logger->debug("Switch number: {}", this->stats.getSwitches());
 
   // Save current state
   double initialEnergy = energy;
@@ -185,13 +180,13 @@ void LinkedNetwork::performBondSwitch(const double temperature) {
   // TODO - Check angles are within range
   if (!checkBondLengths(switchMove.involvedBaseNodes, potentialCoords)) {
     logger->debug("Rejected move: bond lengths are not within range");
-    failedBondLengthChecks++;
+    this->stats.incrementFailedBondLengthChecks();
     rejectMove(initialInvolvedNodesA, initialInvolvedNodesB, switchMove);
     return;
   }
   if (!this->checkAngles(switchMove.involvedBaseNodes, potentialCoords)) {
     logger->debug("Rejected move: angles are not within range");
-    failedAngleChecks++;
+    this->stats.incrementFailedAngleChecks();
     rejectMove(initialInvolvedNodesA, initialInvolvedNodesB, switchMove);
     return;
   }
@@ -199,12 +194,11 @@ void LinkedNetwork::performBondSwitch(const double temperature) {
   if (std::isnan(finalEnergy)) {
     throw std::runtime_error("Final energy is NaN");
   }
-  if (!metropolisCondition.acceptanceCriterion(finalEnergy, initialEnergy,
-                                               temperature)) {
+  if (!acceptanceCriterion(finalEnergy, initialEnergy, temperature)) {
     logger->debug("Rejected move: failed Metropolis criterion: Ei = {:.3f} Eh, "
                   "Ef = {:.3f} Eh",
                   initialEnergy, finalEnergy);
-    failedEnergyChecks++;
+    this->stats.incrementFailedEnergyChecks();
     rejectMove(initialInvolvedNodesA, initialInvolvedNodesB, switchMove);
     return;
   }
@@ -217,7 +211,7 @@ void LinkedNetwork::acceptMove(
     const double initialEnergy, const double finalEnergy) {
   logger->debug("Accepted Move: Ei = {:.3f} Eh, Ef = {:.3f} Eh", initialEnergy,
                 finalEnergy);
-  this->numAcceptedSwitches++;
+  this->stats.incrementAcceptedSwitches();
   logger->debug("Syncing LAMMPS coordinates to BSS coordinates...");
   this->pushCoords(newCoords);
   this->updateWeights();
