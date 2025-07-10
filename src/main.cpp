@@ -5,14 +5,13 @@
 #include "spdlog/sinks/basic_file_sink.h"
 #include "spdlog/sinks/stdout_color_sinks.h"
 #include "spdlog/spdlog.h"
+#include "stats.h"
 #include <atomic>
 #include <ctime>
 #include <expected>
 #include <filesystem>
-#include <iomanip>
 #include <iostream>
 #include <signal.h>
-#include <sstream>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -26,34 +25,6 @@ const auto start = std::chrono::high_resolution_clock::now();
  * @param sig The signal
  */
 inline void exitFlagger([[maybe_unused]] const int sig) { exitFlag = true; }
-
-/**
- * @brief Writes the footer of the statistics file
- * @param linkedNetwork The linked network to write statistics for
- * @param allStatsFile The file to write the statistics to
- */
-void writeStatsFooter(const LinkedNetwork &linkedNetwork,
-                      OutputFile &allStatsFile, const bool &networkConsistent) {
-  auto end = std::chrono::high_resolution_clock::now();
-  auto duration =
-      std::chrono::duration_cast<std::chrono::milliseconds>(end - start) /
-      1000.0;
-  allStatsFile.writeLine(
-      "The following line is a few statistics about the simulation");
-  allStatsFile.writeLine(
-      "Number of attempted switches, Number of accepted switches, Number of "
-      "failed angle checks, Number of failed bond length checks, Number of "
-      "failed energy checks, Monte Carlo acceptance, Total run time (s), "
-      "Average time per step (us), Network Consistent");
-  allStatsFile.writeValues(
-      linkedNetwork.numSwitches, linkedNetwork.numAcceptedSwitches,
-      linkedNetwork.failedAngleChecks, linkedNetwork.failedBondLengthChecks,
-      linkedNetwork.failedEnergyChecks,
-      (double)linkedNetwork.numAcceptedSwitches / linkedNetwork.numSwitches,
-      duration.count(), duration.count() / linkedNetwork.numSwitches * 1000.0,
-      networkConsistent ? "true" : "false");
-  allStatsFile.file.close();
-}
 
 void baseCleanup(const LoggerPtr &logger) {
   logger->flush();
@@ -71,15 +42,15 @@ void cleanup(LinkedNetwork &linkedNetwork, OutputFile &allStatsFile) {
   linkedNetwork.write();
   linkedNetwork.lammpsManager.writeData();
   std::filesystem::remove("./log.lammps");
-  writeStatsFooter(linkedNetwork, allStatsFile,
-                   linkedNetwork.checkConsistency());
+  allStatsFile.writeFooter(linkedNetwork.stats,
+                           linkedNetwork.checkConsistency(), start);
   baseCleanup(linkedNetwork.logger);
 }
 
 /**
  * @brief Initialises the logger by creating a file sink and a console sink
  */
-LoggerPtr initialiseLogger(int argc, char *argv[]) {
+LoggerPtr initialiseLogger(const int argc, char *const *const argv) {
   // Create a file sink and a console sink with different names for clarity
   auto file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(
       std::filesystem::path("./output_files") / "bond_switch_simulator.log",
@@ -132,7 +103,7 @@ void runSimulation(const std::vector<double> &expTemperatures,
     linkedNetwork.performBondSwitch(expTemperatures[i - 1]);
     if (i % writeInterval == 0) {
       linkedNetwork.networkB.refreshStatistics();
-      allStatsFile.writeValues(linkedNetwork.numSwitches,
+      allStatsFile.writeValues(linkedNetwork.stats.getSwitches(),
                                expTemperatures[i - 1], linkedNetwork.energy,
                                linkedNetwork.networkB.entropy,
                                linkedNetwork.networkB.pearsonsCoeff,
@@ -201,7 +172,25 @@ initialiseOutputFile(const std::filesystem::path &path) {
   }
 }
 
-int main(int argc, char *argv[]) {
+void summarise(const LoggerPtr &logger, const Stats &stats,
+               const bool &networkConsistent) {
+  logger->info("");
+  logger->info("Number of attempted switches: {}", stats.getSwitches());
+  logger->info("Number of accepted switches: {}", stats.getAcceptedSwitches());
+  logger->info("Number of failed switches due to angle: {}",
+               stats.getFailedAngleChecks());
+  logger->info("Number of failed switches due to bond length: {}",
+               stats.getFailedBondLengthChecks());
+  logger->info("Number of failed switches due to energy: {}",
+               stats.getFailedEnergyChecks());
+  logger->info("");
+  logger->info("Monte Carlo acceptance: {:.3f}",
+               (double)stats.getAcceptedSwitches() / stats.getSwitches());
+  logger->info("Network consistent: {}", networkConsistent ? "true" : "false");
+  logger->info("");
+}
+
+int main(const int argc, char *const *const argv) {
   // Set up signal handler to cleanly exit when we use ctrl+c
   signal(SIGINT, exitFlagger);
   LoggerPtr logger;
@@ -283,24 +272,8 @@ int main(int argc, char *argv[]) {
     linkedNetwork.write();
     linkedNetwork.lammpsManager.writeData();
     bool networkConsistent = linkedNetwork.checkConsistency();
-    logger->info("");
-    logger->info("Number of attempted switches: {}", linkedNetwork.numSwitches);
-    logger->info("Number of accepted switches: {}",
-                 linkedNetwork.numAcceptedSwitches);
-    logger->info("Number of failed switches due to angle: {}",
-                 linkedNetwork.failedAngleChecks);
-    logger->info("Number of failed switches due to bond length: {}",
-                 linkedNetwork.failedBondLengthChecks);
-    logger->info("Number of failed switches due to energy: {}",
-                 linkedNetwork.failedEnergyChecks);
-    logger->info("");
-    logger->info("Monte Carlo acceptance: {:.3f}",
-                 (double)linkedNetwork.numAcceptedSwitches /
-                     linkedNetwork.numSwitches);
-    logger->info("Network consistent: {}",
-                 networkConsistent ? "true" : "false");
-    logger->info("");
-    writeStatsFooter(linkedNetwork, allStatsFile, networkConsistent);
+    summarise(logger, linkedNetwork.stats, networkConsistent);
+    allStatsFile.writeFooter(linkedNetwork.stats, networkConsistent, start);
 
     // Log time taken
     auto end = std::chrono::high_resolution_clock::now();
@@ -309,7 +282,7 @@ int main(int argc, char *argv[]) {
         1000.0;
     logger->info("Total run time: {:.3f} s", duration.count());
     logger->info("Average time per step: {:.3f} us",
-                 duration.count() / linkedNetwork.numSwitches * 1000.0);
+                 duration.count() / linkedNetwork.stats.getSwitches() * 1000.0);
     std::filesystem::remove("./log.lammps");
     logger->flush();
     spdlog::shutdown();
