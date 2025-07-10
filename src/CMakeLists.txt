@@ -1,6 +1,11 @@
 # Create a new executable
 add_executable(bond_switch_simulator)
 
+# Must set local include directory before others, so that it takes precedence
+target_include_directories(bond_switch_simulator
+    BEFORE PUBLIC ${CMAKE_SOURCE_DIR}/include
+)
+
 # Use CMAKE_PREFIX_PATH to search for lammps
 find_library(LAMMPS_LIBRARY lammps)
 
@@ -45,10 +50,10 @@ target_sources(bond_switch_simulator PRIVATE ${SOURCES})
 
 # Add include directories
 target_include_directories(bond_switch_simulator
-    BEFORE PRIVATE ${CMAKE_SOURCE_DIR}/include
     PRIVATE ${LAMMPS_INCLUDE_DIR}
     PRIVATE ${MPI_CXX_INCLUDE_DIRS}
 )
+
 # Link the LAMMPS, spdlog, and MPI libraries
 target_link_libraries(bond_switch_simulator
     PRIVATE ${LAMMPS_LIBRARY}
